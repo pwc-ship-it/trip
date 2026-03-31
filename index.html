@@ -705,9 +705,60 @@ function saveSc(exId){
 function delSc(id){if(!confirm('이 출장 일정을 삭제할까요?'))return;S.schedules=S.schedules.filter(function(s){return s.id!==id;});saveData();cm();renderAll();}
 
 function showSiteM(){
-  var sr=S.sites.map(function(s,i){return '<div class="mrow" draggable="true" ondragstart="dStart('+i+')" ondragover="dOver(event,'+i+')" ondrop="dDrop('+i+')" ondragleave="dLeave(event)"><span class="dh">⠿</span><input type="color" value="'+s.color+'" onchange="updSC(\''+s.id+'\',this.value)" style="width:28px;height:22px;padding:0;border:none;background:none;cursor:pointer"><input type="text" value="'+s.name+'" onchange="updSN(\''+s.id+'\',this.value)" style="flex:1;min-width:80px"><span style="font-size:10px;color:#666;white-space:nowrap">'+S.projects.filter(function(p){return p.siteId===s.id;}).length+'개 PJT</span><button class="btn sm" onclick="addP(\''+s.id+'\')">PJT+</button><button class="btn sm red" onclick="delSite(\''+s.id+'\')">삭제</button></div>';}).join('');
-  var pr=S.projects.map(function(p){var si=S.sites.find(function(s){return s.id===p.siteId;});return '<div class="mrow"><span style="font-size:10px;padding:1px 6px;border-radius:7px;color:#fff;background:'+(si?si.color:'#666')+';white-space:nowrap;flex-shrink:0">'+(si?si.name:p.siteId)+'</span><input type="text" value="'+p.name+'" onchange="updPN(\''+p.id+'\',this.value)" style="flex:1;min-width:100px"><button class="btn sm red" onclick="delPjt(\''+p.id+'\')">삭제</button></div>';}).join('');
-  mw('<div class="mtit">사이트 / 프로젝트 관리</div><div style="margin-bottom:14px"><div style="font-size:11px;color:#666;margin-bottom:6px">사이트 목록 (⠿ 드래그로 순서변경)</div><div id="siteRows">'+sr+'</div><div style="display:flex;gap:6px;margin-top:8px;align-items:center"><input type="text" id="ns_n" placeholder="새 사이트 이름" style="flex:1"><input type="color" id="ns_c" value="#1558a0" style="width:34px;padding:1px"><button class="btn sm pri" onclick="addSite()">추가</button></div></div><div><div style="font-size:11px;color:#666;margin-bottom:6px">프로젝트 목록</div>'+pr+'</div><div class="mfoot"><button class="btn sm" onclick="cm()">닫기</button></div>',true);
+  mw('<div class="mtit">사이트 / 프로젝트 관리</div>'
+    +'<div style="margin-bottom:14px"><div style="font-size:11px;color:#666;margin-bottom:6px">사이트 목록 (⠿ 드래그로 순서변경)</div>'
+    +'<div id="siteRows"></div>'
+    +'<div style="display:flex;gap:6px;margin-top:8px;align-items:center"><input type="text" id="ns_n" placeholder="새 사이트 이름" style="flex:1"><input type="color" id="ns_c" value="#1558a0" style="width:34px;padding:1px"><button class="btn sm pri" onclick="addSite()">추가</button></div></div>'
+    +'<div><div style="font-size:11px;color:#666;margin-bottom:6px">프로젝트 목록</div><div id="projRows"></div></div>'
+    +'<div class="mfoot"><button class="btn sm" onclick="cm()">닫기</button></div>',true);
+  buildSiteRows();buildProjRows();
+}
+function buildSiteRows(){
+  var el=document.getElementById('siteRows');if(!el)return;el.innerHTML='';
+  S.sites.forEach(function(s,i){
+    var row=document.createElement('div');row.className='mrow';row.draggable=true;
+    row.innerHTML='<span class="dh">⠿</span>'
+      +'<input type="color" value="'+s.color+'" style="width:28px;height:22px;padding:0;border:none;background:none;cursor:pointer">'
+      +'<input type="text" value="'+s.name+'" style="flex:1;min-width:80px">'
+      +'<span style="font-size:10px;color:#666;white-space:nowrap">'+S.projects.filter(function(p){return p.siteId===s.id;}).length+'개 PJT</span>'
+      +'<button class="btn sm">PJT+</button>'
+      +'<button class="btn sm red">삭제</button>';
+    (function(sid,idx2){
+      row.querySelectorAll('input')[0].onchange=function(){updSC(sid,this.value);};
+      row.querySelectorAll('input')[1].onchange=function(){updSN(sid,this.value);};
+      row.querySelectorAll('button')[0].onclick=function(){addP(sid);};
+      row.querySelectorAll('button')[1].onclick=function(){delSite(sid);};
+      row.ondragstart=function(e){e.dataTransfer.effectAllowed="move";_dragIdx=idx2;};
+      row.ondragover=function(e){e.preventDefault();row.classList.add('dover');};
+      row.ondragleave=function(){row.classList.remove('dover');};
+      row.ondrop=function(e){
+        e.preventDefault();
+        row.classList.remove('dover');
+        if(_dragIdx===null||_dragIdx===idx2){_dragIdx=null;return;}
+        var from=_dragIdx, to=idx2;
+        _dragIdx=null;
+        var moved=S.sites.splice(from,1)[0];
+        S.sites.splice(to,0,moved);
+        saveData();buildSiteRows();buildProjRows();renderAll();
+      };
+    })(s.id,i);
+    el.appendChild(row);
+  });
+}
+function buildProjRows(){
+  var el=document.getElementById('projRows');if(!el)return;el.innerHTML='';
+  S.projects.forEach(function(p){
+    var si=S.sites.find(function(s){return s.id===p.siteId;});
+    var row=document.createElement('div');row.className='mrow';
+    row.innerHTML='<span style="font-size:10px;padding:1px 6px;border-radius:7px;color:#fff;background:'+(si?si.color:'#666')+';white-space:nowrap;flex-shrink:0">'+(si?si.name:p.siteId)+'</span>'
+      +'<input type="text" value="'+p.name+'" style="flex:1;min-width:100px">'
+      +'<button class="btn sm red">삭제</button>';
+    (function(pid){
+      row.querySelector('input').onchange=function(){updPN(pid,this.value);};
+      row.querySelector('button').onclick=function(){delPjt(pid);};
+    })(p.id);
+    el.appendChild(row);
+  });
 }
 function updSN(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.name=v.trim();saveData();renderSidebar();renderGantt();}}
 function updSC(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.color=v;saveData();renderSidebar();renderGantt();}}
@@ -743,6 +794,30 @@ function delPjt(id){
 
 loadData();
 renderAll();
+// Sheets URL 있으면 자동 불러오기 (localStorage 없을 때만 - 첫 방문 또는 초기화 후)
+(function(){
+  var url = getSheetsUrl();
+  if(!url) return;
+  if(location.protocol === 'file:') return;
+  // localStorage에 이미 데이터 있으면 자동 불러오기 스킵 (사용자 수정 보존)
+  try{
+    var raw = localStorage.getItem(LS);
+    if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&d.sites.length>0)return;}
+  }catch(e){}
+  var ind = showInd('최신 데이터를 불러오는 중...');
+  fetch(url+'?action=load')
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(data){
+      hideInd(ind);
+      if(data.error)throw new Error(data.error);
+      if(data.sites&&data.sites.length)    S.sites=data.sites;
+      if(data.projects&&data.projects.length)S.projects=data.projects;
+      if(data.schedules&&data.schedules.length)S.schedules=data.schedules;
+      if(data.events)  S.events=data.events;
+      saveData();renderAll();
+    })
+    .catch(function(err){hideInd(ind);console.warn('자동 불러오기 실패:',err.message);});
+})();
 </script>
 </body>
 </html>
