@@ -1,4 +1,6 @@
-<html lang="ko"><head>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>출장 일정 관리</title>
@@ -157,35 +159,36 @@ input:focus,select:focus{border-color:#1a6bbf}
       <button class="btn" onclick="openModal('site')">사이트 관리</button>
       <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
       <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
-      <button class="btn grn" onclick="exportCSV()">↓ CSV 저장</button>
-      <button class="btn" onclick="document.getElementById('cfu').click()">↑ CSV 불러오기</button>
-      <input type="file" id="cfu" accept=".csv" style="display:none" onchange="importCSV(this)">
-      <button class="btn" style="background:#7a4208;color:#fff;border-color:#5a3008" onclick="exportHTML()" title="현재 데이터가 포함된 HTML 파일로 저장">↓ HTML 저장</button>
-      <button class="btn red sm" onclick="resetData()" title="저장 데이터 초기화">초기화</button>
+      <button class="btn" style="background:#1a6b3a;color:#fff;border-color:#0f4a28" onclick="sheetsLoad()">🔄 Sheets 불러오기</button>
+      <button class="btn" style="background:#1a6b3a;color:#fff;border-color:#0f4a28" onclick="sheetsSave()">☁ Sheets 저장</button>
+      <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
+      <button class="btn grn" onclick="exportCSV()">↓ CSV 백업</button>
+      <button class="btn" style="background:#7a4208;color:#fff;border-color:#5a3008" onclick="exportHTML()">↓ HTML 저장</button>
+      <button class="btn red sm" onclick="resetData()">초기화</button>
     </div>
   </div>
   <div class="content">
     <div class="sidebar">
       <div class="slbl">사이트 필터</div>
-      <div class="slist" id="siteList"><div class="sit on"><div class="sdot" style="background:#666"></div><span class="sname">전체 보기</span><span class="scnt">25</span></div><div class="sit"><div class="sdot" style="background:#1558a0"></div><span class="sname">ESHD</span><span class="scnt">6</span></div><div class="sit"><div class="sdot" style="background:#2e6e18"></div><span class="sname">MILS</span><span class="scnt">0</span></div><div class="sit"><div class="sdot" style="background:#4a7a10"></div><span class="sname">UC2</span><span class="scnt">1</span></div><div class="sit"><div class="sdot" style="background:#7a4208"></div><span class="sname">ESOT</span><span class="scnt">3</span></div><div class="sit"><div class="sdot" style="background:#8a2a10"></div><span class="sname">WA</span><span class="scnt">4</span></div><div class="sit"><div class="sdot" style="background:#3C3489"></div><span class="sname">ESHG</span><span class="scnt">6</span></div><div class="sit"><div class="sdot" style="background:#0a5e40"></div><span class="sname">ESNA</span><span class="scnt">2</span></div><div class="sit"><div class="sdot" style="background:#72128c"></div><span class="sname">ESMI</span><span class="scnt">3</span></div></div>
+      <div class="slist" id="siteList"></div>
     </div>
     <div class="main">
       <div class="gscroll" id="gscroll">
-        <div class="gwrap" id="gwrap" style="width: 2124px;">
+        <div class="gwrap" id="gwrap">
           <div class="ghrow">
             <div class="ghinner">
               <div class="ghfixed">
                 <div class="ghc" style="width:68px;min-width:68px;max-width:68px">업무</div>
                 <div class="ghc">출장자</div>
               </div>
-              <div class="ghtl" id="ghTl"><div class="ghmb" style="width: 186px;"><div class="ghmn">2026년 1월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div><div class="ghmb" style="width: 168px;"><div class="ghmn">2월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div></div></div><div class="ghmb" style="width: 186px;"><div class="ghmn">3월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div><div class="ghmb" style="width: 180px;"><div class="ghmn">4월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:12px;min-width:12px">5주</div></div></div><div class="ghmb" style="width: 186px;"><div class="ghmn">5월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div><div class="ghmb" style="width: 180px;"><div class="ghmn">6월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:12px;min-width:12px">5주</div></div></div><div class="ghmb" style="width: 186px;"><div class="ghmn">7월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div><div class="ghmb" style="width: 186px;"><div class="ghmn">8월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div><div class="ghmb" style="width: 180px;"><div class="ghmn">9월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:12px;min-width:12px">5주</div></div></div><div class="ghmb" style="width: 186px;"><div class="ghmn">10월</div><div class="ghwks"><div class="ghwk" style="width:42px;min-width:42px">1주</div><div class="ghwk" style="width:42px;min-width:42px">2주</div><div class="ghwk" style="width:42px;min-width:42px">3주</div><div class="ghwk" style="width:42px;min-width:42px">4주</div><div class="ghwk" style="width:18px;min-width:18px">5주</div></div></div></div>
+              <div class="ghtl" id="ghTl"></div>
             </div>
             <div class="ghdb">
               <div class="ghdbf"></div>
-              <div class="ghdbt" id="ghDb"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tdln" style="left: 528px;"></div><div class="tdlb" style="left: 531px;">3/31</div></div>
+              <div class="ghdbt" id="ghDb"></div>
             </div>
           </div>
-          <div id="gbody"><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#1558a0">ESHD</span><span class="grpname">2세대 셋업+양산</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div></div></div><div class="evrow"><div class="evfix">★ 주요 이벤트</div><div class="evtl" style="flex: 1 1 0%; position: relative; min-height: 22px; height: 22px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.9;"></div><div class="evchip" style="left: 573px; background: rgb(181, 32, 32);">04.06 2주간 부동</div></div></div><div class="grow even"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">박영식<span class="gbadge">02.20~05.05 · 75일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-out-going" title="02.20~05.05 · 박영식 (75일)" style="left: 300px; width: 450px;"><span class="barlbl">02.20~05.05 · 박영식 (75일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">전성준<span class="gbadge">02.20~05.05 · 75일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-out-going" title="02.20~05.05 · 전성준 (75일)" style="left: 300px; width: 450px;"><span class="barlbl">02.20~05.05 · 전성준 (75일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">김성민<span class="gbadge">03.23~06.12 · 82일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-going" title="03.23~06.12 · 김성민 (82일)" style="left: 486px; width: 492px;"><span class="barlbl">03.23~06.12 · 김성민 (82일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">김승민<span class="gbadge">04.11~06.27 · 78일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-plan" title="04.11~06.27 · 김승민 (78일)" style="left: 600px; width: 468px;"><span class="barlbl">04.11~06.27 · 김승민 (78일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">미지정<span class="gbadge">04.06~06.27 · 83일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-out-plan" title="04.06~06.27 · 미지정 (83일)" style="left: 570px; width: 498px;"><span class="barlbl">04.06~06.27 · 미지정 (83일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask">대응</div><div class="gperson">강민호<span class="gbadge">06.06~08.21 · 77일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-plan" title="06.06~08.21 · 강민호 (77일)" style="left: 936px; width: 462px;"><span class="barlbl">06.06~08.21 · 강민호 (77일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#4a7a10">UC2</span><span class="grpname">포밀비전 6대</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div></div></div><div class="grow even"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">송윤선<span class="gbadge">03.15~06.10 · 88일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-going" title="03.15~06.10 · 송윤선 (88일)" style="left: 438px; width: 528px;"><span class="barlbl">03.15~06.10 · 송윤선 (88일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#7a4208">ESOT</span><span class="grpname">1.5세대 셋업</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">최철명<span class="gbadge">03.16~06.12 · 89일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-going" title="03.16~06.12 · 최철명 (89일)" style="left: 444px; width: 534px;"><span class="barlbl">03.16~06.12 · 최철명 (89일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">김세휘<span class="gbadge">03.16~06.12 · 89일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-going" title="03.16~06.12 · 김세휘 (89일)" style="left: 444px; width: 534px;"><span class="barlbl">03.16~06.12 · 김세휘 (89일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask">대응</div><div class="gperson">준테크4인<span class="gbadge">01.01~06.30 · 181일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-going" title="01.01~06.30 · 준테크4인 (181일)" style="left: 0px; width: 1086px;"><span class="barlbl">01.01~06.30 · 준테크4인 (181일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#8a2a10">WA</span><span class="grpname">1.5세대 안정화 / 탈리비전 안정화</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div></div></div><div class="grow even"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">유현우<span class="gbadge">03.02~06.12 · 103일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-going" title="03.02~06.12 · 유현우 (103일)" style="left: 360px; width: 618px;"><span class="barlbl">03.02~06.12 · 유현우 (103일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">안홍석<span class="gbadge">03.30~05.06 · 38일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-going" title="03.30~05.06 · 안홍석 (38일)" style="left: 528px; width: 228px;"><span class="barlbl">03.30~05.06 · 안홍석 (38일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">조장희<span class="gbadge">04.20~06.12 · 54일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-plan" title="04.20~06.12 · 조장희 (54일)" style="left: 654px; width: 324px;"><span class="barlbl">04.20~06.12 · 조장희 (54일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">김지환<span class="gbadge">06.05~08.21 · 78일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-plan" title="06.05~08.21 · 김지환 (78일)" style="left: 930px; width: 468px;"><span class="barlbl">06.05~08.21 · 김지환 (78일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#3C3489">ESHG</span><span class="grpname">DNC (AZS) 셋업+양산</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div></div></div><div class="evrow"><div class="evfix">★ 주요 이벤트</div><div class="evtl" style="flex: 1 1 0%; position: relative; min-height: 22px; height: 22px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.9;"></div><div class="evchip" style="left: 573px; background: rgb(181, 32, 32);">04.06 양산시작</div></div></div><div class="grow even"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">박용대<span class="gbadge">01.21~04.20 · 90일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-going" title="01.21~04.20 · 박용대 (90일)" style="left: 120px; width: 540px;"><span class="barlbl">01.21~04.20 · 박용대 (90일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">남상일<span class="gbadge">01.21~04.20 · 90일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-going" title="01.21~04.20 · 남상일 (90일)" style="left: 120px; width: 540px;"><span class="barlbl">01.21~04.20 · 남상일 (90일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">위동영<span class="gbadge">01.03~09.15 · 256일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-going" title="01.03~09.15 · 위동영 (256일)" style="left: 12px; width: 1536px;"><span class="barlbl">01.03~09.15 · 위동영 (256일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">신호중<span class="gbadge">04.17~07.03 · 78일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-plan" title="04.17~07.03 · 신호중 (78일)" style="left: 636px; width: 468px;"><span class="barlbl">04.17~07.03 · 신호중 (78일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">최형민<span class="gbadge">04.16~06.30 · 76일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-hq-plan" title="04.16~06.30 · 최형민 (76일)" style="left: 630px; width: 456px;"><span class="barlbl">04.16~06.30 · 최형민 (76일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask">대응</div><div class="gperson">(시티즌) 2명<span class="gbadge">03.11~09.15 · 189일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="evln" style="left: 570px; background: rgb(181, 32, 32); opacity: 0.25;"></div><div class="bar bar-out-going" title="03.11~09.15 · (시티즌) 2명 (189일)" style="left: 414px; width: 1134px;"><span class="barlbl">03.11~09.15 · (시티즌) 2명 (189일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#0a5e40">ESNA</span><span class="grpname">NA 스플리터 제거 작업</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div></div></div><div class="grow even"><div class="gfix"><div class="gtask">개조</div><div class="gperson">강민호<span class="gbadge">04.20~05.02 · 13일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-plan" title="04.20~05.02 · 강민호 (13일)" style="left: 654px; width: 78px;"><span class="barlbl">04.20~05.02 · 강민호 (13일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask"></div><div class="gperson">미지정<span class="gbadge">04.20~05.02 · 13일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-plan" title="04.20~05.02 · 미지정 (13일)" style="left: 654px; width: 78px;"><span class="barlbl">04.20~05.02 · 미지정 (13일)</span></div></div></div><div class="grprow"><div class="grpfix"><span class="grpbadge" style="background:#72128c">ESMI</span><span class="grpname">셋업 및 양산대응</span></div><div class="grptl" style="flex: 1 1 0%; position: relative; min-height: 26px; height: 26px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div></div></div><div class="grow even"><div class="gfix"><div class="gtask">셋업</div><div class="gperson">김경태<span class="gbadge">03.21~06.06 · 78일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-hq-going" title="03.21~06.06 · 김경태 (78일)" style="left: 474px; width: 468px;"><span class="barlbl">03.21~06.06 · 김경태 (78일)</span></div></div></div><div class="grow odd"><div class="gfix"><div class="gtask">대응</div><div class="gperson">조용훈<span class="gbadge">02.02~05.01 · 89일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-going" title="02.02~05.01 · 조용훈 (89일)" style="left: 192px; width: 534px;"><span class="barlbl">02.02~05.01 · 조용훈 (89일)</span></div></div></div><div class="grow even"><div class="gfix"><div class="gtask"></div><div class="gperson">김장희<span class="gbadge">02.02~05.01 · 89일</span></div></div><div class="gtl" style="flex: 1 1 0%; position: relative; min-height: 28px; height: 28px;"><div class="gl" style="left: 42px;"></div><div class="gl" style="left: 84px;"></div><div class="gl" style="left: 126px;"></div><div class="gl" style="left: 168px;"></div><div class="gl mo" style="left: 186px;"></div><div class="gl" style="left: 228px;"></div><div class="gl" style="left: 270px;"></div><div class="gl" style="left: 312px;"></div><div class="gl mo" style="left: 354px;"></div><div class="gl" style="left: 396px;"></div><div class="gl" style="left: 438px;"></div><div class="gl" style="left: 480px;"></div><div class="gl" style="left: 522px;"></div><div class="gl mo" style="left: 540px;"></div><div class="gl" style="left: 582px;"></div><div class="gl" style="left: 624px;"></div><div class="gl" style="left: 666px;"></div><div class="gl" style="left: 708px;"></div><div class="gl mo" style="left: 720px;"></div><div class="gl" style="left: 762px;"></div><div class="gl" style="left: 804px;"></div><div class="gl" style="left: 846px;"></div><div class="gl" style="left: 888px;"></div><div class="gl mo" style="left: 906px;"></div><div class="gl" style="left: 948px;"></div><div class="gl" style="left: 990px;"></div><div class="gl" style="left: 1032px;"></div><div class="gl" style="left: 1074px;"></div><div class="gl mo" style="left: 1086px;"></div><div class="gl" style="left: 1128px;"></div><div class="gl" style="left: 1170px;"></div><div class="gl" style="left: 1212px;"></div><div class="gl" style="left: 1254px;"></div><div class="gl mo" style="left: 1272px;"></div><div class="gl" style="left: 1314px;"></div><div class="gl" style="left: 1356px;"></div><div class="gl" style="left: 1398px;"></div><div class="gl" style="left: 1440px;"></div><div class="gl mo" style="left: 1458px;"></div><div class="gl" style="left: 1500px;"></div><div class="gl" style="left: 1542px;"></div><div class="gl" style="left: 1584px;"></div><div class="gl" style="left: 1626px;"></div><div class="gl mo" style="left: 1638px;"></div><div class="gl" style="left: 1680px;"></div><div class="gl" style="left: 1722px;"></div><div class="gl" style="left: 1764px;"></div><div class="gl" style="left: 1806px;"></div><div class="tlnb" style="left: 528px;"></div><div class="bar bar-out-going" title="02.02~05.01 · 김장희 (89일)" style="left: 192px; width: 534px;"><span class="barlbl">02.02~05.01 · 김장희 (89일)</span></div></div></div></div>
+          <div id="gbody"></div>
         </div>
       </div>
     </div>
@@ -196,365 +199,230 @@ input:focus,select:focus{border-color:#1a6bbf}
 <script>
 /* ── 기본 데이터 ── */
 var DEF = {
-  "sites": [
-    {
-      "id": "ESHD",
-      "name": "ESHD",
-      "color": "#1558a0"
-    },
-    {
-      "id": "MILS",
-      "name": "MILS",
-      "color": "#2e6e18"
-    },
-    {
-      "id": "UC2",
-      "name": "UC2",
-      "color": "#4a7a10"
-    },
-    {
-      "id": "ESOT",
-      "name": "ESOT",
-      "color": "#7a4208"
-    },
-    {
-      "id": "WA",
-      "name": "WA",
-      "color": "#8a2a10"
-    },
-    {
-      "id": "ESHG",
-      "name": "ESHG",
-      "color": "#3C3489"
-    },
-    {
-      "id": "ESNA",
-      "name": "ESNA",
-      "color": "#0a5e40"
-    },
-    {
-      "id": "ESMI",
-      "name": "ESMI",
-      "color": "#72128c"
-    }
+  sites:[
+    {id:'ESHD',name:'ESHD',color:'#1558a0'},
+    {id:'MILS',name:'MILS(UC3)',color:'#2e6e18'},
+    {id:'UC2',name:'UC2',color:'#4a7a10'},
+    {id:'ESST',name:'ESST 캐나다',color:'#7a4208'},
+    {id:'WA',name:'WA',color:'#8a2a10'},
+    {id:'ESHG',name:'ESHG',color:'#3C3489'},
+    {id:'ESNB',name:'ESNB/NA',color:'#0a5e40'}
   ],
-  "projects": [
-    {
-      "id": "p1",
-      "siteId": "ESHD",
-      "name": "2세대 셋업+양산"
-    },
-    {
-      "id": "p2",
-      "siteId": "MILS",
-      "name": "포밀비전 6대"
-    },
-    {
-      "id": "p3",
-      "siteId": "UC2",
-      "name": "포밀비전 6대"
-    },
-    {
-      "id": "p4",
-      "siteId": "ESOT",
-      "name": "1.5세대 셋업"
-    },
-    {
-      "id": "p5",
-      "siteId": "WA",
-      "name": "1.5세대 안정화 / 탈리비전 안정화"
-    },
-    {
-      "id": "p6",
-      "siteId": "ESHG",
-      "name": "DNC (AZS) 셋업+양산"
-    },
-    {
-      "id": "p7",
-      "siteId": "ESNA",
-      "name": "NA 스플리터 제거 작업"
-    },
-    {
-      "id": "ESMI",
-      "siteId": "ESMI",
-      "name": "셋업 및 양산대응"
-    }
+  projects:[
+    {id:'p1',siteId:'ESHD',name:'2세대 셋업+양산'},
+    {id:'p2',siteId:'MILS',name:'포밀비전 6대'},
+    {id:'p3',siteId:'UC2',name:'포밀비전 6대'},
+    {id:'p4',siteId:'ESST',name:'1.5세대 셋업'},
+    {id:'p5',siteId:'WA',name:'1.5세대 안정화 / 탈리비전 안정화'},
+    {id:'p6',siteId:'ESHG',name:'DNC (AZS) 셋업+양산'},
+    {id:'p7',siteId:'ESNB',name:'NA 스플리터 작업'}
   ],
-  "schedules": [
-    {
-      "id": "si1774938096290_0",
-      "projectId": "p1",
-      "task": "셋업",
-      "name": "박영식",
-      "type": "outsource",
-      "start": "2026-02-20",
-      "end": "2026-05-05",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_1",
-      "projectId": "p1",
-      "task": "셋업",
-      "name": "전성준",
-      "type": "outsource",
-      "start": "2026-02-20",
-      "end": "2026-05-05",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_2",
-      "projectId": "p1",
-      "task": "셋업",
-      "name": "김성민",
-      "type": "hq",
-      "start": "2026-03-23",
-      "end": "2026-06-12",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_3",
-      "projectId": "p1",
-      "task": "셋업",
-      "name": "김승민",
-      "type": "hq",
-      "start": "2026-04-11",
-      "end": "2026-06-27",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_4",
-      "projectId": "p1",
-      "task": "셋업",
-      "name": "미지정",
-      "type": "outsource",
-      "start": "2026-04-06",
-      "end": "2026-06-27",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_5",
-      "projectId": "p1",
-      "task": "대응",
-      "name": "강민호",
-      "type": "hq",
-      "start": "2026-06-06",
-      "end": "2026-08-21",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_6",
-      "projectId": "p3",
-      "task": "셋업",
-      "name": "송윤선",
-      "type": "outsource",
-      "start": "2026-03-15",
-      "end": "2026-06-10",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_7",
-      "projectId": "p4",
-      "task": "셋업",
-      "name": "최철명",
-      "type": "hq",
-      "start": "2026-03-16",
-      "end": "2026-06-12",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_8",
-      "projectId": "p4",
-      "task": "셋업",
-      "name": "김세휘",
-      "type": "hq",
-      "start": "2026-03-16",
-      "end": "2026-06-12",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_9",
-      "projectId": "p4",
-      "task": "대응",
-      "name": "준테크4인",
-      "type": "outsource",
-      "start": "2026-01-01",
-      "end": "2026-06-30",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_10",
-      "projectId": "p5",
-      "task": "셋업",
-      "name": "유현우",
-      "type": "hq",
-      "start": "2026-03-02",
-      "end": "2026-06-12",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_11",
-      "projectId": "p5",
-      "task": "셋업",
-      "name": "안홍석",
-      "type": "outsource",
-      "start": "2026-03-30",
-      "end": "2026-05-06",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_12",
-      "projectId": "p5",
-      "task": "셋업",
-      "name": "조장희",
-      "type": "hq",
-      "start": "2026-04-20",
-      "end": "2026-06-12",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_13",
-      "projectId": "p5",
-      "task": "셋업",
-      "name": "김지환",
-      "type": "hq",
-      "start": "2026-06-05",
-      "end": "2026-08-21",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_14",
-      "projectId": "p6",
-      "task": "셋업",
-      "name": "박용대",
-      "type": "hq",
-      "start": "2026-01-21",
-      "end": "2026-04-20",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_15",
-      "projectId": "p6",
-      "task": "셋업",
-      "name": "남상일",
-      "type": "hq",
-      "start": "2026-01-21",
-      "end": "2026-04-20",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_16",
-      "projectId": "p6",
-      "task": "셋업",
-      "name": "위동영",
-      "type": "hq",
-      "start": "2026-01-03",
-      "end": "2026-09-15",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_17",
-      "projectId": "p6",
-      "task": "셋업",
-      "name": "신호중",
-      "type": "hq",
-      "start": "2026-04-17",
-      "end": "2026-07-03",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_18",
-      "projectId": "p6",
-      "task": "셋업",
-      "name": "최형민",
-      "type": "hq",
-      "start": "2026-04-16",
-      "end": "2026-06-30",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_19",
-      "projectId": "p6",
-      "task": "대응",
-      "name": "(시티즌) 2명",
-      "type": "outsource",
-      "start": "2026-03-11",
-      "end": "2026-09-15",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_20",
-      "projectId": "p7",
-      "task": "개조",
-      "name": "강민호",
-      "type": "hq",
-      "start": "2026-04-20",
-      "end": "2026-05-02",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_21",
-      "projectId": "p7",
-      "task": "개조",
-      "name": "미지정",
-      "type": "outsource",
-      "start": "2026-04-20",
-      "end": "2026-05-02",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_22",
-      "projectId": "ESMI",
-      "task": "셋업",
-      "name": "김경태",
-      "type": "hq",
-      "start": "2026-03-21",
-      "end": "2026-06-06",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_23",
-      "projectId": "ESMI",
-      "task": "대응",
-      "name": "조용훈",
-      "type": "outsource",
-      "start": "2026-02-02",
-      "end": "2026-05-01",
-      "note": ""
-    },
-    {
-      "id": "si1774938096290_24",
-      "projectId": "ESMI",
-      "task": "대응",
-      "name": "김장희",
-      "type": "outsource",
-      "start": "2026-02-02",
-      "end": "2026-05-01",
-      "note": ""
-    }
+  schedules:[
+    {id:'s1',projectId:'p1',task:'셋업',name:'존 B1 (한빛)',type:'hq',start:'2026-02-20',end:'2026-05-05',note:'9,10호기 Setup'},
+    {id:'s2',projectId:'p1',task:'셋업',name:'김성민 B1',type:'hq',start:'2026-03-23',end:'2026-04-24',note:''},
+    {id:'s3',projectId:'p1',task:'셋업',name:'송일선 B1',type:'hq',start:'2026-04-11',end:'2026-06-12',note:''},
+    {id:'s4',projectId:'p1',task:'대응',name:'강민호 B1',type:'hq',start:'2026-06-06',end:'2026-08-21',note:''},
+    {id:'s5',projectId:'p3',task:'셋업',name:'송은선 B1 (한빛)',type:'hq',start:'2026-03-15',end:'2026-06-10',note:''},
+    {id:'s6',projectId:'p4',task:'셋업',name:'최철영 A',type:'hq',start:'2026-03-16',end:'2026-06-12',note:''},
+    {id:'s7',projectId:'p4',task:'대응',name:'김세휘 A',type:'hq',start:'2026-03-16',end:'2026-06-12',note:''},
+    {id:'s8',projectId:'p4',task:'셋업',name:'김건준, 최승민 A',type:'hq',start:'2026-05-31',end:'2026-08-22',note:''},
+    {id:'s9',projectId:'p5',task:'셋업',name:'유현우',type:'hq',start:'2026-03-02',end:'2026-06-12',note:''},
+    {id:'s10',projectId:'p5',task:'셋업',name:'조장희 (한빛)',type:'hq',start:'2026-05-01',end:'2026-07-24',note:'현장대응'},
+    {id:'s11',projectId:'p5',task:'셋업',name:'김지환',type:'hq',start:'2026-06-05',end:'2026-08-21',note:''},
+    {id:'s12',projectId:'p6',task:'셋업',name:'신호중 B1',type:'hq',start:'2026-04-17',end:'2026-07-03',note:''},
+    {id:'s13',projectId:'p6',task:'셋업',name:'최형민 B1',type:'hq',start:'2026-04-16',end:'2026-06-30',note:''},
+    {id:'s14',projectId:'p6',task:'셋업',name:'(시티즌) 2명',type:'outsource',start:'2026-03-11',end:'2026-09-15',note:'6개월 대응'},
+    {id:'s15',projectId:'p7',task:'개조',name:'김승민',type:'hq',start:'2026-04-06',end:'2026-05-02',note:'출장일정 미정'}
   ],
-  "events": [
-    {
-      "id": "ei1774938096290_0",
-      "projectId": "p6",
-      "date": "2026-04-06",
-      "title": "양산시작",
-      "colorId": "red"
-    },
-    {
-      "id": "e1774939178198",
-      "projectId": "p1",
-      "date": "2026-04-06",
-      "title": "2주간 부동",
-      "colorId": "red"
-    }
-  ]
+  events:[{id:'e1',projectId:'p6',date:'2026-04-06',title:'양산시작',colorId:'purple'}]
 };
 var EVC=[
   {id:'purple',bg:'#534AB7'},{id:'red',bg:'#b52020'},{id:'green',bg:'#1a8c66'},
   {id:'amber',bg:'#b8720a'},{id:'coral',bg:'#c04a22'},{id:'blue',bg:'#1558a0'}
 ];
 
-/* ── localStorage (안전하게) ── */
+/* ══════════════════════════════════════════
+   Google Sheets 연동
+   - SHEETS_URL: Apps Script 웹앱 URL (설정 후 입력)
+══════════════════════════════════════════ */
+var SHEETS_LS_KEY = 'trip_sheets_url';
+
+function getSheetsUrl(){
+  try{ return localStorage.getItem(SHEETS_LS_KEY)||''; }catch(e){return '';}
+}
+function setSheetsUrl(url){
+  try{ localStorage.setItem(SHEETS_LS_KEY, url); }catch(e){}
+}
+
+/* Sheets 설정 모달 */
+function openSheetsSettings(){
+  var cur = getSheetsUrl();
+  mw('<div class="mtit">⚙ Google Sheets 연결 설정</div>'
+  +'<div style="font-size:12px;color:#b0b0b8;margin-bottom:14px;line-height:1.7">'
+  +'Google Apps Script 웹앱 URL을 입력하세요.<br>'
+  +'설정 방법은 아래 안내를 따라해 주세요.</div>'
+  +'<div class="fg"><label class="fl">Apps Script 웹앱 URL</label>'
+  +'<input type="text" id="sheets_url" value="'+cur+'" placeholder="https://script.google.com/macros/s/..."></div>'
+  +'<div style="padding:10px;background:#1e1e26;border-radius:6px;font-size:11px;color:#888;line-height:1.8;margin-bottom:12px">'
+  +'<b style="color:#b0b0b8">설정 방법 (한 번만 하면 됩니다)</b><br>'
+  +'1. <a href="https://sheets.new" target="_blank" style="color:#4a9eff">sheets.new</a> → 새 구글 시트 생성<br>'
+  +'2. 시트 이름을 <b style="color:#e8e8ec">출장일정</b>으로 변경<br>'
+  +'3. 상단 메뉴 → 확장 프로그램 → Apps Script 클릭<br>'
+  +'4. 아래 코드를 붙여넣고 저장(💾)<br>'
+  +'5. 배포 → 새 배포 → 웹앱 → 액세스: 모든 사용자 → 배포<br>'
+  +'6. 생성된 URL을 위 입력창에 붙여넣기</div>'
+  +'<div style="background:#0a0a14;border:1px solid #3a3a44;border-radius:6px;padding:10px;font-size:11px;color:#4a9eff;font-family:monospace;white-space:pre-wrap;margin-bottom:12px;cursor:pointer" onclick="copyScript()" title="클릭하면 복사">'+getAppsScriptCode()+'</div>'
+  +'<div style="font-size:11px;color:#666;margin-bottom:4px">👆 코드 클릭하면 복사됩니다</div>'
+  +'<div class="mfoot">'
+  +'<button class="btn sm" onclick="cm()">취소</button>'
+  +'<button class="btn sm pri" onclick="saveSheetsUrl()">저장</button>'
+  +'</div>');
+}
+
+function copyScript(){
+  var code = getAppsScriptCode().replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(code).then(function(){alert('코드가 복사됐어요! Apps Script에 붙여넣으세요.')});
+  } else {
+    var ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    alert('코드가 복사됐어요! Apps Script에 붙여넣으세요.');
+  }
+}
+
+function saveSheetsUrl(){
+  var url = document.getElementById('sheets_url').value.trim();
+  if(!url){alert('URL을 입력해주세요.');return;}
+  if(url.indexOf('script.google.com')<0){alert('Google Apps Script URL이 아닌 것 같아요.\nhttps://script.google.com/macros/s/... 형태여야 해요.');return;}
+  setSheetsUrl(url);
+  cm();
+  alert('저장됐어요! 이제 Sheets 불러오기/저장 버튼을 사용할 수 있어요.');
+}
+
+/* Sheets에서 데이터 불러오기 */
+function sheetsLoad(){
+  var url = getSheetsUrl();
+  if(!url){alert('먼저 ⚙ Sheets 설정에서 URL을 입력해주세요.');openSheetsSettings();return;}
+
+  var indicator = document.createElement('div');
+  indicator.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e26;color:#e8e8ec;padding:20px 32px;border-radius:10px;border:1px solid #555;z-index:999;font-size:13px';
+  indicator.textContent='Google Sheets에서 불러오는 중...';
+  document.body.appendChild(indicator);
+
+  fetch(url+'?action=load')
+    .then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    })
+    .then(function(data){
+      document.body.removeChild(indicator);
+      if(data.error)throw new Error(data.error);
+      if(data.sites&&data.sites.length)   S.sites    = data.sites;
+      if(data.projects&&data.projects.length) S.projects = data.projects;
+      if(data.schedules&&data.schedules.length)S.schedules= data.schedules;
+      if(data.events)  S.events   = data.events;
+      saveData(); renderAll();
+      alert('불러오기 완료!\n사이트 '+S.sites.length+'개 / 출장일정 '+S.schedules.length+'개');
+    })
+    .catch(function(err){
+      document.body.removeChild(indicator);
+      alert('불러오기 실패: '+err.message+'\n\nApps Script URL과 배포 설정을 확인해주세요.');
+    });
+}
+
+/* Sheets에 데이터 저장 */
+function sheetsSave(){
+  var url = getSheetsUrl();
+  if(!url){alert('먼저 ⚙ Sheets 설정에서 URL을 입력해주세요.');openSheetsSettings();return;}
+
+  if(!confirm('현재 데이터를 Google Sheets에 저장할까요?\n기존 시트 내용이 덮어쓰여집니다.'))return;
+
+  var indicator = document.createElement('div');
+  indicator.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e26;color:#e8e8ec;padding:20px 32px;border-radius:10px;border:1px solid #555;z-index:999;font-size:13px';
+  indicator.textContent='Google Sheets에 저장 중...';
+  document.body.appendChild(indicator);
+
+  var payload = {
+    action: 'save',
+    sites:     S.sites,
+    projects:  S.projects,
+    schedules: S.schedules,
+    events:    S.events
+  };
+
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain'},
+    body: JSON.stringify(payload)
+  })
+    .then(function(r){return r.json()})
+    .then(function(data){
+      document.body.removeChild(indicator);
+      if(data.error)throw new Error(data.error);
+      alert('Google Sheets에 저장 완료!\n시트를 열어서 확인해보세요.');
+    })
+    .catch(function(err){
+      document.body.removeChild(indicator);
+      alert('저장 실패: '+err.message+'\n\nApps Script URL과 배포 설정을 확인해주세요.');
+    });
+}
+
+/* Apps Script 코드 (HTML에서 복사해서 붙여넣기용) */
+function getAppsScriptCode(){
+  return [
+    "const SHEET_NAME = '출장일정';",
+    "",
+    "function doGet(e) {",
+    "  var action = e.parameter.action;",
+    "  if (action === 'load') {",
+    "    return ContentService",
+    "      .createTextOutput(JSON.stringify(loadData()))",
+    "      .setMimeType(ContentService.MimeType.JSON);",
+    "  }",
+    "  return ContentService.createTextOutput('ok');",
+    "}",
+    "",
+    "function doPost(e) {",
+    "  var payload = JSON.parse(e.postData.contents);",
+    "  if (payload.action === 'save') saveData(payload);",
+    "  return ContentService",
+    "    .createTextOutput(JSON.stringify({ok:true}))",
+    "    .setMimeType(ContentService.MimeType.JSON);",
+    "}",
+    "",
+    "function loadData() {",
+    "  var ss = SpreadsheetApp.getActiveSpreadsheet();",
+    "  var result = {};",
+    "  ['sites','projects','schedules','events'].forEach(function(name) {",
+    "    var sh = ss.getSheetByName(name);",
+    "    if (!sh) { result[name] = []; return; }",
+    "    var rows = sh.getDataRange().getValues();",
+    "    var headers = rows[0];",
+    "    result[name] = rows.slice(1).filter(function(r){return r[0];}).map(function(r){",
+    "      var obj = {};",
+    "      headers.forEach(function(h,i){ obj[h] = String(r[i]||''); });",
+    "      return obj;",
+    "    });",
+    "  });",
+    "  return result;",
+    "}",
+    "",
+    "function saveData(data) {",
+    "  var ss = SpreadsheetApp.getActiveSpreadsheet();",
+    "  ['sites','projects','schedules','events'].forEach(function(name) {",
+    "    var arr = data[name] || [];",
+    "    if (!arr.length) return;",
+    "    var sh = ss.getSheetByName(name);",
+    "    if (!sh) sh = ss.insertSheet(name);",
+    "    sh.clearContents();",
+    "    var headers = Object.keys(arr[0]);",
+    "    var rows = [headers].concat(arr.map(function(obj){",
+    "      return headers.map(function(h){ return obj[h]||''; });",
+    "    }));",
+    "    sh.getRange(1,1,rows.length,headers.length).setValues(rows);",
+    "  });",
+    "}"
+  ].join('\n');
+}
 var LS='trip_v5';
 var S={filterSite:'all',sites:[],projects:[],schedules:[],events:[]};
 
@@ -1087,6 +955,5 @@ function delPjt(id){
 loadData();
 renderAll();
 </script>
-
-
-</body></html>
+</body>
+</html>
