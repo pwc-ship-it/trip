@@ -9,7 +9,9 @@
 html,body{height:100%;overflow:hidden;background:#18181e}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#e8e8ec}
 .app{position:fixed;inset:0;display:flex;flex-direction:column;background:#18181e;color:#e8e8ec}
-.topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1.5px solid #555;background:#20202e;flex-wrap:wrap;gap:6px}
+.topbar{flex-shrink:0;display:flex;flex-direction:column;padding:8px 14px;border-bottom:1.5px solid #555;background:#20202e;gap:6px}
+.topbar-row1{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.topbar-row2{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-top:4px;border-top:1px solid #333}
 .ttl{font-size:14px;font-weight:600;color:#e8e8ec;white-space:nowrap}
 .tright{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .btn{padding:4px 11px;font-size:11px;border:1px solid #555;border-radius:5px;cursor:pointer;background:transparent;color:#e8e8ec;transition:background .15s}
@@ -162,9 +164,6 @@ input:focus,select:focus{border-color:#1a6bbf}
       <button class="btn" style="background:#1a6b3a;color:#fff;border-color:#0f4a28" onclick="sheetsLoad()">🔄 Sheets 불러오기</button>
       <button class="btn" style="background:#1a6b3a;color:#fff;border-color:#0f4a28" onclick="sheetsSave()">☁ Sheets 저장</button>
       <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
-      <button class="btn grn" onclick="exportCSV()">↓ CSV 백업</button>
-      <button class="btn" style="background:#7a4208;color:#fff;border-color:#5a3008" onclick="exportHTML()">↓ HTML 저장</button>
-      <button class="btn red sm" onclick="resetData()">초기화</button>
     </div>
   </div>
   <div class="content">
