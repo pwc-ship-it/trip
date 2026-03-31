@@ -586,7 +586,11 @@ function initTL(){
   _totPx=Math.round(_months.reduce(function(s,m){return s+m.days;},0)/7*WPX);
 }
 function d2px(ds){return Math.round(Math.max(0,Math.round((pd(ds)-_sd)/86400000))/7*WPX);}
-function tpx(){return d2px(TODAY.toISOString().slice(0,10));}
+function tpx(){
+  // toISOString은 UTC 기준이라 로컬 날짜와 다를 수 있음 - 로컬 날짜로 직접 계산
+  var y=TODAY.getFullYear(),m=String(TODAY.getMonth()+1).padStart(2,'0'),d=String(TODAY.getDate()).padStart(2,'0');
+  return d2px(y+'-'+m+'-'+d);
+}
 function mPx(mon){return Math.round(mon.days/7*WPX);}
 function wPx(mon,wi){var s=wi*7+1,e=Math.min(s+6,mon.days);return Math.round((e-s+1)/7*WPX);}
 
@@ -618,7 +622,16 @@ function addBar(el,sched){
 }
 function renderGantt(){
   var body=document.getElementById('gbody');body.innerHTML='';
-  var projs=S.projects.filter(function(p){if(S.filterSite!=='all'&&p.siteId!==S.filterSite)return false;return S.schedules.some(function(s){return s.projectId===p.id;})||S.events.some(function(e){return e.projectId===p.id;});});
+  // S.sites 순서 기준으로 프로젝트 정렬
+  var siteOrder={};S.sites.forEach(function(s,i){siteOrder[s.id]=i;});
+  var projs=S.projects.filter(function(p){
+    if(S.filterSite!=='all'&&p.siteId!==S.filterSite)return false;
+    return S.schedules.some(function(s){return s.projectId===p.id;})||S.events.some(function(e){return e.projectId===p.id;});
+  }).sort(function(a,b){
+    var oa=siteOrder[a.siteId]!==undefined?siteOrder[a.siteId]:999;
+    var ob=siteOrder[b.siteId]!==undefined?siteOrder[b.siteId]:999;
+    return oa-ob;
+  });
   if(!projs.length){body.innerHTML='<div class="empty">등록된 출장 일정이 없습니다.</div>';return;}
   var ri=0;
   projs.forEach(function(proj){
