@@ -125,6 +125,12 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .dh{cursor:grab;color:#555;font-size:13px;padding:0 2px;user-select:none;flex-shrink:0}
 .dover{border-top:2px solid #1a6bbf!important}
 .grp-chip{font-size:9px;padding:1px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+/* 날짜 선택기 */
+.date-wrap{position:relative;width:100%;display:block}
+.date-wrap input[type=date]{position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:pointer;z-index:2}
+.date-disp{width:100%;padding:6px 9px;border:1px solid #3a3a44;border-radius:5px;font-size:12px;background:#1e1e26;color:#e8e8ec;cursor:pointer;display:flex;align-items:center;gap:6px;position:relative;z-index:1}
+.date-disp:hover{border-color:#1a6bbf}
+.date-disp .cal-icon{color:#666;font-size:11px}
 </style>
 </head>
 <body>
@@ -877,8 +883,7 @@ function showSM(ex){
   html+='<div class="fg"><label class="fl">업무 유형</label><input type="text" id="f_task" value="'+(ie?ex.task:'')+'" placeholder="예: 셋업, 대응, 개조"></div>';
   html+='<div class="fg"><label class="fl">출장자 이름</label><input type="text" id="f_name" value="'+(ie?ex.name:'')+'" placeholder="이름 입력"></div>';
   html+='<div class="fg"><label class="fl">인원 구분</label><select id="f_type">'+typeOpts+'</select></div>';
-  html+='<div class="fr"><div class="fg"><label class="fl">출발일</label><input type="date" id="f_start" value="'+(ie?ex.start:'2026-03-01')+'"></div>';
-  html+='<div class="fg"><label class="fl">복귀일</label><input type="date" id="f_end" value="'+(ie?ex.end:'2026-03-30')+'"></div></div>';
+  html+='<div class="fr"><div class="fg"><label class="fl">출발일 (YYYY-MM-DD)</label><input type="text" id="f_start" value="'+(ie?ex.start:'2026-03-01')+'" placeholder="2026-04-01" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div><div class="fg"><label class="fl">복귀일 (YYYY-MM-DD)</label><input type="text" id="f_end" value="'+(ie?ex.end:'2026-03-30')+'" placeholder="2026-06-30" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div></div>';
   html+='<div class="dbox"><span id="f_datebox" style="color:#ccc">'+dateInfo+'</span>'+(dateInfo?' &nbsp; ':'')+'체류: <span id="f_days" style="font-weight:500">'+days+'</span></div>';
   html+='<div class="fg"><label class="fl">메모 / 비고</label><input type="text" id="f_note" value="'+(ie?ex.note:'')+'" placeholder="주의사항 등"></div>';
   html+='<label class="chkrow"><input type="checkbox" id="f_hidden"'+(isHidden?' checked':'')+'>간트차트에서 숨기기</label>';
@@ -909,7 +914,33 @@ function showSM(ex){
   }
 }
 function upP(){var sid=document.getElementById('f_site').value;var ps=S.projects.filter(function(p){return p.siteId===sid;});document.getElementById('f_proj').innerHTML=ps.length?ps.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join(''):'<option value="">해당 사이트에 프로젝트 없음</option>';}
-function calcD(){var s=document.getElementById('f_start').value,e=document.getElementById('f_end').value;if(s&&e&&s<=e){document.getElementById('f_days').textContent=dd(s,e)+' 일';var db=document.getElementById('f_datebox');if(db)db.textContent=fmtFull(s)+' → '+fmtFull(e);}}
+function fmtDateInput(el){
+  // 숫자만 남기고 자동으로 - 삽입: 20260401 → 2026-04-01
+  var v=el.value.replace(/[^0-9]/g,'');
+  if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4);
+  if(v.length>7) v=v.slice(0,7)+'-'+v.slice(7);
+  el.value=v.slice(0,10);
+}
+function calcD(){
+  var s=document.getElementById('f_start').value;
+  var e=document.getElementById('f_end').value;
+  var re=/^\d{4}-\d{2}-\d{2}$/;
+  var fs=document.getElementById('f_start');
+  var fe=document.getElementById('f_end');
+  if(fs) fs.style.borderColor=(!s||re.test(s))?'#3a3a44':'#b52020';
+  if(fe) fe.style.borderColor=(!e||re.test(e))?'#3a3a44':'#b52020';
+  if(s&&e&&re.test(s)&&re.test(e)){
+    if(s<=e){
+      document.getElementById('f_days').textContent=dd(s,e)+' 일';
+      var db=document.getElementById('f_datebox');
+      if(db)db.textContent=fmtFull(s)+' → '+fmtFull(e);
+      if(fe) fe.style.borderColor='#3a3a44';
+    } else {
+      if(fe) fe.style.borderColor='#b52020';
+      document.getElementById('f_days').textContent='날짜 오류';
+    }
+  }
+}
 function saveSc(exId){
   var projId=document.getElementById('f_proj').value;
   var task=document.getElementById('f_task').value.trim();
@@ -919,7 +950,9 @@ function saveSc(exId){
   var end=document.getElementById('f_end').value;
   var note=document.getElementById('f_note').value.trim();
   var hidden=document.getElementById('f_hidden').checked;
+  var dateRe=/^\d{4}-\d{2}-\d{2}$/;
   if(!projId||!task||!name||!start||!end){alert('필수 항목을 모두 입력하세요.');return;}
+  if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}
   if(start>end){alert('복귀일이 출발일보다 빠릅니다.');return;}
   if(exId){
     var i=S.schedules.findIndex(function(s){return s.id===exId;});
