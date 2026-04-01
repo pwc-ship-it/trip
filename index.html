@@ -801,7 +801,7 @@ function renderGantt(){
     var evts=S.events.filter(function(e){return e.projectId===proj.id;});
     // 그룹 헤더
     var grp=document.createElement('div');grp.className='grprow';
-    var gf=document.createElement('div');gf.className='grpfix';gf.innerHTML='<span class="grpbadge" style="background:'+sc+'">'+proj.siteId+'</span><span class="grpname">'+proj.name+'</span>';
+    var gf=document.createElement('div');gf.className='grpfix';gf.innerHTML='<span class="grpbadge" style="background:'+sc+'">'+(site?site.name:proj.siteId)+'</span><span class="grpname">'+proj.name+'</span>';
     grp.appendChild(gf);grp.appendChild(makeTL(26,'grptl',evts,false));body.appendChild(grp);
     // 이벤트 행
     if(evts.length){var er=document.createElement('div');er.className='evrow';var ef=document.createElement('div');ef.className='evfix';ef.textContent='★ 주요 이벤트';er.appendChild(ef);er.appendChild(makeTL(22,'evtl',evts,true));body.appendChild(er);}
