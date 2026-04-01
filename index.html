@@ -607,7 +607,15 @@ function sheetsLoad(){
   fetch(url+'?action=load').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){
     hideInd(ind);if(data.error)throw new Error(data.error);
     if(data.groups&&data.groups.length)S.groups=data.groups;
-    if(data.sites&&data.sites.length)S.sites=data.sites;
+    if(data.sites&&data.sites.length){
+      // Sheets에서 온 사이트에 groupId 없으면 기존 groupId 보존
+      var oldSites=S.sites;
+      S.sites=data.sites.map(function(ns){
+        var old=oldSites.find(function(os){return os.id===ns.id;});
+        if(!ns.groupId&&old&&old.groupId) ns.groupId=old.groupId;
+        return ns;
+      });
+    }
     if(data.projects&&data.projects.length)S.projects=data.projects;
     if(data.schedules&&data.schedules.length)S.schedules=data.schedules;
     if(data.events)S.events=data.events;
@@ -891,10 +899,13 @@ function showSM(ex){
     var pr2=S.projects.find(function(p){return p.id===ex.projectId;});
     if(pr2) document.getElementById('f_site').value=pr2.siteId;
     upP();
-    // 프로젝트 다시 선택
-    setTimeout(function(){document.getElementById('f_proj').value=ex.projectId;},0);
+    setTimeout(function(){
+      document.getElementById('f_proj').value=ex.projectId;
+      calcD(); // 수정 모드에서 초기 날짜 표시
+    },0);
   } else {
     upP();
+    calcD(); // 신규 등록 모드 초기 날짜 표시
   }
 }
 function upP(){var sid=document.getElementById('f_site').value;var ps=S.projects.filter(function(p){return p.siteId===sid;});document.getElementById('f_proj').innerHTML=ps.length?ps.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join(''):'<option value="">해당 사이트에 프로젝트 없음</option>';}
@@ -1070,7 +1081,15 @@ renderAll();
   fetch(url+'?action=load').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){
     hideInd(ind);if(data.error)throw new Error(data.error);
     if(data.groups&&data.groups.length)S.groups=data.groups;
-    if(data.sites&&data.sites.length)S.sites=data.sites;
+    if(data.sites&&data.sites.length){
+      // Sheets에서 온 사이트에 groupId 없으면 기존 groupId 보존
+      var oldSites=S.sites;
+      S.sites=data.sites.map(function(ns){
+        var old=oldSites.find(function(os){return os.id===ns.id;});
+        if(!ns.groupId&&old&&old.groupId) ns.groupId=old.groupId;
+        return ns;
+      });
+    }
     if(data.projects&&data.projects.length)S.projects=data.projects;
     if(data.schedules&&data.schedules.length)S.schedules=data.schedules;
     if(data.events)S.events=data.events;
