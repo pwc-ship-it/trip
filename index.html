@@ -170,8 +170,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
       <button class="btn" onclick="openModal('site')">사이트 관리</button>
       <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
       <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
-      <button class="btn gsh" onclick="sheetsLoad()">🔄 Sheets 불러오기</button>
-      <button class="btn gsh" onclick="sheetsSave()">☁ Sheets 저장</button>
+
       <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
       <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
     </div>
@@ -593,28 +592,41 @@ var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a'};
 
 /* ── 상태 ── */
-var LS='trip_v6';
 var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[]};
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function loadData(){
-  try{
-    var raw=localStorage.getItem(LS);
-    if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&d.sites.length){
-      S.groups=d.groups||[];S.sites=d.sites;S.projects=d.projects;
-      S.schedules=(d.schedules||[]).map(function(sc){
-        sc.start=normDate(sc.start);sc.end=normDate(sc.end);return sc;
-      });
-      S.events=d.events||[];return;
-    }}
-  }catch(e){}
-  var def=deepCopy(DEF);S.groups=def.groups||[];S.sites=def.sites;S.projects=def.projects;S.schedules=def.schedules;S.events=def.events;
+  // Sheets 연결 전 DEF 기본 데이터로 초기화
+  var def=deepCopy(DEF);
+  S.groups=def.groups||[];S.sites=def.sites;S.projects=def.projects;
+  S.schedules=def.schedules;S.events=def.events;
 }
 function saveData(){
-  try{localStorage.setItem(LS,JSON.stringify({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events}));}catch(e){}
+  // 자동 저장: Sheets URL 있으면 즉시 Sheets에 저장
+  var url=getSheetsUrl();
+  if(!url||location.protocol==='file:')return;
+  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
+      projects:S.projects,schedules:S.schedules,events:S.events})
+  }).then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error)console.warn('자동저장 실패:',data.error);
+    else updateConnStatus('ok');
+  })
+  .catch(function(err){
+    console.warn('자동저장 실패:',err.message);
+    updateConnStatus('err');
+  });
+}
+function updateConnStatus(state){
+  var led=document.getElementById('connLed');
+  var txt=document.getElementById('connTxt');
+  if(!led)return;
+  if(state==='ok'){led.className='conn-led ok';txt.textContent='연결 정상';}
+  else if(state==='err'){led.className='conn-led err';txt.textContent='저장 실패';}
 }
 
-/* ── Sheets ── */
+
 var SHEETS_LS_KEY='trip_sheets_url';
 var DEFAULT_SHEETS_URL='https://script.google.com/macros/s/AKfycbwzOXzciY5Rh6BEZn6kyjbogzoTwoD0SCCaCnTcZRVEYKJOPr-GcJF0CsOlxlhqYBX0vA/exec';
 // 최초 접속 시 기본 URL 자동 설정
@@ -648,25 +660,8 @@ function resetSheetsUrl(){
 
 /* ── 연결 상태 확인 ── */
 function checkConn(){
-  var url=getSheetsUrl();
-  var led=document.getElementById('connLed');
-  var txt=document.getElementById('connTxt');
-  if(!led)return;
-  if(!url){led.className='conn-led err';txt.textContent='URL 없음';return;}
-  led.className='conn-led chk';txt.textContent='확인 중...';
-  fetch(url+'?action=load&ping=1')
-    .then(function(r){
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      return r.json();
-    })
-    .then(function(){
-      led.className='conn-led ok';txt.textContent='연결 정상';
-      setTimeout(function(){txt.textContent='연결 정상';},0);
-    })
-    .catch(function(err){
-      led.className='conn-led err';
-      txt.textContent='연결 실패';
-    });
+  // 클릭 시 수동으로 Sheets에서 최신 데이터 다시 로드
+  loadFromSheets(function(){renderAll();});
 }
 
 /* ── QR 코드 ── */
@@ -683,38 +678,47 @@ function showQR(){
 function showInd(msg){var d=document.createElement('div');d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e26;color:#e8e8ec;padding:20px 32px;border-radius:10px;border:1px solid #555;z-index:999;font-size:13px';d.textContent=msg;document.body.appendChild(d);return d;}
 function hideInd(d){if(d&&d.parentNode)d.parentNode.removeChild(d);}
 function sheetsLoad(){
-  var url=getSheetsUrl();if(!url){alert('먼저 ⚙ Sheets 설정에서 URL을 입력해주세요.');openSheetsSettings();return;}
-  var ind=showInd('Google Sheets에서 불러오는 중...');
-  fetch(url+'?action=load').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){
-    hideInd(ind);if(data.error)throw new Error(data.error);
-    if(data.groups&&data.groups.length)S.groups=data.groups;
-    if(data.sites&&data.sites.length){
-      // Sheets에서 온 사이트에 groupId 없으면 기존 groupId 보존
-      var oldSites=S.sites;
-      S.sites=data.sites.map(function(ns){
-        var old=oldSites.find(function(os){return os.id===ns.id;});
-        if(!ns.groupId&&old&&old.groupId) ns.groupId=old.groupId;
-        return ns;
-      });
-    }
-    if(data.projects&&data.projects.length)S.projects=data.projects;
-    if(data.schedules&&data.schedules.length){
-      S.schedules=data.schedules.map(function(sc){
-        sc.start=normDate(sc.start);sc.end=normDate(sc.end);return sc;
-      });
-    }
-    if(data.events)S.events=data.events;
-    saveData();renderAll();alert('불러오기 완료! 출장일정 '+S.schedules.length+'개');
-  }).catch(function(err){hideInd(ind);alert('불러오기 실패: '+err.message);});
+  // 수동 새로고침용 (연결 확인 버튼에서 사용)
+  loadFromSheets(function(){renderAll();});
 }
-function sheetsSave(){
-  var url=getSheetsUrl();if(!url){alert('먼저 ⚙ Sheets 설정에서 URL을 입력해주세요.');openSheetsSettings();return;}
-  if(!confirm('현재 데이터를 Google Sheets에 저장할까요?'))return;
-  var ind=showInd('Google Sheets에 저장 중...');
-  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events})}).then(function(r){return r.json();}).then(function(data){
-    hideInd(ind);if(data.error)throw new Error(data.error);alert('Google Sheets에 저장 완료!');
-  }).catch(function(err){hideInd(ind);alert('저장 실패: '+err.message);});
+function loadFromSheets(callback){
+  var url=getSheetsUrl();
+  if(!url||location.protocol==='file:'){
+    if(callback)callback();return;
+  }
+  var led=document.getElementById('connLed');
+  var txt=document.getElementById('connTxt');
+  if(led){led.className='conn-led chk';txt.textContent='불러오는 중...';}
+  fetch(url+'?action=load')
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(data){
+      if(data.error)throw new Error(data.error);
+      if(data.groups&&data.groups.length)S.groups=data.groups;
+      if(data.sites&&data.sites.length){
+        var oldSites=S.sites;
+        S.sites=data.sites.map(function(ns){
+          var old=oldSites.find(function(os){return os.id===ns.id;});
+          if(!ns.groupId&&old&&old.groupId)ns.groupId=old.groupId;
+          return ns;
+        });
+      }
+      if(data.projects&&data.projects.length)S.projects=data.projects;
+      if(data.schedules&&data.schedules.length){
+        S.schedules=data.schedules.map(function(sc){
+          sc.start=normDate(sc.start);sc.end=normDate(sc.end);return sc;
+        });
+      }
+      if(data.events)S.events=data.events;
+      if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
+      if(callback)callback();
+    })
+    .catch(function(err){
+      console.warn('불러오기 실패:',err.message);
+      if(led){led.className='conn-led err';txt.textContent='연결 실패';}
+      if(callback)callback(); // 실패해도 DEF 데이터로 렌더
+    });
 }
+
 
 /* ── 숨김 토글 ── */
 function toggleShowHidden(){
@@ -1192,38 +1196,13 @@ function delPjt(id){
 }
 
 /* ── 시작 ── */
+// 접속 시 DEF 기본 데이터로 초기화 후 Sheets에서 최신 데이터 로드
 loadData();
-renderAll();
-// 시작 시 연결 상태 자동 확인
-if(location.protocol !== 'file:') setTimeout(checkConn, 1000);
-// localStorage 없을 때만 자동 Sheets 불러오기
-(function(){
-  var url=getSheetsUrl();
-  if(!url||location.protocol==='file:')return;
-  try{var raw=localStorage.getItem(LS);if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&d.sites.length>0)return;}}catch(e){}
-  var ind=showInd('최신 데이터를 불러오는 중...');
-  fetch(url+'?action=load').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){
-    hideInd(ind);if(data.error)throw new Error(data.error);
-    if(data.groups&&data.groups.length)S.groups=data.groups;
-    if(data.sites&&data.sites.length){
-      // Sheets에서 온 사이트에 groupId 없으면 기존 groupId 보존
-      var oldSites=S.sites;
-      S.sites=data.sites.map(function(ns){
-        var old=oldSites.find(function(os){return os.id===ns.id;});
-        if(!ns.groupId&&old&&old.groupId) ns.groupId=old.groupId;
-        return ns;
-      });
-    }
-    if(data.projects&&data.projects.length)S.projects=data.projects;
-    if(data.schedules&&data.schedules.length){
-      S.schedules=data.schedules.map(function(sc){
-        sc.start=normDate(sc.start);sc.end=normDate(sc.end);return sc;
-      });
-    }
-    if(data.events)S.events=data.events;
-    saveData();renderAll();
-  }).catch(function(err){hideInd(ind);console.warn('자동 불러오기 실패:',err.message);});
-})();
+renderAll(); // DEF로 우선 렌더 (빈 화면 방지)
+loadFromSheets(function(){
+  renderAll(); // Sheets 데이터로 재렌더
+});
+
 </script>
 </body>
 </html>
