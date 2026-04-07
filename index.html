@@ -688,7 +688,7 @@ function loadFromSheets(callback){
   }
   var led=document.getElementById('connLed');
   var txt=document.getElementById('connTxt');
-  if(led){led.className='conn-led chk';txt.textContent='불러오는 중...';}
+  if(led){led.className='conn-led chk';txt.textContent='동기화 중...';}
   fetch(url+'?action=load')
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
@@ -1203,9 +1203,9 @@ function delPjt(id){
 /* ── 시작 ── */
 // 접속 시 DEF 기본 데이터로 초기화 후 Sheets에서 최신 데이터 로드
 loadData();
-// Sheets에서 최신 데이터 로드 후 한 번만 렌더 (깜빡임 방지)
+renderAll(); // DEF 기본 데이터로 즉시 표시 (빠른 초기 렌더)
 loadFromSheets(function(){
-  renderAll();
+  renderAll(); // Sheets 최신 데이터로 교체
 });
 
 </script>
