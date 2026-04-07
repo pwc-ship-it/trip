@@ -595,11 +595,46 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
 var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[]};
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
+function normDate(s){
+  // 어떤 형식이든 YYYY-MM-DD로 정규화
+  if(!s)return '';
+  // 이미 YYYY-MM-DD 형식이면 그대로
+  if(/^\d{4}-\d{2}-\d{2}$/.test(String(s).trim()))return String(s).trim();
+  // Date 객체 문자열 등 다른 형식은 파싱 후 변환
+  var d=new Date(s);
+  if(isNaN(d.getTime()))return s;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function loadData(){
-  // Sheets 연결 전 DEF 기본 데이터로 초기화
+  // localStorage 캐시 있으면 우선 사용, 없으면 DEF
+  try{
+    var cached=localStorage.getItem(CACHE_KEY);
+    if(cached){
+      var d=JSON.parse(cached);
+      if(d&&Array.isArray(d.sites)&&d.sites.length){
+        S.groups=d.groups||[];S.sites=d.sites;S.projects=d.projects;
+        S.schedules=(d.schedules||[]).map(function(sc){
+          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+          if(typeof sc.hidden==='string'){
+            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          }
+          return sc;
+        });
+        S.events=d.events||[];
+        return;
+      }
+    }
+  }catch(e){}
+  // 캐시 없으면 DEF 기본 데이터
   var def=deepCopy(DEF);
   S.groups=def.groups||[];S.sites=def.sites;S.projects=def.projects;
   S.schedules=def.schedules;S.events=def.events;
+}
+function saveCache(data){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
+  }catch(e){}
 }
 function saveData(){
   // 자동 저장: Sheets URL 있으면 즉시 Sheets에 저장
@@ -628,6 +663,8 @@ function updateConnStatus(state){
 
 
 var SHEETS_LS_KEY='trip_sheets_url';
+var CACHE_KEY='trip_data_cache';  // 데이터 캐시용
+var CACHE_TS_KEY='trip_cache_ts'; // 캐시 타임스탬프
 var DEFAULT_SHEETS_URL='https://script.google.com/macros/s/AKfycbwzOXzciY5Rh6BEZn6kyjbogzoTwoD0SCCaCnTcZRVEYKJOPr-GcJF0CsOlxlhqYBX0vA/exec';
 // 최초 접속 시 기본 URL 자동 설정
 (function(){
@@ -714,6 +751,8 @@ function loadFromSheets(callback){
         });
       }
       if(data.events)S.events=data.events;
+      // 성공적으로 로드된 데이터를 캐시에 저장
+      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events});
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
     })
@@ -736,16 +775,7 @@ function toggleShowHidden(){
 /* ── 날짜 유틸 ── */
 var TODAY=(function(){var d=new Date();d.setHours(0,0,0,0);return d;})();
 function pd(s){var d=new Date(s);d.setHours(0,0,0,0);return d;}
-function normDate(s){
-  // 어떤 형식이든 YYYY-MM-DD로 정규화
-  if(!s)return '';
-  // 이미 YYYY-MM-DD 형식이면 그대로
-  if(/^\d{4}-\d{2}-\d{2}$/.test(String(s).trim()))return String(s).trim();
-  // Date 객체 문자열 등 다른 형식은 파싱 후 변환
-  var d=new Date(s);
-  if(isNaN(d.getTime()))return s;
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
+
 function dd(a,b){return Math.round((pd(b)-pd(a))/86400000)+1;}
 function fmt(s){var d=pd(s);return String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');}
 function fmtFull(s){if(!s)return '';var d=pd(s);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');}
@@ -1203,10 +1233,18 @@ function delPjt(id){
 /* ── 시작 ── */
 // 접속 시 DEF 기본 데이터로 초기화 후 Sheets에서 최신 데이터 로드
 loadData();
-renderAll(); // DEF 기본 데이터로 즉시 표시 (빠른 초기 렌더)
+renderAll(); // 캐시/DEF 데이터로 즉시 표시
 loadFromSheets(function(){
   renderAll(); // Sheets 최신 데이터로 교체
 });
+// Apps Script 워밍업 - 4분마다 ping으로 콜드 스타트 방지
+(function keepWarm(){
+  var url=getSheetsUrl();
+  if(!url||location.protocol==='file:')return;
+  setInterval(function(){
+    fetch(url+'?action=ping').catch(function(){});
+  }, 4*60*1000); // 4분
+})();
 
 </script>
 </body>
