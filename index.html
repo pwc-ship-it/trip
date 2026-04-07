@@ -705,7 +705,12 @@ function loadFromSheets(callback){
       if(data.projects&&data.projects.length)S.projects=data.projects;
       if(data.schedules&&data.schedules.length){
         S.schedules=data.schedules.map(function(sc){
-          sc.start=normDate(sc.start);sc.end=normDate(sc.end);return sc;
+          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+          // Sheets에서 hidden이 "TRUE"/"FALSE" 문자열로 오는 경우 변환
+          if(typeof sc.hidden === 'string'){
+            sc.hidden = sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          }
+          return sc;
         });
       }
       if(data.events)S.events=data.events;
@@ -1198,9 +1203,9 @@ function delPjt(id){
 /* ── 시작 ── */
 // 접속 시 DEF 기본 데이터로 초기화 후 Sheets에서 최신 데이터 로드
 loadData();
-renderAll(); // DEF로 우선 렌더 (빈 화면 방지)
+// Sheets에서 최신 데이터 로드 후 한 번만 렌더 (깜빡임 방지)
 loadFromSheets(function(){
-  renderAll(); // Sheets 데이터로 재렌더
+  renderAll();
 });
 
 </script>
