@@ -637,7 +637,9 @@ function saveCache(data){
   }catch(e){}
 }
 function saveData(){
-  // 자동 저장: Sheets URL 있으면 즉시 Sheets에 저장
+  // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
+  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events});
+  // 2. 비동기로 Sheets에 저장
   var url=getSheetsUrl();
   if(!url||location.protocol==='file:')return;
   fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
