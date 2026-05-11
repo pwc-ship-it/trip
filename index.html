@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>출장 일정 관리</title>
+<meta name="description" content="Vision 현장 출장 일정 & 인원 출장일 관리">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#18181e}
@@ -157,6 +158,63 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .date-disp{width:100%;padding:6px 9px;border:1px solid #3a3a44;border-radius:5px;font-size:12px;background:#1e1e26;color:#e8e8ec;cursor:pointer;display:flex;align-items:center;gap:6px;position:relative;z-index:1}
 .date-disp:hover{border-color:#1a6bbf}
 .date-disp .cal-icon{color:#666;font-size:11px}
+
+/* ── 탭 네비게이션 ── */
+.tab-nav{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.tab-btn{padding:4px 14px;font-size:12px;font-weight:500;border:1px solid #3a3a44;border-radius:5px 5px 0 0;cursor:pointer;background:#20202e;color:#888;transition:all .15s;border-bottom:none;position:relative;top:1px}
+.tab-btn:hover{color:#ccc;background:#252535}
+.tab-btn.on{background:#18181e;color:#e8e8ec;border-color:#555;border-bottom:1px solid #18181e;z-index:2}
+.tab-bar{flex-shrink:0;display:flex;align-items:flex-end;padding:0 14px;background:#20202e;border-bottom:1.5px solid #555;height:30px}
+
+/* ── 인원 출장 일수 탭 ── */
+.pm-wrap{flex:1;overflow:auto;padding:14px 18px;background:#18181e}
+.pm-section{margin-bottom:22px}
+.pm-sec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:7px;border-bottom:1.5px solid #3a3a44}
+.pm-sec-icon{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pm-sec-title{font-size:13px;font-weight:600;color:#e8e8ec}
+.pm-sec-sub{font-size:11px;color:#666}
+.pm-sec-badge{font-size:10px;padding:2px 8px;border-radius:8px;color:#fff;font-weight:500}
+.pm-table{width:100%;border-collapse:collapse;font-size:12px}
+.pm-table th{padding:7px 10px;text-align:left;font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.05em;background:#1a1a26;border-bottom:1px solid #3a3a44;white-space:nowrap}
+.pm-table td{padding:8px 10px;border-bottom:1px solid #232330;vertical-align:top}
+.pm-table tr:hover td{background:#1e2438}
+.pm-table tr:last-child td{border-bottom:none}
+.pm-name{font-size:13px;font-weight:500;color:#e8e8ec}
+.pm-type{font-size:9px;padding:1px 5px;border-radius:3px;color:#fff;margin-left:5px;vertical-align:middle}
+.pm-days-big{font-size:18px;font-weight:700;color:#e8e8ec;line-height:1}
+.pm-days-unit{font-size:11px;color:#888;margin-left:2px}
+.pm-days-warn{color:#e8a020}
+.pm-days-alert{color:#e84040}
+.pm-trips{display:flex;flex-direction:column;gap:3px}
+.pm-trip-row{display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 6px;border-radius:3px;background:#1e1e2a}
+.pm-trip-site{font-size:10px;padding:1px 6px;border-radius:3px;color:#fff;white-space:nowrap;flex-shrink:0}
+.pm-trip-period{color:#888;white-space:nowrap;flex-shrink:0}
+.pm-trip-days{color:#aaa;white-space:nowrap;flex-shrink:0}
+.pm-trip-status{font-size:9px;padding:1px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.pm-kr-days{font-size:12px;font-weight:500;color:#0f9e6e}
+.pm-kr-neg{color:#e84040}
+.pm-bar-wrap{width:100%;background:#1e1e2a;border-radius:3px;height:6px;margin-top:3px;overflow:hidden}
+.pm-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.pm-empty{color:#555;font-size:12px;font-style:italic;padding:12px 10px}
+.pm-rolling-badge{font-size:9px;padding:1px 6px;border-radius:3px;background:#1a3a1a;color:#4aaa4a;border:1px solid #2a5a2a;white-space:nowrap;flex-shrink:0}
+.pm-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.pm-filter-btn{padding:3px 10px;font-size:11px;border:1px solid #3a3a44;border-radius:4px;cursor:pointer;background:transparent;color:#888;transition:all .15s}
+.pm-filter-btn:hover{color:#ccc;background:#252535}
+.pm-filter-btn.on{background:#1a3a5a;color:#7aafee;border-color:#2a5a8a}
+.pm-stats-row{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.pm-stat-card{flex:1;min-width:140px;background:#1a1a26;border:1px solid #2a2a3a;border-radius:7px;padding:10px 14px}
+.pm-stat-val{font-size:22px;font-weight:700;color:#e8e8ec;line-height:1}
+.pm-stat-lbl{font-size:10px;color:#666;margin-top:3px}
+.pm-stat-sub{font-size:11px;color:#888;margin-top:1px}
+/* 진행중 뱃지 */
+.status-going{background:#1a4a2a;color:#4aaa70;border:1px solid #2a6a3a}
+.status-plan{background:#1a2a4a;color:#4a8aee;border:1px solid #2a4a7a}
+.status-done{background:#2a2a3a;color:#888;border:1px solid #3a3a4a}
+/* B1 비자 경고 */
+.b1-ok{color:#4aaa70}
+.b1-warn{color:#e8a020}
+.b1-alert{color:#e84040;font-weight:600}
+.pm-b1-note{font-size:10px;color:#666;padding:4px 0;margin-top:4px}
 </style>
 </head>
 <body>
@@ -169,32 +227,43 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
         <span id="connTxt">연결 확인</span>
       </div>
     </div>
-    <div class="tright">
-      <div class="leg">
-        <div class="legg">
-          <span class="legl">본사계열</span>
-          <div class="legi"><div class="legd" style="background:#4a4a6a"></div>완료</div>
-          <div class="legi"><div class="legd" style="background:#2176cc"></div>출장중</div>
-          <div class="legi"><div class="legd" style="background:#0f9e6e"></div>예정</div>
+    <div class="tright" id="topbarRight">
+      <!-- 간트 탭 전용 버튼 -->
+      <div id="ganttTools" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+        <div class="leg">
+          <div class="legg">
+            <span class="legl">본사계열</span>
+            <div class="legi"><div class="legd" style="background:#4a4a6a"></div>완료</div>
+            <div class="legi"><div class="legd" style="background:#2176cc"></div>출장중</div>
+            <div class="legi"><div class="legd" style="background:#0f9e6e"></div>예정</div>
+          </div>
+          <div class="legs"></div>
+          <div class="legg">
+            <span class="legl">외주계열</span>
+            <div class="legi"><div class="legd" style="background:#5a4a2a"></div>완료</div>
+            <div class="legi"><div class="legd" style="background:#cc8010"></div>출장중</div>
+            <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
+          </div>
         </div>
-        <div class="legs"></div>
-        <div class="legg">
-          <span class="legl">외주계열</span>
-          <div class="legi"><div class="legd" style="background:#5a4a2a"></div>완료</div>
-          <div class="legi"><div class="legd" style="background:#cc8010"></div>출장중</div>
-          <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
-        </div>
+        <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
+        <button class="btn" onclick="openModal('site')">사이트 관리</button>
+        <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
+        <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
       </div>
-      <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
-      <button class="btn" onclick="openModal('site')">사이트 관리</button>
-      <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
-      <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
-
+      <!-- 공통 버튼 -->
       <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
       <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
     </div>
   </div>
-  <div class="content">
+  <!-- 탭 바 -->
+  <div class="tab-bar">
+    <div class="tab-nav">
+      <button class="tab-btn on" id="tab_gantt" onclick="switchTab('gantt')">📅 간트 차트</button>
+      <button class="tab-btn" id="tab_person" onclick="switchTab('person')">👤 인원 출장일</button>
+    </div>
+  </div>
+  <!-- 간트 탭 -->
+  <div class="content" id="view_gantt">
     <div class="sidebar">
       <div class="sbhead"><span class="slbl">사이트 필터</span></div>
       <div class="sbody" id="siteList"></div>
@@ -218,6 +287,12 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
           <div id="gbody"></div>
         </div>
       </div>
+    </div>
+  </div>
+  <!-- 인원 출장일 탭 -->
+  <div class="content" id="view_person" style="display:none">
+    <div class="pm-wrap" id="pmWrap">
+      <!-- JS로 렌더 -->
     </div>
   </div>
 </div>
@@ -1024,7 +1099,7 @@ function renderGantt(){
   document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-120);
 }
 
-function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();}
+function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();}
 
 /* ── 모달 ── */
 var _selCol='purple',_dragIdx=null;
@@ -1427,6 +1502,356 @@ loadFromSheets(function(){
     fetch(url+'?action=ping').catch(function(){});
   }, 4*60*1000); // 4분
 })();
+
+/* ════════════════════════════════════════════
+   탭 전환
+════════════════════════════════════════════ */
+var _activeTab='gantt';
+function switchTab(tab){
+  _activeTab=tab;
+  document.getElementById('view_gantt').style.display=tab==='gantt'?'flex':'none';
+  document.getElementById('view_person').style.display=tab==='person'?'flex':'none';
+  document.getElementById('tab_gantt').className='tab-btn'+(tab==='gantt'?' on':'');
+  document.getElementById('tab_person').className='tab-btn'+(tab==='person'?' on':'');
+  document.getElementById('ganttTools').style.display=tab==='gantt'?'flex':'none';
+  if(tab==='person') renderPersonTab();
+}
+
+/* ════════════════════════════════════════════
+   인원 출장일 관리
+════════════════════════════════════════════ */
+
+// ── 지역 분류 정의
+// siteId 기준 (대소문자 insensitive)
+var REGION_AMERICAS_IDS=[
+  'ESHD','ESMI','ESHG','MILS','ESOT','UC2','현대JV','BOSK_TN'
+];
+var REGION_EUROPE_IDS=['WA','ESWA'];
+// 나머지는 기타
+
+function getSiteRegion(siteId){
+  var sid=(siteId||'').toUpperCase();
+  var americas=REGION_AMERICAS_IDS.map(function(x){return x.toUpperCase();});
+  var europe=REGION_EUROPE_IDS.map(function(x){return x.toUpperCase();});
+  if(americas.indexOf(sid)>=0) return 'americas';
+  if(europe.indexOf(sid)>=0) return 'europe';
+  return 'other';
+}
+
+// 출장 일수 계산 (시작일~종료일 겹치는 날짜 수)
+// 클램프 없이 전체, 또는 범위 내 클램프
+function calcOverlapDays(start, end, rangeStart, rangeEnd){
+  var s=pd(start), e=pd(end);
+  if(rangeStart) s=new Date(Math.max(s,pd(rangeStart)));
+  if(rangeEnd)   e=new Date(Math.min(e,pd(rangeEnd)));
+  if(s>e) return 0;
+  return Math.round((e-s)/86400000)+1;
+}
+
+// 롤링 12개월 범위
+function getRolling12(){
+  var end=new Date(TODAY);
+  var start=new Date(TODAY.getFullYear()-1,TODAY.getMonth(),TODAY.getDate());
+  start.setHours(0,0,0,0);
+  end.setHours(0,0,0,0);
+  return {start:start,end:end};
+}
+
+// 이름 기준으로 전체 출장 목록 집계
+// returns { name, type, trips: [{siteId,siteName,siteColor,start,end,region,days,status}] }
+function aggregatePersonTrips(){
+  var persons={};
+  S.schedules.forEach(function(sc){
+    if(sc.hidden&&!S.showHidden) return;
+    var proj=S.projects.find(function(p){return p.id===sc.projectId;});
+    if(!proj) return;
+    var site=S.sites.find(function(s){return s.id===proj.siteId;});
+    var siteId=proj.siteId;
+    var siteName=site?site.name:siteId;
+    var siteColor=site?site.color:'#555';
+    var region=getSiteRegion(siteId);
+    var s=pd(sc.start),e=pd(sc.end);
+    var status=TODAY>e?'done':(TODAY>=s?'going':'plan');
+    var totalDays=dd(sc.start,sc.end);
+
+    var key=sc.name;
+    if(!persons[key]) persons[key]={name:sc.name,type:sc.type,trips:[]};
+    // type 우선순위: hq > tech > vision > host > outsource
+    var typePri={hq:5,tech:4,vision:3,host:2,outsource:1};
+    if((typePri[sc.type]||0)>(typePri[persons[key].type]||0)) persons[key].type=sc.type;
+    persons[key].trips.push({
+      siteId:siteId,siteName:siteName,siteColor:siteColor,
+      region:region,start:sc.start,end:sc.end,
+      days:totalDays,status:status,task:sc.task,note:sc.note
+    });
+  });
+  // 각 인원의 trips를 시작일 정렬
+  Object.keys(persons).forEach(function(k){
+    persons[k].trips.sort(function(a,b){return a.start>b.start?1:-1;});
+  });
+  return persons;
+}
+
+// 오늘 기준 한국 체류일 계산
+// 모든 출장 기간을 합친 후 (과거분만) 한국에 있었던 날짜 추정
+// 출발일부터 복귀일까지는 해외, 그 이전/이후는 한국으로 가정
+// 기준 기간 내 (rolling 12M) 해외 일수를 제외한 일수
+function calcKoreaDays(trips, rolling12){
+  // 한국 기준일: rolling 시작부터 오늘까지의 기간
+  var totalRange=Math.round((rolling12.end-rolling12.start)/86400000)+1;
+  // 해외 일수 (미주+유럽+기타 모두)
+  var overseasDays=0;
+  trips.forEach(function(t){
+    var o=calcOverlapDays(t.start,t.end,rolling12.start,rolling12.end);
+    overseasDays+=o;
+  });
+  // 겹치는 출장 기간이 있을 경우 중복 제거 필요
+  // 날짜 배열로 중복 제거
+  var overseasSet={};
+  trips.forEach(function(t){
+    var s=new Date(Math.max(pd(t.start),rolling12.start));
+    var e=new Date(Math.min(pd(t.end),rolling12.end));
+    if(s>e) return;
+    var cur=new Date(s);
+    while(cur<=e){
+      var key=cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate();
+      overseasSet[key]=true;
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  var uniqueOverseas=Object.keys(overseasSet).length;
+  return totalRange-uniqueOverseas;
+}
+
+// 현재 체류 중인 곳 (오늘 기준)
+function getCurrentLocation(trips){
+  for(var i=0;i<trips.length;i++){
+    var t=trips[i];
+    if(TODAY>=pd(t.start)&&TODAY<=pd(t.end)){
+      return {onTrip:true,siteName:t.siteName,siteColor:t.siteColor,region:t.region,endDate:t.end};
+    }
+  }
+  return {onTrip:false};
+}
+
+// 상태 뱃지
+function statusHtml(st){
+  if(st==='going') return '<span class="pm-trip-status status-going">출장중</span>';
+  if(st==='plan')  return '<span class="pm-trip-status status-plan">예정</span>';
+  return '<span class="pm-trip-status status-done">완료</span>';
+}
+
+var _pmFilter='all'; // 'all','americas','europe','other','current'
+
+function renderPersonTab(){
+  var wrap=document.getElementById('pmWrap');
+  if(!wrap) return;
+  var persons=aggregatePersonTrips();
+  var names=Object.keys(persons);
+  if(!names.length){wrap.innerHTML='<div class="pm-empty" style="padding:40px;text-align:center">등록된 출장 일정이 없습니다.</div>';return;}
+
+  var rolling12=getRolling12();
+  var r12s=rolling12.start.getFullYear()+'.'+(rolling12.start.getMonth()+1)+'.'+rolling12.start.getDate();
+  var r12e=rolling12.end.getFullYear()+'.'+(rolling12.end.getMonth()+1)+'.'+rolling12.end.getDate();
+
+  // 통계 집계
+  var totalPersons=names.length;
+  var onTripNow=names.filter(function(n){return getCurrentLocation(persons[n].trips).onTrip;}).length;
+  var americasPersons=names.filter(function(n){return persons[n].trips.some(function(t){return t.region==='americas';});}).length;
+  var europePersons=names.filter(function(n){return persons[n].trips.some(function(t){return t.region==='europe';});}).length;
+
+  var html='';
+  // 통계 카드
+  html+='<div class="pm-stats-row">';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val">'+totalPersons+'</div><div class="pm-stat-lbl">등록 인원</div><div class="pm-stat-sub">전체 출장자</div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#2176cc">'+onTripNow+'</div><div class="pm-stat-lbl">현재 출장 중</div><div class="pm-stat-sub">오늘 기준</div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#1a8c66">'+americasPersons+'</div><div class="pm-stat-lbl">미주 경험 인원</div><div class="pm-stat-sub">B1 비자 대상</div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#cc8010">'+europePersons+'</div><div class="pm-stat-lbl">유럽 경험 인원</div><div class="pm-stat-sub">ESWA(WA) 등</div></div>';
+  html+='</div>';
+
+  // 필터 바
+  html+='<div class="pm-filter-bar">';
+  html+='<span style="font-size:11px;color:#666">필터:</span>';
+  ['all','current','americas','europe','other'].forEach(function(f){
+    var lbl={all:'전체',current:'출장중',americas:'미주',europe:'유럽',other:'기타 지역'}[f];
+    html+='<button class="pm-filter-btn'+((_pmFilter===f)?' on':'')+'" onclick="setPmFilter(\''+f+'\')">'+lbl+'</button>';
+  });
+  html+='<span style="font-size:10px;color:#555;margin-left:4px">롤링 12개월: '+r12s+' ~ '+r12e+'</span>';
+  html+='</div>';
+
+  // ── 미주 섹션
+  var americasList=names.filter(function(n){
+    var p=persons[n];
+    if(_pmFilter==='current') return getCurrentLocation(p.trips).onTrip;
+    if(_pmFilter==='europe') return p.trips.some(function(t){return t.region==='europe';});
+    if(_pmFilter==='other') return p.trips.some(function(t){return t.region==='other';});
+    if(_pmFilter==='americas') return p.trips.some(function(t){return t.region==='americas';});
+    return p.trips.some(function(t){return t.region==='americas';});
+  });
+
+  if((_pmFilter==='all'||_pmFilter==='americas'||_pmFilter==='current')&&americasList.length){
+    html+=renderRegionSection(persons, americasList, 'americas', rolling12);
+  }
+
+  // ── 유럽 섹션
+  var europeList=names.filter(function(n){
+    var p=persons[n];
+    if(_pmFilter==='americas'||_pmFilter==='other') return false;
+    if(_pmFilter==='current') return getCurrentLocation(p.trips).onTrip&&p.trips.some(function(t){return t.region==='europe';});
+    if(_pmFilter==='europe') return p.trips.some(function(t){return t.region==='europe';});
+    return p.trips.some(function(t){return t.region==='europe';});
+  });
+
+  if((_pmFilter==='all'||_pmFilter==='europe'||_pmFilter==='current')&&europeList.length){
+    html+=renderRegionSection(persons, europeList, 'europe', rolling12);
+  }
+
+  // ── 기타 섹션
+  var otherList=names.filter(function(n){
+    var p=persons[n];
+    if(_pmFilter==='americas'||_pmFilter==='europe') return false;
+    if(_pmFilter==='current') return getCurrentLocation(p.trips).onTrip&&p.trips.some(function(t){return t.region==='other';});
+    if(_pmFilter==='other') return p.trips.some(function(t){return t.region==='other';});
+    return p.trips.some(function(t){return t.region==='other';});
+  });
+
+  if((_pmFilter==='all'||_pmFilter==='other'||_pmFilter==='current')&&otherList.length){
+    html+=renderRegionSection(persons, otherList, 'other', rolling12);
+  }
+
+  if(!americasList.length&&!europeList.length&&!otherList.length){
+    html+='<div class="pm-empty" style="padding:30px 10px;text-align:center;color:#555">해당 조건의 인원이 없습니다.</div>';
+  }
+
+  wrap.innerHTML=html;
+}
+
+function setPmFilter(f){
+  _pmFilter=f;
+  renderPersonTab();
+}
+
+function renderRegionSection(persons, nameList, region, rolling12){
+  var labels={
+    americas:{title:'미주 출장',sub:'ESHD · ESMI · ESHG · MILS · ESOT · UC2 · 현대JV · BOSK_TN',color:'#1a8c66',icon:'#1a8c66',b1:true},
+    europe:  {title:'유럽 출장',sub:'ESWA / WA 등',color:'#cc8010',icon:'#cc8010',b1:false},
+    other:   {title:'기타 지역 출장',sub:'그 외 사이트',color:'#534AB7',icon:'#534AB7',b1:false}
+  };
+  var L=labels[region];
+  var html='<div class="pm-section">';
+  html+='<div class="pm-sec-head">';
+  html+='<div class="pm-sec-icon" style="background:'+L.icon+'"></div>';
+  html+='<span class="pm-sec-title">'+L.title+'</span>';
+  html+='<span class="pm-sec-sub">'+L.sub+'</span>';
+  if(L.b1) html+='<span class="pm-sec-badge" style="background:#1a3a1a;border:1px solid #2a6a2a">B1 비자 관리</span>';
+  html+='</div>';
+
+  html+='<table class="pm-table"><thead><tr>'
+    +'<th style="width:130px">이름</th>'
+    +'<th style="width:80px">현 위치</th>'
+    +(L.b1?'<th style="width:110px">미주 출장일 (12M)</th>':'<th style="width:110px">출장일 합계</th>')
+    +'<th style="width:100px">한국 체류일 (12M)</th>'
+    +'<th>출장 내역</th>'
+    +'</tr></thead><tbody>';
+
+  nameList.forEach(function(name){
+    var p=persons[name];
+    var regionTrips=p.trips.filter(function(t){return t.region===region;});
+    var allTrips=p.trips;
+
+    // 지역별 롤링 12M 일수
+    var rolling12Days=0;
+    var rolling12Set={};
+    regionTrips.forEach(function(t){
+      var s=new Date(Math.max(pd(t.start),rolling12.start));
+      var e=new Date(Math.min(pd(t.end),rolling12.end));
+      if(s>e) return;
+      var cur=new Date(s);
+      while(cur<=e){
+        var key=cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate();
+        rolling12Set[key]=true;
+        cur.setDate(cur.getDate()+1);
+      }
+    });
+    rolling12Days=Object.keys(rolling12Set).length;
+
+    // 한국 체류일 (전체 출장 기준 rolling 12M)
+    var koreaDays=calcKoreaDays(allTrips, rolling12);
+
+    // 현재 위치
+    var loc=getCurrentLocation(allTrips);
+
+    // B1 경고 레벨 (미주만)
+    var b1Class='', b1Note='';
+    if(L.b1){
+      if(rolling12Days>=150){b1Class='b1-alert';b1Note='⚠ 체류 주의 (150일+)';}
+      else if(rolling12Days>=120){b1Class='b1-warn';b1Note='주의 구간 (120일+)';}
+      else {b1Class='b1-ok';}
+    }
+
+    html+='<tr>';
+    // 이름 + 유형
+    var tc=TYPE_COLOR[p.type]||'#555';var tl=TYPE_LBL[p.type]||p.type;
+    html+='<td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
+      +'<span class="pm-name">'+name+'</span>'
+      +'<span class="pm-type" style="background:'+tc+'">'+tl+'</span>'
+      +'</div></td>';
+
+    // 현 위치
+    if(loc.onTrip){
+      html+='<td><div style="display:flex;flex-direction:column;gap:2px">'
+        +'<span style="font-size:11px;font-weight:600;color:'+loc.siteColor+'">'+loc.siteName+'</span>'
+        +'<span style="font-size:10px;color:#666">~'+fmt(loc.endDate)+'</span>'
+        +'</div></td>';
+    } else {
+      html+='<td><span style="font-size:11px;color:#4aaa70">🇰🇷 국내</span></td>';
+    }
+
+    // 지역 출장일
+    var barPct=Math.min(100,Math.round(rolling12Days/180*100));
+    var barColor=L.b1?(rolling12Days>=150?'#e84040':rolling12Days>=120?'#e8a020':'#1a8c66'):'#534AB7';
+    html+='<td>';
+    html+='<div style="display:flex;align-items:baseline;gap:2px">';
+    html+='<span class="pm-days-big '+(L.b1?b1Class:'')+'" style="font-size:20px">'+rolling12Days+'</span>';
+    html+='<span class="pm-days-unit">일</span>';
+    html+='</div>';
+    if(L.b1){
+      html+='<div class="pm-bar-wrap" style="margin-top:4px"><div class="pm-bar-fill" style="width:'+barPct+'%;background:'+barColor+'"></div></div>';
+      if(b1Note) html+='<div style="font-size:10px;color:'+barColor+';margin-top:2px">'+b1Note+'</div>';
+    }
+    html+='</td>';
+
+    // 한국 체류일
+    var krClass=koreaDays<0?'pm-kr-neg':'pm-kr-days';
+    html+='<td><span class="'+krClass+'" style="font-size:16px;font-weight:600">'+Math.max(0,koreaDays)+'</span><span class="pm-days-unit"> 일</span></td>';
+
+    // 출장 내역 (지역 필터)
+    html+='<td><div class="pm-trips">';
+    regionTrips.forEach(function(t){
+      var r12Days=calcOverlapDays(t.start,t.end,rolling12.start,rolling12.end);
+      var totalD=dd(t.start,t.end);
+      html+='<div class="pm-trip-row">';
+      html+='<span class="pm-trip-site" style="background:'+t.siteColor+'">'+t.siteName+'</span>';
+      html+='<span class="pm-trip-period">'+fmtFull(t.start)+' → '+fmtFull(t.end)+'</span>';
+      html+='<span class="pm-trip-days" style="color:#ccc">'+totalD+'일';
+      if(r12Days>0&&r12Days<totalD) html+=' <span style="color:#666;font-size:10px">(12M내 '+r12Days+'일)</span>';
+      html+='</span>';
+      html+=statusHtml(t.status);
+      if(t.task) html+='<span style="font-size:10px;color:#666">'+t.task+'</span>';
+      html+='</div>';
+    });
+    if(!regionTrips.length) html+='<span class="pm-empty">내역 없음</span>';
+    html+='</div></td>';
+    html+='</tr>';
+  });
+
+  html+='</tbody></table>';
+  if(L.b1){
+    html+='<div class="pm-b1-note">* 미주 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일입니다. B1/B2 비자 상한(180일/년)을 참고로 표시합니다.</div>';
+  }
+  html+='</div>';
+  return html;
+}
 
 </script>
 </body>
