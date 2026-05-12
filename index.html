@@ -1569,7 +1569,7 @@ function getRolling12(){
 function aggregatePersonTrips(){
   var persons={};
   S.schedules.forEach(function(sc){
-    if(sc.hidden&&!S.showHidden) return;
+    // 인원 출장일 탭은 숨김 여부와 무관하게 모든 일정 집계
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj) return;
     var site=S.sites.find(function(s){return s.id===proj.siteId;});
@@ -1612,19 +1612,29 @@ function calcRegionDays12M(trips, region, rolling12){
   return Object.keys(set).length;
 }
 
-// rolling 12M 기준 전체 해외 일수 → 한국 체류 추정
-function calcKoreaDays(trips, rolling12){
-  var totalRange=Math.round((rolling12.end-rolling12.start)/86400000)+1;
-  var overseasSet={};
-  trips.forEach(function(t){
-    var s=new Date(Math.max(pd(t.start),rolling12.start));
-    var e=new Date(Math.min(pd(t.end),rolling12.end));
-    if(s>e) return;
-    for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1)){
-      overseasSet[cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate()]=true;
-    }
-  });
-  return totalRange-Object.keys(overseasSet).length;
+// 마지막 복귀일 기준 한국 체류일 계산
+// 가장 최근 출장 종료일(복귀일) 다음날부터 오늘까지의 일수
+function calcKoreaDays(trips){
+  if(!trips||!trips.length) return 0;
+  // 종료된 출장 중 가장 최근 복귀일 찾기
+  var pastTrips=trips.filter(function(t){return pd(t.end)<=TODAY;});
+  if(!pastTrips.length){
+    // 아직 출장 간 적 없으면 → 0
+    return 0;
+  }
+  // 가장 최근 복귀일
+  var lastEnd=pastTrips.reduce(function(mx,t){
+    return pd(t.end)>pd(mx)?t.end:mx;
+  }, pastTrips[0].end);
+  var lastEndDate=pd(lastEnd);
+  // 현재 출장 중이면 한국 체류 0일
+  var onTrip=trips.some(function(t){return TODAY>=pd(t.start)&&TODAY<=pd(t.end);});
+  if(onTrip) return 0;
+  // 복귀일 다음날부터 오늘까지
+  var returnDay=new Date(lastEndDate);
+  returnDay.setDate(returnDay.getDate()+1);
+  if(returnDay>TODAY) return 0;
+  return Math.round((TODAY-returnDay)/86400000)+1;
 }
 
 function getCurrentLocation(trips){
@@ -1651,7 +1661,10 @@ var _pmSortAsc=true;          // 정렬 방향
 var _pmTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true}; // 인원유형 체크
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
-function setPmSearch(v){ _pmSearch=v.trim().toLowerCase(); renderPersonTab(); }
+function setPmSearch(v){
+  _pmSearch=v.toLowerCase(); // trim 제거 - 공백 포함 그대로 유지해야 재입력 가능
+  renderPersonTabKeepSearch(); // 검색창 포커스 보존 버전으로 렌더
+}
 function setPmSort(key){
   if(_pmSortKey===key) _pmSortAsc=!_pmSortAsc;
   else { _pmSortKey=key; _pmSortAsc=key==='name'; }
@@ -1660,6 +1673,21 @@ function setPmSort(key){
 function togglePmType(type){
   _pmTypeFilter[type]=!_pmTypeFilter[type];
   renderPersonTab();
+}
+
+// 검색창 포커스/커서 위치를 보존하면서 렌더하는 래퍼
+function renderPersonTabKeepSearch(){
+  // 현재 커서 위치 저장
+  var inp=document.getElementById('pmSearchInp');
+  var selStart=inp?inp.selectionStart:null;
+  var selEnd=inp?inp.selectionEnd:null;
+  renderPersonTab();
+  // 렌더 후 포커스 + 커서 복원
+  var inp2=document.getElementById('pmSearchInp');
+  if(inp2){
+    inp2.focus();
+    if(selStart!==null) inp2.setSelectionRange(selStart,selEnd);
+  }
 }
 
 function renderPersonTab(){
@@ -1778,8 +1806,8 @@ function renderPersonTab(){
       var pa=allPersons[a], pb=allPersons[b];
       var r12a=calcRegionDays12M(pa.trips,region,rolling12);
       var r12b=calcRegionDays12M(pb.trips,region,rolling12);
-      var kr_a=calcKoreaDays(pa.trips,rolling12);
-      var kr_b=calcKoreaDays(pb.trips,rolling12);
+      var kr_a=calcKoreaDays(pa.trips);
+      var kr_b=calcKoreaDays(pb.trips);
       var locA=getCurrentLocation(pa.trips);
       var locB=getCurrentLocation(pb.trips);
       var locStrA=locA.onTrip?locA.siteName:'한국';
@@ -1840,7 +1868,7 @@ function renderRegionSection(persons, nameList, region, rolling12){
     +thSort('name','이름')
     +thSort('location','현 위치')
     +thSort(regionSortKey,thDay)
-    +thSort('korea','한국 체류일 (12M)')
+    +thSort('korea','한국 체류일')
     +'<th>출장 내역</th>'
     +'</tr></thead><tbody>';
 
@@ -1850,7 +1878,7 @@ function renderRegionSection(persons, nameList, region, rolling12){
     var allTrips=p.trips;
 
     var rolling12Days=calcRegionDays12M(allTrips, region, rolling12);
-    var koreaDays=calcKoreaDays(allTrips, rolling12);
+    var koreaDays=calcKoreaDays(allTrips);
     var loc=getCurrentLocation(allTrips);
 
     // 경고 레벨 (미주·유럽·기타 동일 기준)
@@ -1916,7 +1944,7 @@ function renderRegionSection(persons, nameList, region, rolling12){
   });
 
   html+='</tbody></table>';
-  html+='<div class="pm-b1-note">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거).'
+  html+='<div class="pm-b1-note">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). 한국 체류일은 마지막 복귀일 다음날부터 오늘까지의 일수.'
     +(L.b1?' B1/B2 비자 참고 상한 180일/년.':'')+'</div>';
   html+='</div>';
   return html;
