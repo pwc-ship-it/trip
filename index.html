@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>출장 일정 관리</title>
+<meta name="description" content="Vision 현장 출장 일정 & 인원 출장일 관리">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="ttl">출장 일정 관리</span>
+      <div class="conn-dot" id="connStatus" onclick="checkConn()" title="클릭하면 연결 상태 확인">
+        <div class="conn-led" id="connLed"></div>
+        <span id="connTxt">연결 확인</span>
+      </div>
+    </div>
+    <div class="tright" id="topbarRight">
+      <!-- 간트 탭 전용 버튼 -->
+      <div id="ganttTools" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+        <div class="leg">
+          <div class="legg">
+            <span class="legl">본사계열</span>
+            <div class="legi"><div class="legd" style="background:#4a4a6a"></div>완료</div>
+            <div class="legi"><div class="legd" style="background:#2176cc"></div>출장중</div>
+            <div class="legi"><div class="legd" style="background:#0f9e6e"></div>예정</div>
+          </div>
+          <div class="legs"></div>
+          <div class="legg">
+            <span class="legl">외주계열</span>
+            <div class="legi"><div class="legd" style="background:#5a4a2a"></div>완료</div>
+            <div class="legi"><div class="legd" style="background:#cc8010"></div>출장중</div>
+            <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
+          </div>
+        </div>
+        <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
+        <button class="btn" onclick="openModal('site')">사이트 관리</button>
+        <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
+        <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
+      </div>
+      <!-- 공통 버튼 -->
+      <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
+      <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
+    </div>
+  </div>
+  <!-- 탭 바 -->
+  <div class="tab-bar">
+    <div class="tab-nav">
+      <button class="tab-btn on" id="tab_gantt" onclick="switchTab('gantt')">📅 간트 차트</button>
+      <button class="tab-btn" id="tab_person" onclick="switchTab('person')">👤 인원 출장일</button>
+    </div>
+  </div>
+  <!-- 간트 탭 -->
+  <div class="content" id="view_gantt">
+    <div class="sidebar">
+      <div class="sbhead"><span class="slbl">사이트 필터</span></div>
+      <div class="sbody" id="siteList"></div>
+    </div>
+    <div class="main">
+      <div class="gscroll" id="gscroll">
+        <div class="gwrap" id="gwrap">
+          <div class="ghrow">
+            <div class="ghinner">
+              <div class="ghfixed">
+                <div class="ghc" style="width:68px;min-width:68px;max-width:68px">업무</div>
+                <div class="ghc">출장자</div>
+              </div>
+              <div class="ghtl" id="ghTl"></div>
+            </div>
+            <div class="ghdb">
+              <div class="ghdbf"></div>
+              <div class="ghdbt" id="ghDb"></div>
+            </div>
+          </div>
+          <div id="gbody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 인원 출장일 탭 -->
+  <div class="content" id="view_person" style="display:none">
+    <div class="pm-wrap" id="pmWrap">
+      <!-- JS로 렌더 -->
+    </div>
+  </div>
+</div>
+<div id="mc"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
