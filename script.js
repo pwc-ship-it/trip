@@ -33,7 +33,7 @@ function loadData(){
         });
         S.events=d.events||[];
         S.workTasks=d.workTasks||[];
-        S.equipItems=d.equipItems||deepCopy(DEF.equipItems||[]);
+        S.equipItems=(d.equipItems&&d.equipItems.length)?d.equipItems:deepCopy(DEF.equipItems||[]);
         S.equipUnits=d.equipUnits||[];
         return;
       }
@@ -170,7 +170,7 @@ function loadFromSheets(callback){
       }
       if(data.events)S.events=data.events;
       if(data.workTasks)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
-      if(data.equipItems)S.equipItems=data.equipItems;
+      if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
       if(data.equipUnits)S.equipUnits=data.equipUnits;
       // 성공적으로 로드된 데이터를 캐시에 저장
       saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits});
