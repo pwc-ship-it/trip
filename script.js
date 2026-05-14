@@ -3,7 +3,7 @@ var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a'};
 
 /* ── 상태 ── */
-var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[]};
+var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[]};
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function normDate(s){
@@ -35,6 +35,7 @@ function loadData(){
         S.workTasks=d.workTasks||[];
         S.equipItems=(d.equipItems&&d.equipItems.length)?d.equipItems:deepCopy(DEF.equipItems||[]);
         S.equipUnits=d.equipUnits||[];
+        S.equipSiteOrder=d.equipSiteOrder||[];
         return;
       }
     }
@@ -53,14 +54,14 @@ function saveCache(data){
 }
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
-  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits});
+  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder});
   // 2. 비동기로 Sheets에 저장
   var url=getSheetsUrl();
   if(!url||location.protocol==='file:')return;
   fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
       projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-      equipItems:S.equipItems,equipUnits:S.equipUnits})
+      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder})
   }).then(function(r){return r.json();})
   .then(function(data){
     if(data.error)console.warn('자동저장 실패:',data.error);
@@ -1321,6 +1322,32 @@ function renderPersonTimeline(trips, colSpan){
 ════════════════════════════════════════════ */
 var _equipEditMode=false;
 var _equipFilterSite='all';
+var _dragEquipSiteId=null;
+
+/* ── 설비 탭 사이트 순서 헬퍼 ── */
+function ensureEquipSiteOrder(){
+  if(!S.equipSiteOrder) S.equipSiteOrder=[];
+  var inUnits={};
+  S.equipUnits.forEach(function(u){inUnits[u.siteId]=true;});
+  S.sites.forEach(function(s){
+    if(inUnits[s.id]&&S.equipSiteOrder.indexOf(s.id)<0)
+      S.equipSiteOrder.push(s.id);
+  });
+  S.equipSiteOrder=S.equipSiteOrder.filter(function(id){
+    return S.sites.some(function(s){return s.id===id;});
+  });
+}
+function onEquipSiteDragStart(siteId){_dragEquipSiteId=siteId;}
+function onEquipSiteDrop(targetSiteId){
+  if(!_dragEquipSiteId||_dragEquipSiteId===targetSiteId){_dragEquipSiteId=null;return;}
+  ensureEquipSiteOrder();
+  var arr=S.equipSiteOrder;
+  var fi=arr.indexOf(_dragEquipSiteId),ti=arr.indexOf(targetSiteId);
+  if(fi<0||ti<0){_dragEquipSiteId=null;return;}
+  arr.splice(fi,1);arr.splice(ti,0,_dragEquipSiteId);
+  _dragEquipSiteId=null;
+  saveData();renderEquipTab();
+}
 
 /* ── 출장중 인원 조회 ── */
 function getOnSitePersonnel(siteId){
@@ -1366,17 +1393,34 @@ function calcSiteProgress(siteId){
 function renderEquipSidebar(){
   var el=document.getElementById('equipSidebar');
   if(!el) return;
-  var usedSiteIds={};
-  S.equipUnits.forEach(function(u){usedSiteIds[u.siteId]=true;});
-  var html='<div class="sbhead"><span class="slbl">사이트 필터</span></div>';
-  html+='<div class="sbody">';
+  ensureEquipSiteOrder();
+  // equipSiteOrder 기반 + units에 있는 사이트 fallback
+  var sidebarSiteIds=[];
+  S.equipSiteOrder.forEach(function(id){
+    if(S.sites.some(function(s){return s.id===id;})) sidebarSiteIds.push(id);
+  });
+  S.equipUnits.forEach(function(u){
+    if(sidebarSiteIds.indexOf(u.siteId)<0) sidebarSiteIds.push(u.siteId);
+  });
+  var html='<div class="sbhead"><span class="slbl">사이트 필터</span>';
+  if(_equipEditMode) html+='<div style="font-size:10px;color:#6a6a88;margin-top:2px">드래그로 순서 변경</div>';
+  html+='</div><div class="sbody">';
   html+='<div class="sit-all'+(_equipFilterSite==='all'?' on':'')
     +'" onclick="setEquipFilter(\'all\')"><span class="sname">전체 보기</span></div>';
-  S.sites.forEach(function(site){
-    if(!usedSiteIds[site.id]) return;
-    var cnt=S.equipUnits.filter(function(u){return u.siteId===site.id;}).length;
-    html+='<div class="sit'+(_equipFilterSite===site.id?' on':'')
-      +'" onclick="setEquipFilter(\''+site.id+'\')"><div class="sdot" style="background:'+site.color+'"></div>'
+  sidebarSiteIds.forEach(function(siteId){
+    var site=S.sites.find(function(s){return s.id===siteId;});
+    if(!site) return;
+    var cnt=S.equipUnits.filter(function(u){return u.siteId===siteId;}).length;
+    var drag=_equipEditMode
+      ?' draggable="true"'
+       +' ondragstart="onEquipSiteDragStart(\''+siteId+'\')"'
+       +' ondragover="event.preventDefault()"'
+       +' ondrop="onEquipSiteDrop(\''+siteId+'\')"'
+       +' style="cursor:grab"'
+      :'';
+    html+='<div class="sit'+(_equipFilterSite===siteId?' on':'')+'"'
+      +drag+' onclick="setEquipFilter(\''+siteId+'\')">'
+      +'<div class="sdot" style="background:'+site.color+'"></div>'
       +'<span class="sname">'+site.name+'</span><span class="scnt">'+cnt+'</span></div>';
   });
   html+='</div>';
@@ -1436,13 +1480,13 @@ function renderEquipGrid(){
     return _equipFilterSite==='all'||u.siteId===_equipFilterSite;
   });
 
-  // 사이트 목록 (순서 유지)
-  var siteIds=[];
-  var siteSet={};
-  S.sites.forEach(function(s){
-    if(allUnits.some(function(u){return u.siteId===s.id;})&&!siteSet[s.id]){
-      siteIds.push(s.id);siteSet[s.id]=true;
-    }
+  // 사이트 목록 — equipSiteOrder 기반
+  ensureEquipSiteOrder();
+  var siteIds=S.equipSiteOrder.filter(function(id){
+    return allUnits.some(function(u){return u.siteId===id;});
+  });
+  allUnits.forEach(function(u){
+    if(siteIds.indexOf(u.siteId)<0) siteIds.push(u.siteId);
   });
 
   /* ── 요약 카드 — eqSummary 영역 (테이블과 분리, 스크롤 독립) ── */
@@ -1479,22 +1523,25 @@ function renderEquipGrid(){
     summaryEl.innerHTML=summaryHtml;
   }
 
-  /* ── 헤더 단일 행 (그룹명은 셀 내 소형 레이블로 표시) ── */
+  /* ── 헤더 단일 행 ── */
   var prevGroup=null;
   var hdrRow='<tr>';
-  hdrRow+='<th class="eq-th fix-col fix-col-1" style="left:0;min-width:80px;width:80px">사이트</th>';
-  hdrRow+='<th class="eq-th fix-col fix-col-2" style="left:80px;min-width:120px;width:120px">라인</th>';
-  hdrRow+='<th class="eq-th fix-col fix-col-3" style="left:200px;min-width:90px;width:90px;border-right:2px solid #555">호기</th>';
-  items.forEach(function(item){
+  // 사이트 열 제거 — 라인(일반)과 호기(sticky)만
+  hdrRow+='<th class="eq-th" style="white-space:nowrap;min-width:40px">라인</th>';
+  hdrRow+='<th class="eq-th fix-col" style="left:0;min-width:80px;width:80px;border-right:2px solid #555">호기</th>';
+  items.forEach(function(item,itemIdx){
     var g=item.groupName||'';
     var groupLbl=g?'<div style="font-size:8px;color:#534AB7;margin-bottom:2px;letter-spacing:.04em">'+g+'</div>':'';
     var borderLeft=(g&&g!==prevGroup&&prevGroup!==null)?'border-left:2px solid #534AB7;':'';
     prevGroup=g;
     if(_equipEditMode){
+      var isFirst=(itemIdx===0),isLast=(itemIdx===items.length-1);
       hdrRow+='<th class="eq-th" style="padding:3px 5px;'+borderLeft+'">'
         +groupLbl
         +'<div style="overflow:hidden;text-overflow:ellipsis;max-width:90px">'+item.name+'</div>'
-        +'<div style="display:flex;gap:2px;margin-top:3px;justify-content:center">'
+        +'<div style="display:flex;gap:2px;margin-top:3px;justify-content:center;flex-wrap:wrap">'
+        +(isFirst?'':'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block" onclick="moveEquipItem(\''+item.id+'\',-1)">↑</button>')
+        +(isLast?'':'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block" onclick="moveEquipItem(\''+item.id+'\',1)">↓</button>')
         +'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block" onclick="openEditEquipItem(\''+item.id+'\')">수정</button>'
         +'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block;color:#c04040;border-color:#7a1010" onclick="openDelEquipItem(\''+item.id+'\')">삭제</button>'
         +'</div></th>';
@@ -1507,6 +1554,7 @@ function renderEquipGrid(){
 
   /* ── 데이터 행 ── */
   var bodyHtml='';
+  var e=_equipEditMode;
   siteIds.forEach(function(siteId){
     var site=S.sites.find(function(s){return s.id===siteId;});
     var siteName=site?site.name:siteId;
@@ -1519,32 +1567,34 @@ function renderEquipGrid(){
           return '<span class="eq-chip '+(p.type||'hq')+'">'+p.name+'</span>';
         }).join('')+'</span>';
     }
-    var colCount=3+items.length+(_equipEditMode?1:0);
+    var colCount=2+items.length+(e?1:0);
     bodyHtml+='<tr class="eq-site-row"><td colspan="'+colCount
       +'" style="border-left:4px solid '+siteColor+'">'
-      +'<span style="color:#e0e0e8;font-size:12px;font-weight:700;letter-spacing:.06em">'+siteName+'</span>'
+      +'<span style="color:#f0f0f8;font-size:14px;font-weight:700;letter-spacing:.04em">'+siteName+'</span>'
       +personnelHtml+'</td></tr>';
 
     var siteUnits=allUnits.filter(function(u){return u.siteId===siteId;});
     siteUnits.forEach(function(unit,idx){
       var rowCls='eq-row '+(idx%2===0?'even':'odd');
       var unitPct=calcUnitProgress(unit);
-      bodyHtml+='<tr class="'+rowCls+'">';
-      // 사이트
-      bodyHtml+='<td class="eq-td-fix col-1" style="border-left:3px solid '+siteColor+';padding-left:6px">'
-        +'<span style="color:#d0d0e0;font-weight:600">'+siteName+'</span></td>';
-      // 라인
-      bodyHtml+='<td class="eq-td-fix col-2">'+(unit.lineName||'')+'</td>';
-      // 호기 + 진행율 미니바
       var pctBar='<div style="font-size:9px;color:#909090;margin-top:1px">'+unitPct+'%</div>';
-      bodyHtml+='<td class="eq-td-fix col-3" style="font-weight:500">'+(unit.unitName||'')+''+pctBar+'</td>';
+      bodyHtml+='<tr class="'+rowCls+'">';
+      // 라인 — 일반 스크롤 (editable in edit mode), 내용에 맞게 자동 너비
+      bodyHtml+='<td class="eq-td'+(e?' editable':'')+'" style="min-width:0;white-space:nowrap;text-align:left"'
+        +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
+        +(unit.lineName||'')+'</td>';
+      // 호기 — sticky at left:0 (editable in edit mode)
+      bodyHtml+='<td class="eq-td-fix'+(e?' editable':'')+'"'
+        +' style="left:0;border-right:2px solid #555;font-weight:500"'
+        +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
+        +(unit.unitName||'')+pctBar+'</td>';
       // 셀들
       items.forEach(function(item){
         var cell=(unit.cells||{})[item.id];
-        bodyHtml+=renderEquipCell(cell,_equipEditMode,unit.id,item.id);
+        bodyHtml+=renderEquipCell(cell,e,unit.id,item.id);
       });
       // 수정모드 액션
-      if(_equipEditMode){
+      if(e){
         bodyHtml+='<td class="eq-td" style="white-space:nowrap">'
           +'<button class="eq-act-btn copy" onclick="openCopyEquipUnit(\''+unit.id+'\')">복사</button>'
           +'<button class="eq-act-btn del" onclick="delEquipUnit(\''+unit.id+'\')">삭제</button>'
@@ -1651,9 +1701,8 @@ function saveEquipCell(unitId,itemId){
 
 /* ── 사이트 추가 ── */
 function openAddEquipSite(){
-  var usedIds={};
-  S.equipUnits.forEach(function(u){usedIds[u.siteId]=true;});
-  var available=S.sites.filter(function(s){return !usedIds[s.id];});
+  ensureEquipSiteOrder();
+  var available=S.sites.filter(function(s){return S.equipSiteOrder.indexOf(s.id)<0;});
   if(!available.length){alert('모든 사이트가 이미 추가되어 있습니다.');return;}
   var opts=available.map(function(s){
     return '<option value="'+s.id+'">'+s.name+'</option>';
@@ -1670,17 +1719,15 @@ function openAddEquipSite(){
 function saveAddEquipSite(){
   var siteId=document.getElementById('eq_add_site').value;
   if(!siteId) return;
-  var initCells={};
-  S.equipItems.forEach(function(item){initCells[item.id]={type:'na',value:null};});
-  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,lineName:'',unitName:'호기1',cells:initCells});
+  ensureEquipSiteOrder();
+  if(S.equipSiteOrder.indexOf(siteId)<0) S.equipSiteOrder.push(siteId);
   saveData();cm();renderEquipTab();
 }
 
 /* ── 호기 추가 ── */
 function openAddEquipUnit(){
-  var usedSiteIds={};
-  S.equipUnits.forEach(function(u){usedSiteIds[u.siteId]=true;});
-  var available=S.sites.filter(function(s){return usedSiteIds[s.id];});
+  ensureEquipSiteOrder();
+  var available=S.sites.filter(function(s){return S.equipSiteOrder.indexOf(s.id)>=0;});
   if(!available.length){alert('먼저 사이트를 추가해주세요.');return;}
   var opts=available.map(function(s){
     return '<option value="'+s.id+'">'+s.name+'</option>';
@@ -1689,11 +1736,14 @@ function openAddEquipUnit(){
     +'<div class="fg"><label class="fl">사이트</label>'
     +'<select id="eq_unit_site">'+opts+'</select></div>'
     +'<div class="fg"><label class="fl">라인명 (선택)</label>'
-    +'<input type="text" id="eq_unit_line" placeholder="예: 1라인 A 호기"></div>'
+    +'<input type="text" id="eq_unit_line" placeholder="예: 1라인"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
-    +'<input type="text" id="eq_unit_name" placeholder="예: Anode"></div>'
+    +'<input type="text" id="eq_unit_name" placeholder="예: Anode"'
+    +' onkeydown="if(event.key===\'Enter\')saveAddEquipUnit()"></div>'
+    +'<div id="eq_unit_feedback" style="display:none;color:#4aaa70;font-size:11px;'
+    +'padding:4px 8px;background:#0a1e10;border-radius:4px;margin-bottom:6px"></div>'
     +'<div class="mfoot">'
-    +'<button class="btn sm" onclick="cm()">취소</button>'
+    +'<button class="btn sm" onclick="cm()">닫기</button>'
     +'<button class="btn sm pri" onclick="saveAddEquipUnit()">추가</button>'
     +'</div>');
 }
@@ -1706,7 +1756,14 @@ function saveAddEquipUnit(){
   var initCells={};
   S.equipItems.forEach(function(item){initCells[item.id]={type:'na',value:null};});
   S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,lineName:lineName,unitName:unitName,cells:initCells});
-  saveData();cm();renderEquipTab();
+  saveData();
+  renderEquipGrid();
+  // 모달 유지 — 필드 초기화 후 포커스
+  document.getElementById('eq_unit_line').value='';
+  document.getElementById('eq_unit_name').value='';
+  document.getElementById('eq_unit_name').focus();
+  var fb=document.getElementById('eq_unit_feedback');
+  if(fb){fb.style.display='';fb.textContent='"'+unitName+'" 추가됨';}
 }
 
 /* ── 항목 추가 ── */
@@ -1795,6 +1852,46 @@ function openDelEquipItem(itemId){
 function execDelEquipItem(itemId){
   S.equipItems=S.equipItems.filter(function(i){return i.id!==itemId;});
   S.equipUnits.forEach(function(u){if(u.cells)delete u.cells[itemId];});
+  saveData();cm();renderEquipTab();
+}
+
+/* ── 항목 순서 변경 ── */
+function moveEquipItem(itemId,dir){
+  var sorted=S.equipItems.slice().sort(function(a,b){return a.order-b.order;});
+  var idx=sorted.findIndex(function(i){return i.id===itemId;});
+  var swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=sorted.length) return;
+  var tmp=sorted[idx].order;
+  sorted[idx].order=sorted[swapIdx].order;
+  sorted[swapIdx].order=tmp;
+  S.equipItems.forEach(function(item){
+    var s=sorted.find(function(i){return i.id===item.id;});
+    if(s) item.order=s.order;
+  });
+  saveData();renderEquipGrid();
+}
+
+/* ── 라인/호기 수정 ── */
+function openEditEquipUnit(unitId){
+  var unit=S.equipUnits.find(function(u){return u.id===unitId;});
+  if(!unit) return;
+  mw('<div class="mtit">라인 / 호기 수정</div>'
+    +'<div class="fg"><label class="fl">라인명 (선택)</label>'
+    +'<input type="text" id="eq_edit_unit_line" value="'+(unit.lineName||'')+'"></div>'
+    +'<div class="fg"><label class="fl">호기명</label>'
+    +'<input type="text" id="eq_edit_unit_name" value="'+(unit.unitName||'')+'"></div>'
+    +'<div class="mfoot">'
+    +'<button class="btn sm" onclick="cm()">취소</button>'
+    +'<button class="btn sm pri" onclick="saveEditEquipUnit(\''+unitId+'\')">저장</button>'
+    +'</div>');
+}
+function saveEditEquipUnit(unitId){
+  var unit=S.equipUnits.find(function(u){return u.id===unitId;});
+  if(!unit) return;
+  var ln=document.getElementById('eq_edit_unit_line').value.trim();
+  var un=document.getElementById('eq_edit_unit_name').value.trim();
+  if(!un){alert('호기명을 입력해주세요.');return;}
+  unit.lineName=ln;unit.unitName=un;
   saveData();cm();renderEquipTab();
 }
 
