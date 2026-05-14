@@ -1518,14 +1518,40 @@ function renderEquipMemoCell(unit,editMode){
   var onclick=editMode?' onclick="openEditUnitMemo(\''+unit.id+'\')">':'>';
   if(memo){
     var escaped=memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    var tooltipHtml='<div class="eq-memo-tooltip">'+escaped.replace(/\n/g,'<br>')+'</div>';
     return '<td class="'+cls+'"'+styleAttr+onclick
-      +'<span class="eq-memo-icon-wrap"><span class="eq-memo-icon has-memo">&#x1F4AC;</span>'+tooltipHtml+'</span></td>';
+      +'<span class="eq-memo-icon-wrap" data-memo="'+escaped+'" onmouseenter="showMemoTooltip(this)" onmouseleave="hideMemoTooltip()">'
+      +'<span class="eq-memo-icon has-memo">&#x1F4AC;</span>'
+      +'</span></td>';
   }
   if(editMode){
     return '<td class="'+cls+'"'+styleAttr+onclick+'<span class="eq-memo-icon">+</span></td>';
   }
   return '<td class="'+cls+'"'+styleAttr+'></td>';
+}
+
+function showMemoTooltip(el){
+  var memo=el.getAttribute('data-memo');
+  if(!memo) return;
+  var tt=document.getElementById('eq-memo-tt');
+  if(!tt){
+    tt=document.createElement('div');
+    tt.id='eq-memo-tt';
+    tt.className='eq-memo-tooltip-fixed';
+    document.body.appendChild(tt);
+  }
+  tt.innerHTML=memo.replace(/\n/g,'<br>');
+  tt.style.display='block';
+  var rect=el.getBoundingClientRect();
+  var top=rect.bottom+4;
+  var left=rect.left;
+  tt.style.top=top+'px';
+  tt.style.left=left+'px';
+  var w=tt.offsetWidth;
+  if(left+w>window.innerWidth-8) tt.style.left=Math.max(8,window.innerWidth-w-8)+'px';
+}
+function hideMemoTooltip(){
+  var tt=document.getElementById('eq-memo-tt');
+  if(tt) tt.style.display='none';
 }
 
 /* ── 그리드 렌더 ── */

@@ -292,9 +292,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 /* 메모 아이콘 및 툴팁 */
 .eq-memo-icon{font-size:14px;cursor:pointer;display:inline-block;line-height:1}
 .eq-memo-icon.has-memo{color:#6ab0f0}
-.eq-memo-icon-wrap{position:relative;display:inline-block}
-.eq-memo-tooltip{display:none;position:absolute;z-index:200;background:#28283a;color:#e0e0ec;padding:7px 10px;border-radius:5px;font-size:12px;white-space:pre-wrap;max-width:220px;min-width:80px;top:calc(100% + 4px);left:0;border:1px solid #4a4a64;box-shadow:0 4px 12px rgba(0,0,0,.5);pointer-events:none;line-height:1.5}
-.eq-memo-icon-wrap:hover .eq-memo-tooltip{display:block}
+.eq-memo-icon-wrap{display:inline-block}
+.eq-memo-tooltip-fixed{display:none;position:fixed;z-index:9999;background:#28283a;color:#e0e0ec;padding:7px 10px;border-radius:5px;font-size:12px;white-space:pre-wrap;max-width:260px;min-width:80px;border:1px solid #4a4a64;box-shadow:0 4px 12px rgba(0,0,0,.5);pointer-events:none;line-height:1.5}
 
 /* 빈 상태 */
 .eq-empty{padding:60px 40px;text-align:center;color:#555;font-size:13px}
