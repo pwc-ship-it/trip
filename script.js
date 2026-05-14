@@ -1432,12 +1432,18 @@ function setEquipFilter(siteId){
   renderEquipTab();
 }
 
-/* ── sticky 좌측 오프셋 보정 ── */
+/* ── sticky 좌측 오프셋 보정 (라인/호기/양산시작/메모 4열) ── */
 function fixEquipStickyOffsets(){
   var lineEl=document.querySelector('#eqGrid .eq-col-line');
+  var unitEl=document.querySelector('#eqGrid .eq-col-unit');
+  var msEl=document.querySelector('#eqGrid .eq-col-msdate');
   if(!lineEl) return;
-  var w=lineEl.offsetWidth;
-  document.querySelectorAll('#eqGrid .eq-col-unit').forEach(function(el){el.style.left=w+'px';});
+  var lw=lineEl.offsetWidth;
+  var uw=unitEl?unitEl.offsetWidth:80;
+  var mw2=msEl?msEl.offsetWidth:80;
+  document.querySelectorAll('#eqGrid .eq-col-unit').forEach(function(el){el.style.left=lw+'px';});
+  document.querySelectorAll('#eqGrid .eq-col-msdate').forEach(function(el){el.style.left=(lw+uw)+'px';});
+  document.querySelectorAll('#eqGrid .eq-col-memo').forEach(function(el){el.style.left=(lw+uw+mw2)+'px';});
 }
 
 /* ── 메인 렌더 진입점 ── */
@@ -1476,12 +1482,60 @@ function renderEquipCell(cell,editMode,unitId,itemId){
   return '<td class="'+cls+'"'+onclick+inner+'</td>';
 }
 
+/* ── sticky 셀 렌더러 (고정 열용) ── */
+function renderEquipCellSticky(cell,editMode,unitId,itemId,extraCls,extraStyle){
+  var cls='eq-td-fix'+(extraCls?' '+extraCls:'')+(editMode?' editable':'');
+  var style=extraStyle?(' style="'+extraStyle+'"'):'';
+  var onclick=editMode?' onclick="openEquipCellEdit(\''+unitId+'\',\''+itemId+'\')">':'>';
+  if(!cell||cell.type==='na'){
+    return '<td class="'+cls+'"'+style+onclick+'<span class="eq-na">N/A</span></td>';
+  }
+  if(cell.type==='done'){
+    var doneDate=cell.value?'<div style="font-size:10px;color:#5a9aee;margin-top:2px">'+cell.value+'</div>':'';
+    return '<td class="'+cls+' eq-done"'+style+onclick+'100% ✓'+doneDate+'</td>';
+  }
+  if(cell.type==='percent'){
+    var pct=parseFloat(cell.value)||0;
+    var barCls2=pct>=90?'eq-bar-fill hi':'eq-bar-fill';
+    var inner='<div class="eq-pct">'+pct+'%</div>'
+      +'<div class="eq-bar-wrap"><div class="'+barCls2+'" style="width:'+Math.min(pct,100)+'%"></div></div>';
+    return '<td class="'+cls+'"'+style+onclick+inner+'</td>';
+  }
+  if(cell.type==='date'){
+    var today=TODAY.toISOString().slice(0,10);
+    var isOver=cell.value&&cell.value<today;
+    var dateCls=isOver?'eq-date overdue':'eq-date';
+    return '<td class="'+cls+'"'+style+onclick+'<span class="'+dateCls+'">'+cell.value+'</span></td>';
+  }
+  return '<td class="'+cls+'"'+style+onclick+'</td>';
+}
+
+/* ── 메모 셀 렌더러 ── */
+function renderEquipMemoCell(unit,editMode){
+  var memo=unit.memo||'';
+  var cls='eq-td-fix eq-col-memo'+(editMode?' editable':'');
+  var styleAttr=' style="left:0;border-right:2px solid #555;text-align:center;padding:4px"';
+  var onclick=editMode?' onclick="openEditUnitMemo(\''+unit.id+'\')">':'>';
+  if(memo){
+    var escaped=memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    var tooltipHtml='<div class="eq-memo-tooltip">'+escaped.replace(/\n/g,'<br>')+'</div>';
+    return '<td class="'+cls+'"'+styleAttr+onclick+'<span class="eq-memo-icon has-memo">&#x1F4AC;</span>'+tooltipHtml+'</td>';
+  }
+  if(editMode){
+    return '<td class="'+cls+'"'+styleAttr+onclick+'<span class="eq-memo-icon">+</span></td>';
+  }
+  return '<td class="'+cls+'"'+styleAttr+'></td>';
+}
+
 /* ── 그리드 렌더 ── */
 function renderEquipGrid(){
   var el=document.getElementById('eqGrid');
   if(!el) return;
 
   var items=S.equipItems.slice().sort(function(a,b){return a.order-b.order;});
+  // 양산시작(ei21)은 고정 열로 분리, 나머지가 스크롤 항목
+  var msDateItem=items.find(function(i){return i.id==='ei21';});
+  var scrollItems=items.filter(function(i){return i.id!=='ei21';});
 
   // 필터링
   var allUnits=S.equipUnits.filter(function(u){
@@ -1531,19 +1585,26 @@ function renderEquipGrid(){
     summaryEl.innerHTML=summaryHtml;
   }
 
+  var e=_equipEditMode;
+  // colCount: 고정 4열 (라인/호기/양산시작/메모) + 스크롤 항목 + 관리열(수정모드)
+  var scrollColCount=scrollItems.length+(e?1:0);
+
   /* ── 헤더 단일 행 ── */
   var prevGroup=null;
   var hdrRow='<tr>';
-  // 라인/호기 모두 sticky — 라인 left:0, 호기 left는 fixEquipStickyOffsets()로 동적 설정
+  // 고정 4열 헤더
   hdrRow+='<th class="eq-th fix-col eq-col-line" style="left:0;white-space:nowrap;min-width:40px">라인</th>';
-  hdrRow+='<th class="eq-th fix-col eq-col-unit" style="left:0;min-width:80px;width:80px;border-right:2px solid #555">호기</th>';
-  items.forEach(function(item,itemIdx){
+  hdrRow+='<th class="eq-th fix-col eq-col-unit" style="left:0;min-width:80px;width:80px;border-right:1px solid #3a3a44">호기</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-msdate" style="left:0;min-width:80px;width:80px;border-right:1px solid #3a3a44">'+(msDateItem?msDateItem.name:'양산시작')+'</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-memo" style="left:0;min-width:40px;width:40px;border-right:2px solid #555">메모</th>';
+  // 스크롤 항목 헤더
+  scrollItems.forEach(function(item,itemIdx){
     var g=item.groupName||'';
     var groupLbl=g?'<div style="font-size:8px;color:#534AB7;margin-bottom:2px;letter-spacing:.04em">'+g+'</div>':'';
     var borderLeft=(g&&g!==prevGroup&&prevGroup!==null)?'border-left:2px solid #534AB7;':'';
     prevGroup=g;
-    if(_equipEditMode){
-      var isFirst=(itemIdx===0),isLast=(itemIdx===items.length-1);
+    if(e){
+      var isFirst=(itemIdx===0),isLast=(itemIdx===scrollItems.length-1);
       hdrRow+='<th class="eq-th" style="padding:3px 5px;'+borderLeft+'white-space:normal;max-width:100px">'
         +groupLbl
         +'<div style="word-break:break-word">'+item.name+'</div>'
@@ -1557,12 +1618,11 @@ function renderEquipGrid(){
       hdrRow+='<th class="eq-th" style="'+borderLeft+'white-space:normal;max-width:100px">'+groupLbl+item.name+'</th>';
     }
   });
-  if(_equipEditMode) hdrRow+='<th class="eq-th">관리</th>';
+  if(e) hdrRow+='<th class="eq-th">관리</th>';
   hdrRow+='</tr>';
 
   /* ── 데이터 행 ── */
   var bodyHtml='';
-  var e=_equipEditMode;
   siteIds.forEach(function(siteId){
     var site=S.sites.find(function(s){return s.id===siteId;});
     var siteName=site?site.name:siteId;
@@ -1575,11 +1635,13 @@ function renderEquipGrid(){
           return '<span class="eq-chip '+(p.type||'hq')+'">'+p.name+'</span>';
         }).join('')+'</span>';
     }
-    var colCount=2+items.length+(e?1:0);
-    bodyHtml+='<tr class="eq-site-row"><td colspan="'+colCount
-      +'" style="border-left:4px solid '+siteColor+'">'
+    // 사이트 구분 행 — 4열 colspan sticky로 사이트명/출장자 고정
+    bodyHtml+='<tr class="eq-site-row">'
+      +'<td colspan="4" style="position:sticky;left:0;z-index:25;border-left:4px solid '+siteColor+'">'
       +'<span style="color:#f0f0f8;font-size:14px;font-weight:700;letter-spacing:.04em">'+siteName+'</span>'
-      +personnelHtml+'</td></tr>';
+      +personnelHtml+'</td>'
+      +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#1a1a26;border-top:2px solid #2a2a3a"></td>':'')
+      +'</tr>';
 
     var siteUnits=allUnits.filter(function(u){return u.siteId===siteId;});
     siteUnits.forEach(function(unit,idx){
@@ -1594,19 +1656,27 @@ function renderEquipGrid(){
         pctBar='<div style="font-size:11px;color:#b0b0c0;margin-top:2px">'+unitPct+'%</div>';
       }
       bodyHtml+='<tr class="'+rowCls+'">';
-      // 라인 — sticky at left:0 (editable in edit mode)
+      // 라인 — sticky left:0
       bodyHtml+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
         +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
         +(unit.lineName||'')+'</td>';
-      // 호기 — sticky at dynamic left (set by fixEquipStickyOffsets), editable
+      // 호기 — sticky (left 동적)
       bodyHtml+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
-        +' style="left:0;border-right:2px solid #555;font-weight:500;'+unitBg+'"'
+        +' style="left:0;border-right:1px solid #3a3a44;font-weight:500;'+unitBg+'"'
         +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
         +(unit.unitName||'')+pctBar+'</td>';
-      // 셀들
-      items.forEach(function(item){
-        var cell=(unit.cells||{})[item.id];
-        bodyHtml+=renderEquipCell(cell,e,unit.id,item.id);
+      // 양산시작 — sticky (left 동적)
+      if(msDateItem){
+        bodyHtml+=renderEquipCellSticky((unit.cells||{})[msDateItem.id],e,unit.id,msDateItem.id,
+          'eq-col-msdate','left:0;border-right:1px solid #3a3a44');
+      } else {
+        bodyHtml+='<td class="eq-td-fix eq-col-msdate" style="left:0;border-right:1px solid #3a3a44"></td>';
+      }
+      // 메모 — sticky (left 동적)
+      bodyHtml+=renderEquipMemoCell(unit,e);
+      // 스크롤 항목 셀
+      scrollItems.forEach(function(item){
+        bodyHtml+=renderEquipCell((unit.cells||{})[item.id],e,unit.id,item.id);
       });
       // 수정모드 액션
       if(e){
@@ -1715,6 +1785,32 @@ function saveEquipCell(unitId,itemId){
   saveData();cm();renderEquipGrid();
 }
 
+/* ── 호기 메모 편집 ── */
+function openEditUnitMemo(unitId){
+  var unit=S.equipUnits.find(function(u){return u.id===unitId;});
+  if(!unit) return;
+  var memo=unit.memo||'';
+  mw('<div class="mtit">호기 메모</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">'+unit.unitName+'</div>'
+    +'<div class="fg"><label class="fl">메모 내용</label>'
+    +'<textarea id="eq_memo_text" rows="4" style="width:100%;resize:vertical;background:#141420;'
+    +'color:#e0e0ec;border:1px solid #3a3a4e;border-radius:4px;padding:6px;font-size:12px">'
+    +memo+'</textarea></div>'
+    +'<div class="mfoot">'
+    +'<button class="btn sm" onclick="cm()">취소</button>'
+    +'<button class="btn sm warn" onclick="saveUnitMemo(\''+unitId+'\',true)">삭제</button>'
+    +'<button class="btn sm pri" onclick="saveUnitMemo(\''+unitId+'\',false)">저장</button>'
+    +'</div>');
+  setTimeout(function(){var el=document.getElementById('eq_memo_text');if(el)el.focus();},50);
+}
+
+function saveUnitMemo(unitId,clear){
+  var unit=S.equipUnits.find(function(u){return u.id===unitId;});
+  if(!unit) return;
+  unit.memo=clear?'':(document.getElementById('eq_memo_text').value.trim());
+  saveData();cm();renderEquipGrid();
+}
+
 /* ── 사이트 추가 ── */
 function openAddEquipSite(){
   ensureEquipSiteOrder();
@@ -1771,7 +1867,7 @@ function saveAddEquipUnit(){
   if(!unitName){alert('호기명을 입력해주세요.');return;}
   var initCells={};
   S.equipItems.forEach(function(item){initCells[item.id]={type:'na',value:null};});
-  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,lineName:lineName,unitName:unitName,cells:initCells});
+  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,lineName:lineName,unitName:unitName,memo:'',cells:initCells});
   saveData();
   renderEquipGrid();
   // 모달 유지 — 필드 초기화 후 포커스
