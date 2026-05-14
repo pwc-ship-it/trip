@@ -1445,34 +1445,39 @@ function renderEquipGrid(){
     }
   });
 
+  /* ── 요약 카드 — eqSummary 영역 (테이블과 분리, 스크롤 독립) ── */
+  var summaryEl=document.getElementById('eqSummary');
   if(!allUnits.length){
     el.innerHTML='<div class="eq-empty">등록된 설비가 없습니다.'
       +'<div class="eq-empty-sub">수정 모드로 전환 후 [+ 사이트]와 [+ 호기]를 추가하세요.</div></div>';
+    if(summaryEl) summaryEl.innerHTML='';
     return;
   }
 
-  /* ── 사이트별 진행율 요약 카드 (eq-scroll 안에 배치 → 좌우 스크롤 연동) ── */
-  var summaryHtml='<div class="eq-summary-bar">';
-  siteIds.forEach(function(siteId){
-    var site=S.sites.find(function(s){return s.id===siteId;});
-    if(!site) return;
-    var pct=calcSiteProgress(siteId);
-    if(pct===null) return;
-    var units=S.equipUnits.filter(function(u){return u.siteId===siteId;});
-    var doneCount=units.filter(function(u){return calcUnitProgress(u)===100;}).length;
-    var barColor=pct===100?'#2a8a40':(pct>=70?'#1a6bbf':'#b87a10');
-    summaryHtml+='<div class="eq-summary-card">'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
-      +'<div style="width:8px;height:8px;border-radius:50%;background:'+site.color+';flex-shrink:0"></div>'
-      +'<span style="font-size:12px;font-weight:600;color:#e8e8ec">'+site.name+'</span>'
-      +'</div>'
-      +'<div style="font-size:22px;font-weight:700;color:#e8e8ec;line-height:1">'+pct+'%</div>'
-      +'<div style="margin:5px 0 3px;background:#1e1e2a;border-radius:3px;height:5px;overflow:hidden">'
-      +'<div style="height:100%;border-radius:3px;background:'+barColor+';width:'+pct+'%"></div></div>'
-      +'<div style="font-size:10px;color:#909090;margin-top:2px">'+doneCount+' / '+units.length+' 호기 완료</div>'
-      +'</div>';
-  });
-  summaryHtml+='</div>';
+  if(summaryEl){
+    var summaryHtml='<div class="eq-summary-bar">';
+    siteIds.forEach(function(siteId){
+      var site=S.sites.find(function(s){return s.id===siteId;});
+      if(!site) return;
+      var pct=calcSiteProgress(siteId);
+      if(pct===null) return;
+      var units=S.equipUnits.filter(function(u){return u.siteId===siteId;});
+      var doneCount=units.filter(function(u){return calcUnitProgress(u)===100;}).length;
+      var barColor=pct===100?'#2a8a40':(pct>=70?'#1a6bbf':'#b87a10');
+      summaryHtml+='<div class="eq-summary-card">'
+        +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
+        +'<div style="width:4px;height:28px;border-radius:2px;background:'+site.color+';flex-shrink:0"></div>'
+        +'<span style="font-size:13px;font-weight:700;color:#e8e8ec">'+site.name+'</span>'
+        +'</div>'
+        +'<div style="font-size:24px;font-weight:700;color:#e8e8ec;line-height:1">'+pct+'%</div>'
+        +'<div style="margin:6px 0 3px;background:#1e1e2a;border-radius:3px;height:5px;overflow:hidden">'
+        +'<div style="height:100%;border-radius:3px;background:'+barColor+';width:'+pct+'%"></div></div>'
+        +'<div style="font-size:10px;color:#a0a0b0;margin-top:3px">'+doneCount+' / '+units.length+' 호기 완료</div>'
+        +'</div>';
+    });
+    summaryHtml+='</div>';
+    summaryEl.innerHTML=summaryHtml;
+  }
 
   /* ── 헤더 단일 행 (그룹명은 셀 내 소형 레이블로 표시) ── */
   var prevGroup=null;
@@ -1516,8 +1521,8 @@ function renderEquipGrid(){
     }
     var colCount=3+items.length+(_equipEditMode?1:0);
     bodyHtml+='<tr class="eq-site-row"><td colspan="'+colCount
-      +'" style="background:#151520;padding:4px 12px;font-size:10px;font-weight:600;letter-spacing:.06em">'
-      +'<span style="color:'+siteColor+'">■</span> <span style="color:#888">'+siteName+'</span>'
+      +'" style="border-left:4px solid '+siteColor+'">'
+      +'<span style="color:#e0e0e8;font-size:12px;font-weight:700;letter-spacing:.06em">'+siteName+'</span>'
       +personnelHtml+'</td></tr>';
 
     var siteUnits=allUnits.filter(function(u){return u.siteId===siteId;});
@@ -1526,11 +1531,12 @@ function renderEquipGrid(){
       var unitPct=calcUnitProgress(unit);
       bodyHtml+='<tr class="'+rowCls+'">';
       // 사이트
-      bodyHtml+='<td class="eq-td-fix col-1" style="color:'+siteColor+';font-weight:500">'+siteName+'</td>';
+      bodyHtml+='<td class="eq-td-fix col-1" style="border-left:3px solid '+siteColor+';padding-left:6px">'
+        +'<span style="color:#d0d0e0;font-weight:600">'+siteName+'</span></td>';
       // 라인
       bodyHtml+='<td class="eq-td-fix col-2">'+(unit.lineName||'')+'</td>';
       // 호기 + 진행율 미니바
-      var pctBar='<div style="font-size:9px;color:#666;margin-top:1px">'+unitPct+'%</div>';
+      var pctBar='<div style="font-size:9px;color:#909090;margin-top:1px">'+unitPct+'%</div>';
       bodyHtml+='<td class="eq-td-fix col-3" style="font-weight:500">'+(unit.unitName||'')+''+pctBar+'</td>';
       // 셀들
       items.forEach(function(item){
@@ -1548,8 +1554,7 @@ function renderEquipGrid(){
     });
   });
 
-  el.innerHTML=summaryHtml
-    +'<table class="eq-table"><thead>'+hdrRow+'</thead><tbody>'+bodyHtml+'</tbody></table>';
+  el.innerHTML='<table class="eq-table"><thead>'+hdrRow+'</thead><tbody>'+bodyHtml+'</tbody></table>';
 }
 
 /* ── 수정 모드 토글 ── */
