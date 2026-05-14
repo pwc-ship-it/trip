@@ -1432,6 +1432,14 @@ function setEquipFilter(siteId){
   renderEquipTab();
 }
 
+/* ── sticky 좌측 오프셋 보정 ── */
+function fixEquipStickyOffsets(){
+  var lineEl=document.querySelector('#eqGrid .eq-col-line');
+  if(!lineEl) return;
+  var w=lineEl.offsetWidth;
+  document.querySelectorAll('#eqGrid .eq-col-unit').forEach(function(el){el.style.left=w+'px';});
+}
+
 /* ── 메인 렌더 진입점 ── */
 function renderEquipTab(){
   renderEquipSidebar();
@@ -1526,9 +1534,9 @@ function renderEquipGrid(){
   /* ── 헤더 단일 행 ── */
   var prevGroup=null;
   var hdrRow='<tr>';
-  // 사이트 열 제거 — 라인(일반)과 호기(sticky)만
-  hdrRow+='<th class="eq-th" style="white-space:nowrap;min-width:40px">라인</th>';
-  hdrRow+='<th class="eq-th fix-col" style="left:0;min-width:80px;width:80px;border-right:2px solid #555">호기</th>';
+  // 라인/호기 모두 sticky — 라인 left:0, 호기 left는 fixEquipStickyOffsets()로 동적 설정
+  hdrRow+='<th class="eq-th fix-col eq-col-line" style="left:0;white-space:nowrap;min-width:40px">라인</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-unit" style="left:0;min-width:80px;width:80px;border-right:2px solid #555">호기</th>';
   items.forEach(function(item,itemIdx){
     var g=item.groupName||'';
     var groupLbl=g?'<div style="font-size:8px;color:#534AB7;margin-bottom:2px;letter-spacing:.04em">'+g+'</div>':'';
@@ -1536,9 +1544,9 @@ function renderEquipGrid(){
     prevGroup=g;
     if(_equipEditMode){
       var isFirst=(itemIdx===0),isLast=(itemIdx===items.length-1);
-      hdrRow+='<th class="eq-th" style="padding:3px 5px;'+borderLeft+'">'
+      hdrRow+='<th class="eq-th" style="padding:3px 5px;'+borderLeft+'white-space:normal;max-width:100px">'
         +groupLbl
-        +'<div style="overflow:hidden;text-overflow:ellipsis;max-width:90px">'+item.name+'</div>'
+        +'<div style="word-break:break-word">'+item.name+'</div>'
         +'<div style="display:flex;gap:2px;margin-top:3px;justify-content:center;flex-wrap:wrap">'
         +(isFirst?'':'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block" onclick="moveEquipItem(\''+item.id+'\',-1)">↑</button>')
         +(isLast?'':'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block" onclick="moveEquipItem(\''+item.id+'\',1)">↓</button>')
@@ -1546,7 +1554,7 @@ function renderEquipGrid(){
         +'<button class="eq-item-edit-btn" style="width:auto;padding:1px 5px;display:inline-block;color:#c04040;border-color:#7a1010" onclick="openDelEquipItem(\''+item.id+'\')">삭제</button>'
         +'</div></th>';
     } else {
-      hdrRow+='<th class="eq-th" style="'+borderLeft+'">'+groupLbl+item.name+'</th>';
+      hdrRow+='<th class="eq-th" style="'+borderLeft+'white-space:normal;max-width:100px">'+groupLbl+item.name+'</th>';
     }
   });
   if(_equipEditMode) hdrRow+='<th class="eq-th">관리</th>';
@@ -1577,15 +1585,22 @@ function renderEquipGrid(){
     siteUnits.forEach(function(unit,idx){
       var rowCls='eq-row '+(idx%2===0?'even':'odd');
       var unitPct=calcUnitProgress(unit);
-      var pctBar='<div style="font-size:9px;color:#909090;margin-top:1px">'+unitPct+'%</div>';
+      // 진행율 표시 — 100%: 녹색 완료 표시, 나머지: 밝은 색 11px
+      var pctBar,unitBg='';
+      if(unitPct===100){
+        pctBar='<div style="font-size:11px;font-weight:600;color:#4aaa70;margin-top:2px">완료 ✓</div>';
+        unitBg='background:#091810;';
+      } else {
+        pctBar='<div style="font-size:11px;color:#b0b0c0;margin-top:2px">'+unitPct+'%</div>';
+      }
       bodyHtml+='<tr class="'+rowCls+'">';
-      // 라인 — 일반 스크롤 (editable in edit mode), 내용에 맞게 자동 너비
-      bodyHtml+='<td class="eq-td'+(e?' editable':'')+'" style="min-width:0;white-space:nowrap;text-align:left"'
+      // 라인 — sticky at left:0 (editable in edit mode)
+      bodyHtml+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
         +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
         +(unit.lineName||'')+'</td>';
-      // 호기 — sticky at left:0 (editable in edit mode)
-      bodyHtml+='<td class="eq-td-fix'+(e?' editable':'')+'"'
-        +' style="left:0;border-right:2px solid #555;font-weight:500"'
+      // 호기 — sticky at dynamic left (set by fixEquipStickyOffsets), editable
+      bodyHtml+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
+        +' style="left:0;border-right:2px solid #555;font-weight:500;'+unitBg+'"'
         +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
         +(unit.unitName||'')+pctBar+'</td>';
       // 셀들
@@ -1605,6 +1620,7 @@ function renderEquipGrid(){
   });
 
   el.innerHTML='<table class="eq-table"><thead>'+hdrRow+'</thead><tbody>'+bodyHtml+'</tbody></table>';
+  fixEquipStickyOffsets();
 }
 
 /* ── 수정 모드 토글 ── */
