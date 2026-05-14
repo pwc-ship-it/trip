@@ -429,7 +429,7 @@ var _selCol='purple',_dragIdx=null;
 function openModal(t){if(t==='schedule')showSM(null);else if(t==='event')showEM(null);else showSiteM();}
 function openEditSc(id){var s=S.schedules.find(function(x){return x.id===id;});if(s)showSM(s);}
 function openEditEv(id){var e=S.events.find(function(x){return x.id===id;});if(e)showEM(e);}
-function mw(inner,wide){document.getElementById('mc').innerHTML='<div class="mover" onclick="if(event.target===this)cm()"><div class="modal'+(wide?' wide':'')+'" onclick="event.stopPropagation()">'+inner+'</div></div>';}
+function mw(inner,wide){document.getElementById('mc').innerHTML='<div class="mover"><div class="modal'+(wide?' wide':'')+'">'+inner+'</div></div>';}
 function cm(){document.getElementById('mc').innerHTML='';_selCol='purple';_dragIdx=null;}
 
 /* 이벤트 모달 */
@@ -1736,9 +1736,9 @@ function openAddEquipUnit(){
     +'<div class="fg"><label class="fl">사이트</label>'
     +'<select id="eq_unit_site">'+opts+'</select></div>'
     +'<div class="fg"><label class="fl">라인명 (선택)</label>'
-    +'<input type="text" id="eq_unit_line" placeholder="예: 1라인"></div>'
+    +'<input type="text" id="eq_unit_line" placeholder="예: 1라인" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
-    +'<input type="text" id="eq_unit_name" placeholder="예: Anode"'
+    +'<input type="text" id="eq_unit_name" placeholder="예: Anode" autocorrect="off" autocomplete="off" spellcheck="false"'
     +' onkeydown="if(event.key===\'Enter\')saveAddEquipUnit()"></div>'
     +'<div id="eq_unit_feedback" style="display:none;color:#4aaa70;font-size:11px;'
     +'padding:4px 8px;background:#0a1e10;border-radius:4px;margin-bottom:6px"></div>'
@@ -1875,11 +1875,16 @@ function moveEquipItem(itemId,dir){
 function openEditEquipUnit(unitId){
   var unit=S.equipUnits.find(function(u){return u.id===unitId;});
   if(!unit) return;
+  var siteOpts=S.sites.map(function(s){
+    return '<option value="'+s.id+'"'+(s.id===unit.siteId?' selected':'')+'>'+s.name+'</option>';
+  }).join('');
   mw('<div class="mtit">라인 / 호기 수정</div>'
+    +'<div class="fg"><label class="fl">사이트</label>'
+    +'<select id="eq_edit_unit_site">'+siteOpts+'</select></div>'
     +'<div class="fg"><label class="fl">라인명 (선택)</label>'
-    +'<input type="text" id="eq_edit_unit_line" value="'+(unit.lineName||'')+'"></div>'
+    +'<input type="text" id="eq_edit_unit_line" value="'+(unit.lineName||'')+'" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
-    +'<input type="text" id="eq_edit_unit_name" value="'+(unit.unitName||'')+'"></div>'
+    +'<input type="text" id="eq_edit_unit_name" value="'+(unit.unitName||'')+'" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveEditEquipUnit(\''+unitId+'\')">저장</button>'
@@ -1888,9 +1893,11 @@ function openEditEquipUnit(unitId){
 function saveEditEquipUnit(unitId){
   var unit=S.equipUnits.find(function(u){return u.id===unitId;});
   if(!unit) return;
+  var newSiteId=document.getElementById('eq_edit_unit_site').value;
   var ln=document.getElementById('eq_edit_unit_line').value.trim();
   var un=document.getElementById('eq_edit_unit_name').value.trim();
   if(!un){alert('호기명을 입력해주세요.');return;}
+  unit.siteId=newSiteId;
   unit.lineName=ln;unit.unitName=un;
   saveData();cm();renderEquipTab();
 }
