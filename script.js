@@ -1519,7 +1519,8 @@ function renderEquipMemoCell(unit,editMode){
   if(memo){
     var escaped=memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     var tooltipHtml='<div class="eq-memo-tooltip">'+escaped.replace(/\n/g,'<br>')+'</div>';
-    return '<td class="'+cls+'"'+styleAttr+onclick+'<span class="eq-memo-icon has-memo">&#x1F4AC;</span>'+tooltipHtml+'</td>';
+    return '<td class="'+cls+'"'+styleAttr+onclick
+      +'<span class="eq-memo-icon-wrap"><span class="eq-memo-icon has-memo">&#x1F4AC;</span>'+tooltipHtml+'</span></td>';
   }
   if(editMode){
     return '<td class="'+cls+'"'+styleAttr+onclick+'<span class="eq-memo-icon">+</span></td>';
