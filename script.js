@@ -872,6 +872,47 @@ function getRolling12(){
   return {start:start,end:end};
 }
 
+// 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
+function calcKoreaDays12M(trips, rolling12){
+  var overseas={};
+  trips.forEach(function(t){
+    var s=new Date(Math.max(pd(t.start),rolling12.start));
+    var e=new Date(Math.min(pd(t.end),rolling12.end));
+    if(s>e) return;
+    for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+      overseas[cur.toDateString()]=true;
+  });
+  var windowDays=Math.round((rolling12.end-rolling12.start)/86400000)+1;
+  return windowDays-Object.keys(overseas).length;
+}
+
+// 롤링 12개월 창 안에서 모든 지역 합산 해외 체류일
+function calcTotalOverseas12M(trips, rolling12){
+  var set={};
+  trips.forEach(function(t){
+    var s=new Date(Math.max(pd(t.start),rolling12.start));
+    var e=new Date(Math.min(pd(t.end),rolling12.end));
+    if(s>e) return;
+    for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+      set[cur.toDateString()]=true;
+  });
+  return Object.keys(set).length;
+}
+
+// 현재 연속 국내 체류일 (기존 calcKoreaDays와 동일 로직, 이름만 명확화)
+function calcCurrentKoreaDays(trips){
+  if(!trips||!trips.length) return 0;
+  var pastTrips=trips.filter(function(t){return pd(t.end)<=TODAY;});
+  if(!pastTrips.length) return 0;
+  var lastEnd=pastTrips.reduce(function(mx,t){return pd(t.end)>pd(mx)?t.end:mx;},pastTrips[0].end);
+  var onTrip=trips.some(function(t){return TODAY>=pd(t.start)&&TODAY<=pd(t.end);});
+  if(onTrip) return 0;
+  var returnDay=new Date(pd(lastEnd));
+  returnDay.setDate(returnDay.getDate()+1);
+  if(returnDay>TODAY) return 0;
+  return Math.round((TODAY-returnDay)/86400000)+1;
+}
+
 function aggregatePersonTrips(){
   var persons={};
   S.schedules.forEach(function(sc){
@@ -960,20 +1001,25 @@ function statusHtml(st){
 }
 
 // ── 상태 변수
-var _pmFilter='all';          // 지역 필터
+var _pmFilter='all';          // 상태 필터: all | going | home
 var _pmSearch='';             // 이름 검색
-var _pmSortKey='name';        // 정렬 기준: name | location | americas | europe | other | korea
+var _pmSortKey='name';        // 정렬 기준: name | americas | europe | total | korea12m | koreaCur
 var _pmSortAsc=true;          // 정렬 방향
 var _pmTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true}; // 인원유형 체크
+var _pmExpanded={};           // 행 펼침 상태: { '이름': true }
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
 function setPmSearch(v){
   _pmSearch=v.toLowerCase();
-  renderPersonBody(); // 결과 영역만 갱신 - 검색창 DOM 건드리지 않음
+  renderPersonBody();
 }
 function setPmSort(key){
   if(_pmSortKey===key) _pmSortAsc=!_pmSortAsc;
   else { _pmSortKey=key; _pmSortAsc=key==='name'; }
+  renderPersonBody();
+}
+function togglePersonExpand(name){
+  _pmExpanded[name]=!_pmExpanded[name];
   renderPersonBody();
 }
 function togglePmType(type){
@@ -1022,10 +1068,9 @@ function renderPersonTab(){
   html+='</div>';
   html+='<div class="pm-ctrl-sep"></div>';
   html+='<div class="pm-ctrl-group">';
-  html+='<span style="font-size:10px;color:#555">지역</span>';
-  ['all','current','americas','europe','other'].forEach(function(f){
-    var lbl={all:'전체',current:'출장중',americas:'미주',europe:'유럽',other:'기타'}[f];
-    html+='<button class="pm-filter-btn'+((_pmFilter===f)?' on':'')+'" onclick="setPmFilter(\''+f+'\')">'+lbl+'</button>';
+  html+='<span style="font-size:10px;color:#555">상태</span>';
+  [{v:'all',l:'전체'},{v:'going',l:'출장중'},{v:'home',l:'국내'}].forEach(function(f){
+    html+='<button class="pm-filter-btn'+((_pmFilter===f.v)?' on':'')+'" onclick="setPmFilter(\''+f.v+'\')">'+f.l+'</button>';
   });
   html+='</div>';
   html+='<div class="pm-ctrl-sep"></div>';
@@ -1053,7 +1098,7 @@ function renderPersonTab(){
 
 // 정렬 버튼 HTML 조각 생성 (컨트롤바 내 정렬 버튼 업데이트에 재사용)
 function buildSortBtnsHtml(){
-  var sortBtns=[['name','이름'],['location','현위치'],['americas','미주(12M)'],['europe','유럽(12M)'],['other','기타(12M)'],['korea','한국체류']];
+  var sortBtns=[['name','이름'],['americas','미주(12M)'],['europe','유럽(12M)'],['total','전체해외(12M)'],['korea12m','국내(12M)'],['koreaCur','현재국내']];
   var h='<span style="font-size:10px;color:#555">정렬</span>';
   sortBtns.forEach(function(b){
     var isOn=_pmSortKey===b[0];
@@ -1073,7 +1118,6 @@ function renderPersonBody(){
   if(sortEl) sortEl.innerHTML=buildSortBtnsHtml();
 
   // 타입필터 버튼 상태 업데이트
-  var typeList=[['hq','본사',TYPE_COLOR.hq],['outsource','외주',TYPE_COLOR.outsource],['tech','기술',TYPE_COLOR.tech],['vision','비전',TYPE_COLOR.vision],['host','호스트',TYPE_COLOR.host]];
   var ctrlBar=document.getElementById('pmCtrlBar');
   if(ctrlBar){
     ctrlBar.querySelectorAll('.pm-type-ck').forEach(function(el){
@@ -1090,171 +1134,187 @@ function renderPersonBody(){
   var allPersons=aggregatePersonTrips();
   var rolling12=getRolling12();
 
-  // 이름 검색 + 인원유형 필터
+  // 이름 검색 + 인원유형 필터 + 상태 필터
   var names=Object.keys(allPersons).filter(function(n){
     var p=allPersons[n];
     var typeKeys=Object.keys(p.types||{});
     if(typeKeys.length===0) typeKeys=[p.type];
     if(!typeKeys.some(function(t){return _pmTypeFilter[t];})) return false;
     if(_pmSearch && n.toLowerCase().indexOf(_pmSearch)<0) return false;
+    var loc=getCurrentLocation(p.trips);
+    if(_pmFilter==='going' && !loc.onTrip) return false;
+    if(_pmFilter==='home'  &&  loc.onTrip) return false;
     return true;
   });
 
-  // ── 지역 필터에 따른 섹션 결정
-  var showRegions=[];
-  if(_pmFilter==='all'||_pmFilter==='current'||_pmFilter==='americas') showRegions.push('americas');
-  if(_pmFilter==='all'||_pmFilter==='current'||_pmFilter==='europe')   showRegions.push('europe');
-  if(_pmFilter==='all'||_pmFilter==='current'||_pmFilter==='other')    showRegions.push('other');
-
-  var html='';
-  showRegions.forEach(function(region){
-    var sectionNames=names.filter(function(n){
-      var p=allPersons[n];
-      if(_pmFilter==='current') return getCurrentLocation(p.trips).onTrip;
-      return p.trips.some(function(t){return t.region===region;});
-    });
-    if(!sectionNames.length) return;
-
-    // 정렬
-    sectionNames=sectionNames.slice().sort(function(a,b){
-      var pa=allPersons[a], pb=allPersons[b];
-      var locA=getCurrentLocation(pa.trips), locB=getCurrentLocation(pb.trips);
-      var locStrA=locA.onTrip?locA.siteName:'한국';
-      var locStrB=locB.onTrip?locB.siteName:'한국';
-      var v;
-      if(_pmSortKey==='name')          v=a.localeCompare(b,'ko');
-      else if(_pmSortKey==='location') v=locStrA.localeCompare(locStrB,'ko');
-      else if(_pmSortKey==='americas') v=calcRegionDays12M(pa.trips,'americas',rolling12)-calcRegionDays12M(pb.trips,'americas',rolling12);
-      else if(_pmSortKey==='europe')   v=calcRegionDays12M(pa.trips,'europe',rolling12)-calcRegionDays12M(pb.trips,'europe',rolling12);
-      else if(_pmSortKey==='other')    v=calcRegionDays12M(pa.trips,'other',rolling12)-calcRegionDays12M(pb.trips,'other',rolling12);
-      else if(_pmSortKey==='korea')    v=calcKoreaDays(pa.trips)-calcKoreaDays(pb.trips);
-      else                             v=a.localeCompare(b,'ko');
-      return _pmSortAsc?v:-v;
-    });
-    html+=renderRegionSection(allPersons, sectionNames, region, rolling12);
-  });
-
-  var anySection=showRegions.some(function(region){
-    return names.some(function(n){
-      var p=allPersons[n];
-      if(_pmFilter==='current') return getCurrentLocation(p.trips).onTrip;
-      return p.trips.some(function(t){return t.region===region;});
-    });
-  });
-  if(!anySection){
-    html='<div style="padding:30px 10px;text-align:center;color:#555;font-size:13px">해당 조건의 인원이 없습니다.</div>';
+  if(!names.length){
+    body.innerHTML='<div style="padding:30px 10px;text-align:center;color:#707080;font-size:13px">해당 조건의 인원이 없습니다.</div>';
+    return;
   }
-  body.innerHTML=html;
+
+  // 정렬
+  names=names.slice().sort(function(a,b){
+    var pa=allPersons[a], pb=allPersons[b];
+    var v;
+    if(_pmSortKey==='name')        v=a.localeCompare(b,'ko');
+    else if(_pmSortKey==='americas') v=calcRegionDays12M(pa.trips,'americas',rolling12)-calcRegionDays12M(pb.trips,'americas',rolling12);
+    else if(_pmSortKey==='europe')   v=calcRegionDays12M(pa.trips,'europe',rolling12)-calcRegionDays12M(pb.trips,'europe',rolling12);
+    else if(_pmSortKey==='total')    v=calcTotalOverseas12M(pa.trips,rolling12)-calcTotalOverseas12M(pb.trips,rolling12);
+    else if(_pmSortKey==='korea12m') v=calcKoreaDays12M(pa.trips,rolling12)-calcKoreaDays12M(pb.trips,rolling12);
+    else if(_pmSortKey==='koreaCur') v=calcCurrentKoreaDays(pa.trips)-calcCurrentKoreaDays(pb.trips);
+    else                             v=a.localeCompare(b,'ko');
+    return _pmSortAsc?v:-v;
+  });
+
+  body.innerHTML=renderPersonTable(allPersons, names, rolling12);
 }
 
-function renderRegionSection(persons, nameList, region, rolling12){
-  var labels={
-    americas:{title:'미주 출장',sub:'ESHD · ESMI · ESHG · MILS · ESOT · UC2 · 현대JV · BOSK_TN',color:'#1a8c66',icon:'#1a8c66',b1:true,  limit:180,warn1:120,warn2:150},
-    europe:  {title:'유럽 출장',sub:'ESWA / WA',                                                  color:'#cc8010',icon:'#cc8010',b1:false, limit:180,warn1:120,warn2:150},
-    other:   {title:'기타 지역 출장',sub:'그 외 사이트',                                          color:'#534AB7',icon:'#534AB7',b1:false, limit:180,warn1:120,warn2:150}
-  };
-  var L=labels[region];
-  var html='<div class="pm-section">';
-  html+='<div class="pm-sec-head">';
-  html+='<div class="pm-sec-icon" style="background:'+L.icon+'"></div>';
-  html+='<span class="pm-sec-title">'+L.title+'</span>';
-  html+='<span class="pm-sec-sub">'+L.sub+'</span>';
-  if(L.b1) html+='<span class="pm-sec-badge" style="background:#1a3a1a;border:1px solid #2a6a2a">B1 비자 관리</span>';
-  html+='</div>';
-
-  // ── 테이블 헤더 (정렬 버튼 포함)
-  var thDay=region==='americas'?'미주 출장일 (12M)':(region==='europe'?'유럽 출장일 (12M)':'기타 출장일 (12M)');
-  var regionSortKey=region; // americas|europe|other 그대로 사용
-  function thSort(key,label){
+function renderPersonTable(persons, nameList, rolling12){
+  var html='<table class="pm-person-table">';
+  html+='<thead><tr>';
+  function thS(key,lbl){
     var isOn=_pmSortKey===key;
-    var arrow=isOn?(_pmSortAsc?'▲':'▼'):'⇅';
-    return '<th class="pm-th-sort'+(isOn?' on':'')+'" onclick="setPmSort(\''+key+'\')">'+label+' <span class="pm-th-arrow">'+arrow+'</span></th>';
+    var arrow=isOn?(_pmSortAsc?' ▲':' ▼'):'';
+    return '<th class="'+(isOn?'on':'')+'" onclick="setPmSort(\''+key+'\')">'+lbl+arrow+'</th>';
   }
-  html+='<table class="pm-table"><thead><tr>'
-    +thSort('name','이름')
-    +thSort('location','현 위치')
-    +thSort(regionSortKey,thDay)
-    +thSort('korea','한국 체류일')
-    +'<th>출장 내역</th>'
-    +'</tr></thead><tbody>';
+  html+=thS('name','이름');
+  html+='<th>현재위치</th>';
+  html+=thS('americas','미주(12M)');
+  html+=thS('europe','유럽(12M)');
+  html+=thS('total','전체해외(12M)');
+  html+=thS('koreaCur','현재국내');
+  html+=thS('korea12m','국내(12M)');
+  html+='<th>B1</th>';
+  html+='</tr></thead><tbody>';
 
   nameList.forEach(function(name){
-    var p=persons[name];
-    var regionTrips=p.trips.filter(function(t){return t.region===region;});
-    var allTrips=p.trips;
-
-    var rolling12Days=calcRegionDays12M(allTrips, region, rolling12);
-    var koreaDays=calcKoreaDays(allTrips);
-    var loc=getCurrentLocation(allTrips);
-
-    // 경고 레벨 (미주·유럽·기타 동일 기준)
-    var daysCls='',daysNote='';
-    if(rolling12Days>=L.warn2){daysCls='b1-alert';daysNote='⚠ 체류 주의 ('+rolling12Days+'일)';}
-    else if(rolling12Days>=L.warn1){daysCls='b1-warn';daysNote='주의 구간 ('+rolling12Days+'일)';}
-    else{daysCls='b1-ok';}
-
-    html+='<tr>';
-
-    // 이름 + 유형
-    var tc=TYPE_COLOR[p.type]||'#555'; var tl=TYPE_LBL[p.type]||p.type;
-    html+='<td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
-      +'<span class="pm-name">'+name+'</span>'
-      +'<span class="pm-type" style="background:'+tc+'">'+tl+'</span>'
-      +'</div></td>';
-
-    // 현 위치
-    if(loc.onTrip){
-      html+='<td><div style="display:flex;flex-direction:column;gap:2px">'
-        +'<span style="font-size:11px;font-weight:600;color:'+loc.siteColor+'">'+loc.siteName+'</span>'
-        +'<span style="font-size:10px;color:#666">~'+fmt(loc.endDate)+'</span>'
-        +'</div></td>';
-    } else {
-      html+='<td><span style="font-size:11px;color:#4aaa70">🇰🇷 국내</span></td>';
-    }
-
-    // 지역 출장일 (rolling 12M)
-    var barPct=Math.min(100,Math.round(rolling12Days/L.limit*100));
-    var barColor=rolling12Days>=L.warn2?'#e84040':rolling12Days>=L.warn1?'#e8a020':L.icon;
-    html+='<td>';
-    html+='<div style="display:flex;align-items:baseline;gap:2px">'
-      +'<span class="pm-days-big '+daysCls+'" style="font-size:20px">'+rolling12Days+'</span>'
-      +'<span class="pm-days-unit">일</span>'
-      +'</div>';
-    html+='<div class="pm-bar-wrap" style="margin-top:4px"><div class="pm-bar-fill" style="width:'+barPct+'%;background:'+barColor+'"></div></div>';
-    if(daysNote) html+='<div style="font-size:10px;color:'+barColor+';margin-top:2px">'+daysNote+'</div>';
-    html+='</td>';
-
-    // 한국 체류일
-    var kd=Math.max(0,koreaDays);
-    var krColor=kd<30?'#e84040':kd<60?'#e8a020':'#4aaa70';
-    html+='<td><span style="font-size:16px;font-weight:600;color:'+krColor+'">'+kd+'</span><span class="pm-days-unit"> 일</span></td>';
-
-    // 출장 내역 (해당 지역만)
-    html+='<td><div class="pm-trips">';
-    regionTrips.forEach(function(t){
-      var r12d=calcOverlapDays(t.start,t.end,rolling12.start,rolling12.end);
-      var totalD=dd(t.start,t.end);
-      html+='<div class="pm-trip-row">'
-        +'<span class="pm-trip-site" style="background:'+t.siteColor+'">'+t.siteName+'</span>'
-        +'<span class="pm-trip-period">'+fmtFull(t.start)+' → '+fmtFull(t.end)+'</span>'
-        +'<span class="pm-trip-days" style="color:#ccc">'+totalD+'일'
-        +(r12d>0&&r12d<totalD?' <span style="color:#666;font-size:10px">(12M내 '+r12d+'일)</span>':'')
-        +'</span>'
-        +statusHtml(t.status)
-        +(t.task?'<span style="font-size:10px;color:#666">'+t.task+'</span>':'')
-        +'</div>';
-    });
-    if(!regionTrips.length) html+='<span class="pm-empty">내역 없음</span>';
-    html+='</div></td>';
-    html+='</tr>';
+    html+=renderPersonRow(name, persons[name], rolling12);
+    if(_pmExpanded[name]) html+=renderPersonTimeline(persons[name].trips, nameList.length);
   });
 
   html+='</tbody></table>';
-  html+='<div class="pm-b1-note">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). 한국 체류일은 마지막 복귀일 다음날부터 오늘까지의 일수.'
-    +(L.b1?' B1/B2 비자 참고 상한 180일/년.':'')+'</div>';
-  html+='</div>';
+  html+='<div style="font-size:10px;color:#707080;padding:8px 4px;margin-top:4px">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). B1 위험도는 미주 12M 기준.</div>';
   return html;
 }
+
+function renderPersonRow(name, person, rolling12){
+  var trips=person.trips;
+  var loc=getCurrentLocation(trips);
+  var amDays=calcRegionDays12M(trips,'americas',rolling12);
+  var euDays=calcRegionDays12M(trips,'europe',rolling12);
+  var totalDays=calcTotalOverseas12M(trips,rolling12);
+  var koreaCur=calcCurrentKoreaDays(trips);
+  var korea12m=calcKoreaDays12M(trips,rolling12);
+
+  // B1 위험도 (미주 12M 기준)
+  var b1Cls='b1-safe', b1Txt='안전';
+  if(amDays>=150){b1Cls='b1-alert';b1Txt='위험';}
+  else if(amDays>=120){b1Cls='b1-warn';b1Txt='주의';}
+
+  var tc=TYPE_COLOR[person.type]||'#555';
+  var tl=TYPE_LBL[person.type]||person.type;
+  var expanded=_pmExpanded[name];
+  var arrow=expanded?'▼':'▶';
+
+  var html='<tr class="pm-person-row" onclick="togglePersonExpand(\''+name.replace(/'/g,"\\'")+'\')">';
+
+  // 이름 + 유형 + 펼침 화살표
+  html+='<td><div style="display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:10px;color:#606070">'+arrow+'</span>'
+    +'<span class="pm-name">'+name+'</span>'
+    +'<span class="pm-type" style="background:'+tc+'">'+tl+'</span>'
+    +'</div></td>';
+
+  // 현재 위치
+  if(loc.onTrip){
+    html+='<td><div style="display:flex;flex-direction:column;gap:1px">'
+      +'<span style="font-size:12px;font-weight:600;color:'+loc.siteColor+'">'+loc.siteName+'</span>'
+      +'<span style="font-size:10px;color:#909090">~'+fmt(loc.endDate)+'</span>'
+      +'</div></td>';
+  } else {
+    html+='<td><span style="font-size:12px;color:#4aaa70;font-weight:500">🇰🇷 국내</span></td>';
+  }
+
+  // 미주(12M)
+  var amCls=amDays>=150?'b1-alert':amDays>=120?'b1-warn':'';
+  html+='<td style="text-align:center"><span class="pm-days-big '+(amCls)+'" style="font-size:16px">'+amDays+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // 유럽(12M)
+  html+='<td style="text-align:center"><span class="pm-days-big" style="font-size:16px">'+euDays+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // 전체해외(12M)
+  html+='<td style="text-align:center"><span style="font-size:16px;font-weight:700;color:#e8e8ec">'+totalDays+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // 현재국내
+  var curColor=koreaCur===0?(loc.onTrip?'#606070':'#e84040'):(koreaCur<30?'#e8a020':'#4aaa70');
+  html+='<td style="text-align:center"><span style="font-size:16px;font-weight:600;color:'+curColor+'">'+koreaCur+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // 국내(12M)
+  html+='<td style="text-align:center"><span style="font-size:16px;font-weight:600;color:#7aafee">'+korea12m+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // B1
+  html+='<td style="text-align:center"><span class="'+b1Cls+'" style="font-size:12px;font-weight:600">'+b1Txt+'</span></td>';
+
+  html+='</tr>';
+  return html;
+}
+
+function renderPersonTimeline(trips, colSpan){
+  if(!trips||!trips.length) return '';
+  var sorted=trips.slice().sort(function(a,b){return a.start>b.start?1:-1;});
+  var rows='';
+  var prevEnd=null;
+  var todayStr=TODAY.getFullYear()+'-'+String(TODAY.getMonth()+1).padStart(2,'0')+'-'+String(TODAY.getDate()).padStart(2,'0');
+
+  sorted.forEach(function(t){
+    // 이전 출장과 사이에 국내 체류 갭이 있으면 표시
+    if(prevEnd!==null){
+      var gapStart=new Date(pd(prevEnd));
+      gapStart.setDate(gapStart.getDate()+1);
+      var gapEnd=new Date(pd(t.start));
+      gapEnd.setDate(gapEnd.getDate()-1);
+      if(gapStart<=gapEnd){
+        var gapDays=Math.round((gapEnd-gapStart)/86400000)+1;
+        rows+='<div class="pm-tl-korea">'
+          +'<span style="font-size:16px;margin-right:2px">🇰🇷</span>'
+          +'<span style="flex:1">국내 체류</span>'
+          +'<span style="color:#a0a0a8;font-size:11px">'+fmtFull(gapStart.getFullYear()+'-'+String(gapStart.getMonth()+1).padStart(2,'0')+'-'+String(gapStart.getDate()).padStart(2,'0'))
+          +' → '+fmtFull(gapEnd.getFullYear()+'-'+String(gapEnd.getMonth()+1).padStart(2,'0')+'-'+String(gapEnd.getDate()).padStart(2,'0'))+'</span>'
+          +'<span style="min-width:50px;text-align:right;color:#b0b0b8">'+gapDays+'일</span>'
+          +'</div>';
+      }
+    }
+    // 출장 행
+    var stHtml=statusHtml(t.status);
+    rows+='<div class="pm-tl-trip">'
+      +'<span class="pm-trip-site" style="background:'+t.siteColor+'">'+t.siteName+'</span>'
+      +'<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#1e1e2a;color:#b0b0b8">'+(['americas'].indexOf(t.region)>=0?'미주':t.region==='europe'?'유럽':'기타')+'</span>'
+      +'<span style="flex:1;color:#a0a0a8;font-size:11px">'+fmtFull(t.start)+' → '+fmtFull(t.end)+'</span>'
+      +'<span style="min-width:50px;text-align:right;color:#c8c8d4">'+t.days+'일</span>'
+      +stHtml
+      +'</div>';
+    prevEnd=t.end;
+  });
+
+  // 마지막 출장 후 현재까지 국내 체류 (출장중이 아닌 경우)
+  var onTrip=trips.some(function(t){return TODAY>=pd(t.start)&&TODAY<=pd(t.end);});
+  if(!onTrip && prevEnd!==null){
+    var afterStart=new Date(pd(prevEnd));
+    afterStart.setDate(afterStart.getDate()+1);
+    if(afterStart<=TODAY){
+      var afterDays=Math.round((TODAY-afterStart)/86400000)+1;
+      rows+='<div class="pm-tl-korea">'
+        +'<span style="font-size:16px;margin-right:2px">🇰🇷</span>'
+        +'<span style="flex:1">국내 체류 (현재)</span>'
+        +'<span style="color:#a0a0a8;font-size:11px">'+fmtFull(afterStart.getFullYear()+'-'+String(afterStart.getMonth()+1).padStart(2,'0')+'-'+String(afterStart.getDate()).padStart(2,'0'))+' → 오늘</span>'
+        +'<span style="min-width:50px;text-align:right;color:#4aaa70">'+afterDays+'일</span>'
+        +'</div>';
+    }
+  }
+
+  return '<tr class="pm-expand-row"><td colspan="8"><div class="pm-timeline">'+rows+'</div></td></tr>';
+}
+
 
 /* ════════════════════════════════════════════
    설비 진행율 탭
@@ -1345,7 +1405,8 @@ function renderEquipCell(cell,editMode,unitId,itemId){
     return '<td class="'+cls+'"'+onclick+'<span class="eq-na">N/A</span></td>';
   }
   if(cell.type==='done'){
-    return '<td class="'+cls+' eq-done"'+onclick+'100% ✓</td>';
+    var doneDate=cell.value?'<div style="font-size:10px;color:#5a9aee;margin-top:2px">'+cell.value+'</div>':'';
+    return '<td class="'+cls+' eq-done"'+onclick+'100% ✓'+doneDate+'</td>';
   }
   if(cell.type==='percent'){
     var pct=parseFloat(cell.value)||0;
@@ -1390,8 +1451,8 @@ function renderEquipGrid(){
     return;
   }
 
-  /* ── 상단 사이트별 진행율 요약 카드 ── */
-  var summaryHtml='<div style="padding:12px 16px 8px;display:flex;flex-wrap:wrap;gap:10px;border-bottom:1.5px solid #2a2a3a">';
+  /* ── 사이트별 진행율 요약 카드 (eq-scroll 안에 배치 → 좌우 스크롤 연동) ── */
+  var summaryHtml='<div class="eq-summary-bar">';
   siteIds.forEach(function(siteId){
     var site=S.sites.find(function(s){return s.id===siteId;});
     if(!site) return;
@@ -1400,7 +1461,7 @@ function renderEquipGrid(){
     var units=S.equipUnits.filter(function(u){return u.siteId===siteId;});
     var doneCount=units.filter(function(u){return calcUnitProgress(u)===100;}).length;
     var barColor=pct===100?'#2a8a40':(pct>=70?'#1a6bbf':'#b87a10');
-    summaryHtml+='<div style="background:#1a1a26;border:1px solid #2a2a3a;border-radius:8px;padding:10px 14px;min-width:140px;flex:1;max-width:200px">'
+    summaryHtml+='<div class="eq-summary-card">'
       +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
       +'<div style="width:8px;height:8px;border-radius:50%;background:'+site.color+';flex-shrink:0"></div>'
       +'<span style="font-size:12px;font-weight:600;color:#e8e8ec">'+site.name+'</span>'
@@ -1408,7 +1469,7 @@ function renderEquipGrid(){
       +'<div style="font-size:22px;font-weight:700;color:#e8e8ec;line-height:1">'+pct+'%</div>'
       +'<div style="margin:5px 0 3px;background:#1e1e2a;border-radius:3px;height:5px;overflow:hidden">'
       +'<div style="height:100%;border-radius:3px;background:'+barColor+';width:'+pct+'%"></div></div>'
-      +'<div style="font-size:10px;color:#666;margin-top:2px">'+doneCount+' / '+units.length+' 호기 완료</div>'
+      +'<div style="font-size:10px;color:#909090;margin-top:2px">'+doneCount+' / '+units.length+' 호기 완료</div>'
       +'</div>';
   });
   summaryHtml+='</div>';
@@ -1526,8 +1587,8 @@ function openEquipCellEdit(unitId,itemId){
     +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#e8e8ec;cursor:pointer">'
     +'<input type="radio" name="eq_type" value="done"'+(t==='done'?' checked':'')+' onchange="equipCellTypeChange()"> 완료(100%)</label>'
     +'</div></div>'
-    +'<div class="fg" id="eq_val_wrap" style="'+(t==='na'||t==='done'?'display:none':'')+'"><label class="fl" id="eq_val_lbl">'+(t==='date'?'예정일':'진행율(%)')+'</label>'
-    +'<input type="'+(t==='date'?'date':'number')+'" id="eq_val" min="0" max="100" value="'+v+'" style="width:100%"></div>'
+    +'<div class="fg" id="eq_val_wrap" style="'+(t==='na'?'display:none':'')+'"><label class="fl" id="eq_val_lbl">'+(t==='done'?'완료 일자 (선택)':(t==='date'?'예정일':'진행율(%)'))+'</label>'
+    +'<input type="'+(t==='done'||t==='date'?'date':'number')+'" id="eq_val" min="0" max="100" value="'+v+'" placeholder="'+(t==='done'?'날짜 선택 (선택사항)':'')+'" style="width:100%"></div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveEquipCell(\''+unitId+'\',\''+itemId+'\')">저장</button>'
@@ -1540,12 +1601,25 @@ function equipCellTypeChange(){
   var wrap=document.getElementById('eq_val_wrap');
   var lbl=document.getElementById('eq_val_lbl');
   var inp=document.getElementById('eq_val');
-  if(t.value==='na'||t.value==='done'){
+  if(t.value==='na'){
     wrap.style.display='none';
+  } else if(t.value==='done'){
+    wrap.style.display='';
+    lbl.textContent='완료 일자 (선택)';
+    inp.type='date';
+    inp.removeAttribute('min');inp.removeAttribute('max');
+    inp.placeholder='날짜 선택 (선택사항)';
+  } else if(t.value==='date'){
+    wrap.style.display='';
+    lbl.textContent='예정일';
+    inp.type='date';
+    inp.removeAttribute('min');inp.removeAttribute('max');
+    inp.placeholder='';
   } else {
     wrap.style.display='';
-    if(t.value==='date'){lbl.textContent='예정일';inp.type='date';}
-    else{lbl.textContent='진행율(%)';inp.type='number';inp.min='0';inp.max='100';}
+    lbl.textContent='진행율(%)';
+    inp.type='number';inp.min='0';inp.max='100';
+    inp.placeholder='';
   }
 }
 
@@ -1559,6 +1633,8 @@ function saveEquipCell(unitId,itemId){
   if(type==='date'){
     value=document.getElementById('eq_val').value||'';
     if(!value){alert('날짜를 입력해주세요.');return;}
+  } else if(type==='done'){
+    value=document.getElementById('eq_val').value||null;
   } else if(type==='percent'){
     value=parseFloat(document.getElementById('eq_val').value);
     if(isNaN(value)||value<0||value>100){alert('0~100 사이의 숫자를 입력해주세요.');return;}
