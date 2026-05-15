@@ -295,6 +295,20 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .eq-memo-icon-wrap{display:inline-block}
 .eq-memo-tooltip-fixed{display:none;position:fixed;z-index:9999;background:#28283a;color:#e0e0ec;padding:7px 10px;border-radius:5px;font-size:12px;white-space:pre-wrap;max-width:260px;min-width:80px;border:1px solid #4a4a64;box-shadow:0 4px 12px rgba(0,0,0,.5);pointer-events:none;line-height:1.5}
 
+/* 프로젝트 구분 행 */
+.eq-project-row>td{border-top:1px solid #2a2a40;border-bottom:1px solid #2a2a40}
+.eq-proj-sticky{padding:4px 10px 4px 20px;display:flex;align-items:center;gap:8px}
+.eq-proj-name{font-size:12px;font-weight:600;color:#c0c0d8}
+.eq-proj-pct{font-size:11px;color:#8888aa;background:#20203a;border-radius:3px;padding:1px 6px;flex-shrink:0}
+.eq-project-row.unassigned>td{background:#141422}
+/* 요약 카드 프로젝트 소카드 */
+.eq-proj-sub-list{margin-top:7px;border-top:1px solid #2a2a3a;padding-top:6px;display:flex;flex-direction:column;gap:4px}
+.eq-proj-sub-item{display:flex;align-items:center;gap:6px;font-size:10px}
+.eq-proj-sub-name{color:#9090a8;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.eq-proj-sub-pct{font-weight:600;min-width:32px;text-align:right;flex-shrink:0}
+.eq-proj-sub-bar{flex:2;background:#1e1e2a;border-radius:2px;height:3px;overflow:hidden;min-width:30px}
+.eq-proj-sub-bar-fill{height:100%;border-radius:2px}
+
 /* 빈 상태 */
 .eq-empty{padding:60px 40px;text-align:center;color:#555;font-size:13px}
 .eq-empty-sub{font-size:11px;color:#707080;margin-top:8px}

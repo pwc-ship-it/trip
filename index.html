@@ -43,9 +43,11 @@
         <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
           <button class="btn" id="btnEquipEdit" onclick="toggleEquipEdit()">수정 모드</button>
           <button class="btn" id="btnAddEquipSite" onclick="openAddEquipSite()" style="display:none">+ 사이트</button>
+          <button class="btn" id="btnAddEquipProject" onclick="openAddEquipProject()" style="display:none">+ 프로젝트</button>
           <button class="btn" id="btnAddEquipUnit" onclick="openAddEquipUnit()" style="display:none">+ 호기</button>
           <button class="btn warn" id="btnAddEquipItem" onclick="openAddEquipItem()" style="display:none">+ 항목</button>
         </div>
+        <button class="btn" onclick="downloadExcel()">⬇ 엑셀</button>
         <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
         <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
       </div>

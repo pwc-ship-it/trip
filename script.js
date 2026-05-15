@@ -3,7 +3,7 @@ var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a'};
 
 /* ── 상태 ── */
-var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[]};
+var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[]};
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function normDate(s){
@@ -36,6 +36,7 @@ function loadData(){
         S.equipItems=(d.equipItems&&d.equipItems.length)?d.equipItems:deepCopy(DEF.equipItems||[]);
         S.equipUnits=d.equipUnits||[];
         S.equipSiteOrder=d.equipSiteOrder||[];
+        S.equipProjects=d.equipProjects||[];
         return;
       }
     }
@@ -54,14 +55,14 @@ function saveCache(data){
 }
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
-  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder});
+  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects});
   // 2. 비동기로 Sheets에 저장
   var url=getSheetsUrl();
   if(!url||location.protocol==='file:')return;
   fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
       projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder})
+      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects})
   }).then(function(r){return r.json();})
   .then(function(data){
     if(data.error)console.warn('자동저장 실패:',data.error);
@@ -179,8 +180,9 @@ function loadFromSheets(callback){
       if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
       if(data.equipUnits)S.equipUnits=data.equipUnits;
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
+      if(data.equipProjects)S.equipProjects=data.equipProjects;
       // 성공적으로 로드된 데이터를 캐시에 저장
-      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder});
+      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects});
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
     })
@@ -1394,6 +1396,13 @@ function calcSiteProgress(siteId){
   units.forEach(function(u){sum+=calcUnitProgress(u);});
   return Math.round(sum/units.length);
 }
+function calcProjectProgress(projectId){
+  var units=S.equipUnits.filter(function(u){return u.equipProjectId===projectId;});
+  if(!units.length) return null;
+  var sum=0;
+  units.forEach(function(u){sum+=calcUnitProgress(u);});
+  return Math.round(sum/units.length);
+}
 
 /* ── 사이드바 렌더 ── */
 function renderEquipSidebar(){
@@ -1560,6 +1569,44 @@ function hideMemoTooltip(){
   if(tt) tt.style.display='none';
 }
 
+function _renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems){
+  var rowCls='eq-row '+(idx%2===0?'even':'odd');
+  var unitPct=calcUnitProgress(unit);
+  var pctBar,unitBg='';
+  if(unitPct===100){
+    pctBar='<div style="font-size:11px;font-weight:600;color:#4aaa70;margin-top:2px">완료 ✓</div>';
+    unitBg='background:#091810;';
+  } else {
+    pctBar='<div style="font-size:11px;color:#b0b0c0;margin-top:2px">'+unitPct+'%</div>';
+  }
+  var html='<tr class="'+rowCls+'">';
+  html+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
+    +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
+    +(unit.lineName||'')+'</td>';
+  html+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
+    +' style="left:0;border-right:1px solid #3a3a44;font-weight:500;'+unitBg+'"'
+    +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
+    +(unit.unitName||'')+pctBar+'</td>';
+  if(msDateItem){
+    html+=renderEquipCellSticky((unit.cells||{})[msDateItem.id],e,unit.id,msDateItem.id,
+      'eq-col-msdate','left:0;border-right:1px solid #3a3a44');
+  } else {
+    html+='<td class="eq-td-fix eq-col-msdate" style="left:0;border-right:1px solid #3a3a44"></td>';
+  }
+  html+=renderEquipMemoCell(unit,e);
+  scrollItems.forEach(function(item){
+    html+=renderEquipCell((unit.cells||{})[item.id],e,unit.id,item.id);
+  });
+  if(e){
+    html+='<td class="eq-td" style="white-space:nowrap">'
+      +'<button class="eq-act-btn copy" onclick="openCopyEquipUnit(\''+unit.id+'\')">복사</button>'
+      +'<button class="eq-act-btn del" onclick="delEquipUnit(\''+unit.id+'\')">삭제</button>'
+      +'</td>';
+  }
+  html+='</tr>';
+  return html;
+}
+
 /* ── 그리드 렌더 ── */
 function renderEquipGrid(){
   var el=document.getElementById('eqGrid');
@@ -1603,6 +1650,22 @@ function renderEquipGrid(){
       var units=S.equipUnits.filter(function(u){return u.siteId===siteId;});
       var doneCount=units.filter(function(u){return calcUnitProgress(u)===100;}).length;
       var barColor=pct===100?'#2a8a40':(pct>=70?'#1a6bbf':'#b87a10');
+      var siteProjs=(S.equipProjects||[]).filter(function(p){return p.siteId===siteId;});
+      var projSubHtml='';
+      if(siteProjs.length>0){
+        projSubHtml='<div class="eq-proj-sub-list">';
+        siteProjs.forEach(function(proj){
+          var pp=calcProjectProgress(proj.id);
+          if(pp===null) return;
+          var pc=pp===100?'#2a8a40':(pp>=70?'#1a6bbf':'#b87a10');
+          projSubHtml+='<div class="eq-proj-sub-item">'
+            +'<span class="eq-proj-sub-name">'+proj.name+'</span>'
+            +'<span class="eq-proj-sub-pct" style="color:'+pc+'">'+pp+'%</span>'
+            +'<div class="eq-proj-sub-bar"><div class="eq-proj-sub-bar-fill" style="width:'+pp+'%;background:'+pc+'"></div></div>'
+            +'</div>';
+        });
+        projSubHtml+='</div>';
+      }
       summaryHtml+='<div class="eq-summary-card">'
         +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
         +'<div style="width:4px;height:28px;border-radius:2px;background:'+site.color+';flex-shrink:0"></div>'
@@ -1612,6 +1675,7 @@ function renderEquipGrid(){
         +'<div style="margin:6px 0 3px;background:#1e1e2a;border-radius:3px;height:5px;overflow:hidden">'
         +'<div style="height:100%;border-radius:3px;background:'+barColor+';width:'+pct+'%"></div></div>'
         +'<div style="font-size:10px;color:#a0a0b0;margin-top:3px">'+doneCount+' / '+units.length+' 호기 완료</div>'
+        +projSubHtml
         +'</div>';
     });
     summaryHtml+='</div>';
@@ -1677,49 +1741,41 @@ function renderEquipGrid(){
       +'</tr>';
 
     var siteUnits=allUnits.filter(function(u){return u.siteId===siteId;});
-    siteUnits.forEach(function(unit,idx){
-      var rowCls='eq-row '+(idx%2===0?'even':'odd');
-      var unitPct=calcUnitProgress(unit);
-      // 진행율 표시 — 100%: 녹색 완료 표시, 나머지: 밝은 색 11px
-      var pctBar,unitBg='';
-      if(unitPct===100){
-        pctBar='<div style="font-size:11px;font-weight:600;color:#4aaa70;margin-top:2px">완료 ✓</div>';
-        unitBg='background:#091810;';
-      } else {
-        pctBar='<div style="font-size:11px;color:#b0b0c0;margin-top:2px">'+unitPct+'%</div>';
-      }
-      bodyHtml+='<tr class="'+rowCls+'">';
-      // 라인 — sticky left:0
-      bodyHtml+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
-        +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
-        +(unit.lineName||'')+'</td>';
-      // 호기 — sticky (left 동적)
-      bodyHtml+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
-        +' style="left:0;border-right:1px solid #3a3a44;font-weight:500;'+unitBg+'"'
-        +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
-        +(unit.unitName||'')+pctBar+'</td>';
-      // 양산시작 — sticky (left 동적)
-      if(msDateItem){
-        bodyHtml+=renderEquipCellSticky((unit.cells||{})[msDateItem.id],e,unit.id,msDateItem.id,
-          'eq-col-msdate','left:0;border-right:1px solid #3a3a44');
-      } else {
-        bodyHtml+='<td class="eq-td-fix eq-col-msdate" style="left:0;border-right:1px solid #3a3a44"></td>';
-      }
-      // 메모 — sticky (left 동적)
-      bodyHtml+=renderEquipMemoCell(unit,e);
-      // 스크롤 항목 셀
-      scrollItems.forEach(function(item){
-        bodyHtml+=renderEquipCell((unit.cells||{})[item.id],e,unit.id,item.id);
+    var siteProjects=(S.equipProjects||[]).filter(function(p){return p.siteId===siteId;});
+    if(siteProjects.length>0){
+      // 프로젝트 모드: 프로젝트별 서브그룹
+      siteProjects.forEach(function(proj){
+        var projUnits=siteUnits.filter(function(u){return u.equipProjectId===proj.id;});
+        var projPct=calcProjectProgress(proj.id);
+        var projPctStr=projPct!==null?projPct+'%':'—';
+        bodyHtml+='<tr class="eq-project-row">'
+          +'<td colspan="4" class="eq-proj-sticky" style="position:sticky;left:0;z-index:22;background:#16162a;'
+          +'border-top:1px solid #2a2a40;border-left:3px solid #4a4a6a;border-bottom:1px solid #2a2a40;">'
+          +'<span class="eq-proj-name">'+proj.name+'</span>'
+          +'<span class="eq-proj-pct">'+projPctStr+'</span>'
+          +(e?'<button class="eq-item-edit-btn" onclick="openEditEquipProject(\''+proj.id+'\')">수정</button>'
+            +'<button class="eq-item-edit-btn" style="color:#c04040;border-color:#7a1010" onclick="delEquipProject(\''+proj.id+'\')">삭제</button>':'')
+          +'</td>'
+          +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#16162a;border-top:1px solid #2a2a40;border-bottom:1px solid #2a2a40"></td>':'')
+          +'</tr>';
+        projUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
       });
-      // 수정모드 액션
-      if(e){
-        bodyHtml+='<td class="eq-td" style="white-space:nowrap">'
-          +'<button class="eq-act-btn copy" onclick="openCopyEquipUnit(\''+unit.id+'\')">복사</button>'
-          +'<button class="eq-act-btn del" onclick="delEquipUnit(\''+unit.id+'\')">삭제</button>'
-          +'</td>';
+      // 미지정 호기
+      var unassigned=siteUnits.filter(function(u){
+        return !u.equipProjectId||!siteProjects.find(function(p){return p.id===u.equipProjectId;});
+      });
+      if(unassigned.length){
+        bodyHtml+='<tr class="eq-project-row unassigned">'
+          +'<td colspan="'+(4+scrollColCount)+'" style="position:sticky;left:0;z-index:22;background:#141422;'
+          +'border-top:1px solid #2a2a3a;border-bottom:1px solid #2a2a3a;'
+          +'color:#555566;font-size:11px;font-style:italic;padding:4px 10px 4px 20px">미지정</td>'
+          +'</tr>';
+        unassigned.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
       }
-      bodyHtml+='</tr>';
-    });
+    } else {
+      // 기존 방식
+      siteUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
+    }
   });
 
   el.innerHTML='<table class="eq-table"><thead>'+hdrRow+'</thead><tbody>'+bodyHtml+'</tbody></table>';
@@ -1731,7 +1787,7 @@ function toggleEquipEdit(){
   _equipEditMode=!_equipEditMode;
   var btn=document.getElementById('btnEquipEdit');
   if(btn) btn.className='btn'+(_equipEditMode?' edit-on':'');
-  ['btnAddEquipSite','btnAddEquipUnit','btnAddEquipItem'].forEach(function(id){
+  ['btnAddEquipSite','btnAddEquipProject','btnAddEquipUnit','btnAddEquipItem'].forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=_equipEditMode?'':'none';
   });
@@ -1844,6 +1900,61 @@ function saveUnitMemo(unitId,clear){
   saveData();cm();renderEquipGrid();
 }
 
+/* ── 프로젝트 CRUD ── */
+function openAddEquipProject(){
+  ensureEquipSiteOrder();
+  var available=S.sites.filter(function(s){return S.equipSiteOrder.indexOf(s.id)>=0;});
+  if(!available.length){alert('먼저 사이트를 추가해주세요.');return;}
+  var opts=available.map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+  mw('<div class="mtit">프로젝트 추가</div>'
+    +'<div class="fg"><label class="fl">사이트</label>'
+    +'<select id="eq_proj_site">'+opts+'</select></div>'
+    +'<div class="fg"><label class="fl">프로젝트명</label>'
+    +'<input type="text" id="eq_proj_name" placeholder="예: Phase 1" autocorrect="off" autocomplete="off" spellcheck="false"'
+    +' onkeydown="if(event.key===\'Enter\')saveAddEquipProject()"></div>'
+    +'<div class="mfoot">'
+    +'<button class="btn sm" onclick="cm()">취소</button>'
+    +'<button class="btn sm pri" onclick="saveAddEquipProject()">추가</button>'
+    +'</div>');
+  setTimeout(function(){var el=document.getElementById('eq_proj_name');if(el)el.focus();},50);
+}
+function saveAddEquipProject(){
+  var siteId=document.getElementById('eq_proj_site').value;
+  var name=document.getElementById('eq_proj_name').value.trim();
+  if(!name){alert('프로젝트명을 입력해주세요.');return;}
+  S.equipProjects.push({id:'ep'+Date.now(),siteId:siteId,name:name});
+  saveData();cm();renderEquipGrid();
+}
+function openEditEquipProject(projectId){
+  var proj=S.equipProjects.find(function(p){return p.id===projectId;});
+  if(!proj) return;
+  mw('<div class="mtit">프로젝트 수정</div>'
+    +'<div class="fg"><label class="fl">프로젝트명</label>'
+    +'<input type="text" id="eq_edit_proj_name" value="'+proj.name+'" autocorrect="off" autocomplete="off" spellcheck="false"'
+    +' onkeydown="if(event.key===\'Enter\')saveEditEquipProject(\''+projectId+'\')"></div>'
+    +'<div class="mfoot">'
+    +'<button class="btn sm" onclick="cm()">취소</button>'
+    +'<button class="btn sm pri" onclick="saveEditEquipProject(\''+projectId+'\')">저장</button>'
+    +'</div>');
+  setTimeout(function(){var el=document.getElementById('eq_edit_proj_name');if(el)el.focus();},50);
+}
+function saveEditEquipProject(projectId){
+  var proj=S.equipProjects.find(function(p){return p.id===projectId;});
+  if(!proj) return;
+  var name=document.getElementById('eq_edit_proj_name').value.trim();
+  if(!name){alert('프로젝트명을 입력해주세요.');return;}
+  proj.name=name;
+  saveData();cm();renderEquipGrid();
+}
+function delEquipProject(projectId){
+  var proj=S.equipProjects.find(function(p){return p.id===projectId;});
+  if(!proj) return;
+  if(!confirm('"'+proj.name+'" 프로젝트를 삭제하시겠습니까?\n소속 호기는 미지정으로 이동됩니다.')) return;
+  S.equipUnits.forEach(function(u){if(u.equipProjectId===projectId)u.equipProjectId=null;});
+  S.equipProjects=S.equipProjects.filter(function(p){return p.id!==projectId;});
+  saveData();renderEquipGrid();
+}
+
 /* ── 사이트 추가 ── */
 function openAddEquipSite(){
   ensureEquipSiteOrder();
@@ -1870,16 +1981,24 @@ function saveAddEquipSite(){
 }
 
 /* ── 호기 추가 ── */
+function _equipProjOpts(siteId, selectedId){
+  var projs=S.equipProjects.filter(function(p){return p.siteId===siteId;});
+  if(!projs.length) return '';
+  return '<option value=""'+(selectedId?'':' selected')+'>없음</option>'
+    +projs.map(function(p){return '<option value="'+p.id+'"'+(p.id===selectedId?' selected':'')+'>'+p.name+'</option>';}).join('');
+}
 function openAddEquipUnit(){
   ensureEquipSiteOrder();
   var available=S.sites.filter(function(s){return S.equipSiteOrder.indexOf(s.id)>=0;});
   if(!available.length){alert('먼저 사이트를 추가해주세요.');return;}
-  var opts=available.map(function(s){
-    return '<option value="'+s.id+'">'+s.name+'</option>';
-  }).join('');
+  var firstSiteId=available[0].id;
+  var opts=available.map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+  var projOpts=_equipProjOpts(firstSiteId,'');
   mw('<div class="mtit">호기 추가</div>'
     +'<div class="fg"><label class="fl">사이트</label>'
-    +'<select id="eq_unit_site">'+opts+'</select></div>'
+    +'<select id="eq_unit_site" onchange="_updateUnitProjSelect()">'+opts+'</select></div>'
+    +(projOpts?'<div class="fg" id="eq_unit_proj_wrap"><label class="fl">프로젝트</label>'
+      +'<select id="eq_unit_proj">'+projOpts+'</select></div>':'<div id="eq_unit_proj_wrap"></div>')
     +'<div class="fg"><label class="fl">라인명 (선택)</label>'
     +'<input type="text" id="eq_unit_line" placeholder="예: 1라인" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
@@ -1892,15 +2011,24 @@ function openAddEquipUnit(){
     +'<button class="btn sm pri" onclick="saveAddEquipUnit()">추가</button>'
     +'</div>');
 }
+function _updateUnitProjSelect(){
+  var siteId=document.getElementById('eq_unit_site').value;
+  var wrap=document.getElementById('eq_unit_proj_wrap');
+  if(!wrap) return;
+  var opts=_equipProjOpts(siteId,'');
+  wrap.innerHTML=opts?'<label class="fl">프로젝트</label><select id="eq_unit_proj">'+opts+'</select>':'';
+}
 
 function saveAddEquipUnit(){
   var siteId=document.getElementById('eq_unit_site').value;
   var lineName=document.getElementById('eq_unit_line').value.trim();
   var unitName=document.getElementById('eq_unit_name').value.trim();
   if(!unitName){alert('호기명을 입력해주세요.');return;}
+  var projEl=document.getElementById('eq_unit_proj');
+  var equipProjectId=projEl?projEl.value||null:null;
   var initCells={};
   S.equipItems.forEach(function(item){initCells[item.id]={type:'na',value:null};});
-  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,lineName:lineName,unitName:unitName,memo:'',cells:initCells});
+  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,equipProjectId:equipProjectId,lineName:lineName,unitName:unitName,memo:'',cells:initCells});
   saveData();
   renderEquipGrid();
   // 모달 유지 — 필드 초기화 후 포커스
@@ -2023,9 +2151,12 @@ function openEditEquipUnit(unitId){
   var siteOpts=S.sites.map(function(s){
     return '<option value="'+s.id+'"'+(s.id===unit.siteId?' selected':'')+'>'+s.name+'</option>';
   }).join('');
+  var projOpts=_equipProjOpts(unit.siteId,unit.equipProjectId||'');
   mw('<div class="mtit">라인 / 호기 수정</div>'
     +'<div class="fg"><label class="fl">사이트</label>'
-    +'<select id="eq_edit_unit_site">'+siteOpts+'</select></div>'
+    +'<select id="eq_edit_unit_site" onchange="_updateEditUnitProjSelect(\''+unitId+'\')">'+siteOpts+'</select></div>'
+    +(projOpts?'<div class="fg" id="eq_edit_unit_proj_wrap"><label class="fl">프로젝트</label>'
+      +'<select id="eq_edit_unit_proj">'+projOpts+'</select></div>':'<div id="eq_edit_unit_proj_wrap"></div>')
     +'<div class="fg"><label class="fl">라인명 (선택)</label>'
     +'<input type="text" id="eq_edit_unit_line" value="'+(unit.lineName||'')+'" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
@@ -2035,6 +2166,13 @@ function openEditEquipUnit(unitId){
     +'<button class="btn sm pri" onclick="saveEditEquipUnit(\''+unitId+'\')">저장</button>'
     +'</div>');
 }
+function _updateEditUnitProjSelect(){
+  var siteId=document.getElementById('eq_edit_unit_site').value;
+  var wrap=document.getElementById('eq_edit_unit_proj_wrap');
+  if(!wrap) return;
+  var opts=_equipProjOpts(siteId,'');
+  wrap.innerHTML=opts?'<label class="fl">프로젝트</label><select id="eq_edit_unit_proj">'+opts+'</select>':'';
+}
 function saveEditEquipUnit(unitId){
   var unit=S.equipUnits.find(function(u){return u.id===unitId;});
   if(!unit) return;
@@ -2042,7 +2180,9 @@ function saveEditEquipUnit(unitId){
   var ln=document.getElementById('eq_edit_unit_line').value.trim();
   var un=document.getElementById('eq_edit_unit_name').value.trim();
   if(!un){alert('호기명을 입력해주세요.');return;}
+  var projEl=document.getElementById('eq_edit_unit_proj');
   unit.siteId=newSiteId;
+  unit.equipProjectId=projEl?projEl.value||null:null;
   unit.lineName=ln;unit.unitName=un;
   saveData();cm();renderEquipTab();
 }
