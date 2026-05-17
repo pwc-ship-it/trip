@@ -881,6 +881,32 @@ function getRolling12(){
   return {start:start,end:end};
 }
 
+function getRolling180(){
+  var end=new Date(TODAY);
+  var start=new Date(TODAY);
+  start.setDate(start.getDate()-179);
+  start.setHours(0,0,0,0); end.setHours(0,0,0,0);
+  return {start:start,end:end};
+}
+
+function getMaxSingleStay(trips, region, window){
+  var max=0;
+  trips.filter(function(t){return t.region===region;}).forEach(function(t){
+    var s=new Date(Math.max(pd(t.start),window.start));
+    var e=new Date(Math.min(pd(t.end),window.end));
+    if(s>e) return;
+    var days=Math.round((e-s)/86400000)+1;
+    if(days>max) max=days;
+  });
+  return max;
+}
+
+function escAttr(s){
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 // 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
 function calcKoreaDays12M(trips, rolling12){
   var overseas={};
@@ -966,6 +992,82 @@ function calcRegionDays12M(trips, region, rolling12){
     }
   });
   return Object.keys(set).length;
+}
+
+function calcSchengenRisk(trips){
+  var r180=getRolling180();
+  var usedDays=calcRegionDays12M(trips,'europe',r180);
+  var remaining=90-usedDays;
+  var status, tooltip;
+
+  if(remaining<=0){
+    var usedDateSet={};
+    trips.filter(function(t){return t.region==='europe';}).forEach(function(t){
+      var s=new Date(Math.max(pd(t.start),r180.start));
+      var e=new Date(Math.min(pd(t.end),r180.end));
+      if(s>e) return;
+      for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+        usedDateSet[cur.toDateString()]=new Date(cur);
+    });
+    var sorted=Object.keys(usedDateSet).map(function(k){return usedDateSet[k];})
+      .sort(function(a,b){return a-b;});
+    var anchorDate=sorted[usedDays-90]||sorted[0];
+    var nextEntry=new Date(anchorDate);
+    nextEntry.setDate(nextEntry.getDate()+180);
+    var ne=nextEntry.getFullYear()+'.'
+      +String(nextEntry.getMonth()+1).padStart(2,'0')+'.'
+      +String(nextEntry.getDate()).padStart(2,'0');
+    status='danger';
+    tooltip='솅겐 90일 초과 (사용 '+usedDays+'일). 재입국 가능: '+ne;
+  } else if(remaining<=14){
+    status='warn';
+    tooltip='솅겐 잔여 '+remaining+'일 (사용 '+usedDays+'/90일)';
+  } else {
+    status='safe';
+    tooltip=usedDays>0
+      ?'솅겐 잔여 '+remaining+'일 (사용 '+usedDays+'/90일)'
+      :'유럽 체류 이력 없음';
+  }
+  return {status:status,usedDays:usedDays,remaining:remaining,tooltip:tooltip};
+}
+
+function calcUsRisk(trips){
+  var r365=getRolling12();
+  var amDays=calcRegionDays12M(trips,'americas',r365);
+  var koreaDays=calcKoreaDays12M(trips,r365);
+  var maxSingle=getMaxSingleStay(trips,'americas',r365);
+
+  var status='safe', reasons=[];
+
+  if(amDays>=180){
+    status='danger';
+    reasons.push('누적 체류 '+amDays+'일 (180일 이상)');
+  }
+  if(maxSingle>=180){
+    status='danger';
+    reasons.push('단일 체류 '+maxSingle+'일 (180일 이상)');
+  }
+
+  if(status!=='danger'){
+    if(amDays>=150){
+      status='warn';
+      reasons.push('누적 체류 '+amDays+'일 (150일 이상)');
+    }
+    if(amDays>koreaDays){
+      if(status==='safe') status='warn';
+      reasons.push('미국 '+amDays+'일 > 한국 '+koreaDays+'일 (거주 의심)');
+    }
+    if(maxSingle>=90){
+      if(status==='safe') status='warn';
+      reasons.push('단일 체류 '+maxSingle+'일 (90일 이상)');
+    }
+  }
+
+  var tooltip=reasons.length
+    ?reasons.join(' | ')
+    :'이상 없음 (미주 '+amDays+'일 / 365일)';
+
+  return {status:status,amDays:amDays,tooltip:tooltip};
 }
 
 // 마지막 복귀일 기준 한국 체류일 계산
@@ -1061,6 +1163,8 @@ function renderPersonTab(){
 
   var html='';
 
+  html+='<div class="pm-fixed-header">';
+
   // 통계 카드
   html+='<div class="pm-stats-row">';
   html+='<div class="pm-stat-card"><div class="pm-stat-val">'+totalPersons+'</div><div class="pm-stat-lbl">등록 인원</div><div class="pm-stat-sub">전체 출장자</div></div>';
@@ -1098,8 +1202,10 @@ function renderPersonTab(){
   html+='<span style="font-size:10px;color:#444;margin-left:auto">롤링12M: '+r12s+' ~ '+r12e+'</span>';
   html+='</div>';
 
+  html+='</div>'; // .pm-fixed-header 닫기
+
   // ── 결과 영역 (검색/정렬/타입 변경 시 이 div만 갱신)
-  html+='<div id="pmBody"></div>';
+  html+='<div class="pm-body-scroll"><div id="pmBody"></div></div>';
 
   wrap.innerHTML=html;
   renderPersonBody(); // 결과 채우기
@@ -1193,7 +1299,8 @@ function renderPersonTable(persons, nameList, rolling12){
   html+=thS('total','전체해외(12M)');
   html+=thS('koreaCur','현재국내');
   html+=thS('korea12m','국내(12M)');
-  html+='<th>B1</th>';
+  html+='<th>미국 B1</th>';
+  html+='<th>유럽 솅겐</th>';
   html+='</tr></thead><tbody>';
 
   nameList.forEach(function(name){
@@ -1202,7 +1309,7 @@ function renderPersonTable(persons, nameList, rolling12){
   });
 
   html+='</tbody></table>';
-  html+='<div style="font-size:10px;color:#707080;padding:8px 4px;margin-top:4px">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). B1 위험도는 미주 12M 기준.</div>';
+  html+='<div style="font-size:10px;color:#707080;padding:8px 4px;margin-top:4px">* 출장일은 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). 미국 B1: 롤링 365일 기준. 유럽 솅겐: 롤링 180일 기준.</div>';
   return html;
 }
 
@@ -1215,10 +1322,8 @@ function renderPersonRow(name, person, rolling12){
   var koreaCur=calcCurrentKoreaDays(trips);
   var korea12m=calcKoreaDays12M(trips,rolling12);
 
-  // B1 위험도 (미주 12M 기준)
-  var b1Cls='b1-safe', b1Txt='안전';
-  if(amDays>=150){b1Cls='b1-alert';b1Txt='위험';}
-  else if(amDays>=120){b1Cls='b1-warn';b1Txt='주의';}
+  var usRisk=calcUsRisk(trips);
+  var euRisk=calcSchengenRisk(trips);
 
   var tc=TYPE_COLOR[person.type]||'#555';
   var tl=TYPE_LBL[person.type]||person.type;
@@ -1245,7 +1350,7 @@ function renderPersonRow(name, person, rolling12){
   }
 
   // 미주(12M)
-  var amCls=amDays>=150?'b1-alert':amDays>=120?'b1-warn':'';
+  var amCls=usRisk.status==='danger'?'b1-alert':usRisk.status==='warn'?'b1-warn':'';
   html+='<td style="text-align:center"><span class="pm-days-big '+(amCls)+'" style="font-size:16px">'+amDays+'</span><span class="pm-days-unit"> 일</span></td>';
 
   // 유럽(12M)
@@ -1261,8 +1366,13 @@ function renderPersonRow(name, person, rolling12){
   // 국내(12M)
   html+='<td style="text-align:center"><span style="font-size:16px;font-weight:600;color:#7aafee">'+korea12m+'</span><span class="pm-days-unit"> 일</span></td>';
 
-  // B1
-  html+='<td style="text-align:center"><span class="'+b1Cls+'" style="font-size:12px;font-weight:600">'+b1Txt+'</span></td>';
+  // 미국 B1 리스크
+  var usLbl=usRisk.status==='danger'?'위험':usRisk.status==='warn'?'주의':'안전';
+  html+='<td style="text-align:center"><span class="risk-badge risk-'+usRisk.status+'" data-tooltip="'+escAttr(usRisk.tooltip)+'">'+usLbl+'</span></td>';
+
+  // 유럽 솅겐 리스크
+  var euLbl=euRisk.status==='danger'?'위험':euRisk.status==='warn'?'주의':'안전';
+  html+='<td style="text-align:center"><span class="risk-badge risk-'+euRisk.status+'" data-tooltip="'+escAttr(euRisk.tooltip)+'">'+euLbl+'</span></td>';
 
   html+='</tr>';
   return html;
@@ -1321,7 +1431,7 @@ function renderPersonTimeline(trips, colSpan){
     }
   }
 
-  return '<tr class="pm-expand-row"><td colspan="8"><div class="pm-timeline">'+rows+'</div></td></tr>';
+  return '<tr class="pm-expand-row"><td colspan="9"><div class="pm-timeline">'+rows+'</div></td></tr>';
 }
 
 

@@ -159,7 +159,9 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .tab-bar{flex-shrink:0;display:flex;align-items:flex-end;padding:0 14px;background:#20202e;border-bottom:1.5px solid #555;height:30px}
 
 /* ── 인원 출장 일수 탭 ── */
-.pm-wrap{flex:1;overflow:auto;padding:14px 18px;background:#18181e}
+.pm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;background:#18181e}
+.pm-fixed-header{flex-shrink:0;padding:14px 18px 0 18px}
+.pm-body-scroll{flex:1;overflow-y:auto;padding:0 18px 14px 18px}
 .pm-section{margin-bottom:22px}
 .pm-sec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:7px;border-bottom:1.5px solid #3a3a44}
 .pm-sec-icon{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -337,3 +339,10 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .b1-safe{color:#4aaa70}
 .b1-warn{color:#e8a020}
 .b1-alert{color:#e84040;font-weight:600}
+/* ── 리스크 뱃지 (미국 B1 / 유럽 솅겐) ── */
+.risk-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;white-space:nowrap;cursor:default;position:relative}
+.risk-safe{background:#0a2a18;color:#4aaa70;border:1px solid #1a5a30}
+.risk-warn{background:#2a1a00;color:#e8a020;border:1px solid #6a4000}
+.risk-danger{background:#2a0a0a;color:#e84040;border:1px solid #7a1010;font-weight:700}
+/* hover 툴팁 */
+.risk-badge[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2a;border:1px solid #3a3a5a;color:#d0d0e0;padding:5px 9px;border-radius:5px;font-size:11px;white-space:nowrap;z-index:1000;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)}
