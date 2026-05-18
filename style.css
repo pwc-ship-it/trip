@@ -344,5 +344,5 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .risk-safe{background:#0a2a18;color:#4aaa70;border:1px solid #1a5a30}
 .risk-warn{background:#2a1a00;color:#e8a020;border:1px solid #6a4000}
 .risk-danger{background:#2a0a0a;color:#e84040;border:1px solid #7a1010;font-weight:700}
-/* hover 툴팁 */
-.risk-badge[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2a;border:1px solid #3a3a5a;color:#d0d0e0;padding:5px 9px;border-radius:5px;font-size:11px;white-space:nowrap;z-index:1000;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+/* JS 툴팁 (risk-tooltip div) */
+#riskTooltip{display:none;position:fixed;background:#1a1a2a;border:1px solid #3a3a5a;color:#d0d0e0;padding:6px 10px;border-radius:5px;font-size:11px;white-space:normal;word-break:keep-all;max-width:260px;line-height:1.6;z-index:9999;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.65)}

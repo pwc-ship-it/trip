@@ -907,6 +907,58 @@ function escAttr(s){
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function showRiskTooltip(el){
+  var text=el.getAttribute('data-tooltip');
+  if(!text) return;
+  var tip=document.getElementById('riskTooltip');
+  if(!tip){
+    tip=document.createElement('div');
+    tip.id='riskTooltip';
+    document.body.appendChild(tip);
+  }
+  tip.textContent=text;
+  tip.style.display='block';
+  var rect=el.getBoundingClientRect();
+  var tw=tip.offsetWidth, th=tip.offsetHeight;
+  var left=rect.left+rect.width/2-tw/2;
+  left=Math.max(8,Math.min(left,window.innerWidth-tw-8));
+  var top=rect.top-th-6;
+  if(top<8) top=rect.bottom+6;
+  tip.style.left=left+'px';
+  tip.style.top=top+'px';
+}
+function hideRiskTooltip(){
+  var tip=document.getElementById('riskTooltip');
+  if(tip) tip.style.display='none';
+}
+
+function fmtDate(d){
+  return d.getFullYear()+'.'
+    +String(d.getMonth()+1).padStart(2,'0')+'.'
+    +String(d.getDate()).padStart(2,'0');
+}
+
+// 미주 누적 체류일이 targetDays 미만으로 떨어지는 최초 날짜 (롤링 365일 기준)
+function calcUsNextSafeDate(trips, targetDays){
+  var r365=getRolling12();
+  var usedSet={};
+  trips.filter(function(t){return t.region==='americas';}).forEach(function(t){
+    var s=new Date(Math.max(pd(t.start),r365.start));
+    var e=new Date(Math.min(pd(t.end),r365.end));
+    if(s>e) return;
+    for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+      usedSet[cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate()]=new Date(cur);
+  });
+  var sorted=Object.keys(usedSet).map(function(k){return usedSet[k];})
+    .sort(function(a,b){return a-b;});
+  var amDays=sorted.length;
+  if(amDays<targetDays) return null;
+  var anchorDate=sorted[amDays-targetDays];
+  var next=new Date(anchorDate);
+  next.setDate(next.getDate()+365);
+  return next;
+}
+
 // 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
 function calcKoreaDays12M(trips, rolling12){
   var overseas={};
@@ -1028,7 +1080,11 @@ function calcSchengenRisk(trips){
       ?'솅겐 잔여 '+remaining+'일 (사용 '+usedDays+'/90일)'
       :'유럽 체류 이력 없음';
   }
-  return {status:status,usedDays:usedDays,remaining:remaining,tooltip:tooltip};
+  var subText;
+  if(status==='danger')        subText='재입국 '+ne;
+  else if(usedDays>0)          subText='잔여 '+remaining+'일 / 90일';
+  else                         subText='-';
+  return {status:status,usedDays:usedDays,remaining:remaining,tooltip:tooltip,subText:subText};
 }
 
 function calcUsRisk(trips){
@@ -1067,7 +1123,16 @@ function calcUsRisk(trips){
     ?reasons.join(' | ')
     :'이상 없음 (미주 '+amDays+'일 / 365일)';
 
-  return {status:status,amDays:amDays,tooltip:tooltip};
+  var subText='누적 '+amDays+'일';
+  if(amDays>=180){
+    var nd=calcUsNextSafeDate(trips,180);
+    if(nd) subText+=' · 해소 '+fmtDate(nd);
+  } else if(amDays>=150){
+    var nd=calcUsNextSafeDate(trips,150);
+    if(nd) subText+=' · 해제 '+fmtDate(nd);
+  }
+
+  return {status:status,amDays:amDays,tooltip:tooltip,subText:subText};
 }
 
 // 마지막 복귀일 기준 한국 체류일 계산
@@ -1368,11 +1433,19 @@ function renderPersonRow(name, person, rolling12){
 
   // 미국 B1 리스크
   var usLbl=usRisk.status==='danger'?'위험':usRisk.status==='warn'?'주의':'안전';
-  html+='<td style="text-align:center"><span class="risk-badge risk-'+usRisk.status+'" data-tooltip="'+escAttr(usRisk.tooltip)+'">'+usLbl+'</span></td>';
+  html+='<td style="text-align:center">'
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+    +'<span class="risk-badge risk-'+usRisk.status+'" data-tooltip="'+escAttr(usRisk.tooltip)+'" onmouseenter="showRiskTooltip(this)" onmouseleave="hideRiskTooltip()">'+usLbl+'</span>'
+    +'<span style="font-size:10px;color:#a0a0a8;white-space:nowrap">'+usRisk.subText+'</span>'
+    +'</div></td>';
 
   // 유럽 솅겐 리스크
   var euLbl=euRisk.status==='danger'?'위험':euRisk.status==='warn'?'주의':'안전';
-  html+='<td style="text-align:center"><span class="risk-badge risk-'+euRisk.status+'" data-tooltip="'+escAttr(euRisk.tooltip)+'">'+euLbl+'</span></td>';
+  html+='<td style="text-align:center">'
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+    +'<span class="risk-badge risk-'+euRisk.status+'" data-tooltip="'+escAttr(euRisk.tooltip)+'" onmouseenter="showRiskTooltip(this)" onmouseleave="hideRiskTooltip()">'+euLbl+'</span>'
+    +'<span style="font-size:10px;color:#a0a0a8;white-space:nowrap">'+euRisk.subText+'</span>'
+    +'</div></td>';
 
   html+='</tr>';
   return html;
