@@ -200,6 +200,9 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .pm-stat-val{font-size:22px;font-weight:700;color:#e8e8ec;line-height:1}
 .pm-stat-lbl{font-size:10px;color:#909090;margin-top:3px}
 .pm-stat-sub{font-size:11px;color:#b0b0b8;margin-top:1px}
+.pm-stat-breakdown{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pm-bd-hq{font-size:10px;color:#7aafee;background:#1a2a3a;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.pm-bd-out{font-size:10px;color:#cc8a4a;background:#2a1e0a;padding:2px 6px;border-radius:3px;white-space:nowrap}
 /* 진행중 뱃지 */
 .status-going{background:#1a4a2a;color:#4aaa70;border:1px solid #2a6a3a}
 .status-plan{background:#1a2a4a;color:#4a8aee;border:1px solid #2a4a7a}

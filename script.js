@@ -1220,6 +1220,14 @@ function renderPersonTab(){
   var onTripNow=allNames.filter(function(n){return getCurrentLocation(allPersons[n].trips).onTrip;}).length;
   var americasPersons=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='americas';});}).length;
   var europePersons=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='europe';});}).length;
+  var totalHq=allNames.filter(function(n){return allPersons[n].type!=='outsource';}).length;
+  var totalOut=allNames.filter(function(n){return allPersons[n].type==='outsource';}).length;
+  var onTripHq=allNames.filter(function(n){return getCurrentLocation(allPersons[n].trips).onTrip&&allPersons[n].type!=='outsource';}).length;
+  var onTripOut=allNames.filter(function(n){return getCurrentLocation(allPersons[n].trips).onTrip&&allPersons[n].type==='outsource';}).length;
+  var americasHq=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='americas';})&&allPersons[n].type!=='outsource';}).length;
+  var americasOut=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='americas';})&&allPersons[n].type==='outsource';}).length;
+  var europeHq=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='europe';})&&allPersons[n].type!=='outsource';}).length;
+  var europeOut=allNames.filter(function(n){return allPersons[n].trips.some(function(t){return t.region==='europe';})&&allPersons[n].type==='outsource';}).length;
 
   if(!totalPersons){
     wrap.innerHTML='<div style="padding:40px;text-align:center;color:#555">등록된 출장 일정이 없습니다.</div>';
@@ -1232,10 +1240,10 @@ function renderPersonTab(){
 
   // 통계 카드
   html+='<div class="pm-stats-row">';
-  html+='<div class="pm-stat-card"><div class="pm-stat-val">'+totalPersons+'</div><div class="pm-stat-lbl">등록 인원</div><div class="pm-stat-sub">전체 출장자</div></div>';
-  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#2176cc">'+onTripNow+'</div><div class="pm-stat-lbl">현재 출장 중</div><div class="pm-stat-sub">오늘 기준</div></div>';
-  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#1a8c66">'+americasPersons+'</div><div class="pm-stat-lbl">미주 경험 인원</div><div class="pm-stat-sub">B1 비자 대상</div></div>';
-  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#cc8010">'+europePersons+'</div><div class="pm-stat-lbl">유럽 경험 인원</div><div class="pm-stat-sub">ESWA/WA 등</div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val">'+totalPersons+'</div><div class="pm-stat-lbl">등록 인원</div><div class="pm-stat-sub">전체 출장자</div><div class="pm-stat-breakdown"><span class="pm-bd-hq">본사계열 '+totalHq+'</span><span class="pm-bd-out">외주 '+totalOut+'</span></div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#2176cc">'+onTripNow+'</div><div class="pm-stat-lbl">현재 출장 중</div><div class="pm-stat-sub">오늘 기준</div><div class="pm-stat-breakdown"><span class="pm-bd-hq">본사계열 '+onTripHq+'</span><span class="pm-bd-out">외주 '+onTripOut+'</span></div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#1a8c66">'+americasPersons+'</div><div class="pm-stat-lbl">미주 경험 인원</div><div class="pm-stat-sub">B1 비자 대상</div><div class="pm-stat-breakdown"><span class="pm-bd-hq">본사계열 '+americasHq+'</span><span class="pm-bd-out">외주 '+americasOut+'</span></div></div>';
+  html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#cc8010">'+europePersons+'</div><div class="pm-stat-lbl">유럽 경험 인원</div><div class="pm-stat-sub">ESWA/WA 등</div><div class="pm-stat-breakdown"><span class="pm-bd-hq">본사계열 '+europeHq+'</span><span class="pm-bd-out">외주 '+europeOut+'</span></div></div>';
   html+='</div>';
 
   // ── 컨트롤 바 (검색창 포함 - 여기서 한 번만 생성, 이후 재생성 안 함)
