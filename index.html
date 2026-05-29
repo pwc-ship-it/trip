@@ -35,7 +35,7 @@
               <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
             </div>
           </div>
-          <input type="text" id="ganttSearchInput" class="gantt-search" placeholder="담당자 검색..." oninput="ganttSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+          <input type="text" id="ganttSearchInput" class="gantt-search" placeholder="검색" oninput="ganttSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
           <div style="display:flex;gap:2px">
             <button class="btn active" id="zoomBtn_week" onclick="setGanttZoom('week')">주</button>
             <button class="btn" id="zoomBtn_biweek" onclick="setGanttZoom('biweek')">격주</button>
@@ -47,6 +47,8 @@
           <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
         </div>
         <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="btn" onclick="collapseAllEquip()">접기 전체</button>
+          <button class="btn" onclick="expandAllEquip()">펼치기 전체</button>
           <button class="btn" id="btnEquipEdit" onclick="toggleEquipEdit()">수정 모드</button>
           <button class="btn" id="btnAddEquipSite" onclick="openAddEquipSite()" style="display:none">+ 사이트</button>
           <button class="btn" id="btnAddEquipProject" onclick="openAddEquipProject()" style="display:none">+ 프로젝트</button>

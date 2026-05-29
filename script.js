@@ -55,22 +55,34 @@ function saveCache(data){
 }
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
-  saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects});
+  var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects};
+  saveCache(snapshot);
+  // 로컬 변경이 Sheets에 아직 미확인 상태임을 표시
+  try{localStorage.setItem(CACHE_DIRTY_KEY,'1');}catch(e){}
   // 2. 비동기로 Sheets에 저장
   var url=getSheetsUrl();
-  if(!url||location.protocol==='file:')return;
+  if(!url||location.protocol==='file:'){
+    // file:// 환경은 Sheets 없이 로컬만 사용 — dirty 플래그 즉시 해제
+    try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+    return;
+  }
   fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
       projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
       equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects})
   }).then(function(r){return r.json();})
   .then(function(data){
-    if(data.error)console.warn('자동저장 실패:',data.error);
-    else updateConnStatus('ok');
+    if(data.error){console.warn('자동저장 실패:',data.error);updateConnStatus('err');}
+    else{
+      // Sheets 저장 확인됨 — dirty 플래그 해제
+      try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+      updateConnStatus('ok');
+    }
   })
   .catch(function(err){
     console.warn('자동저장 실패:',err.message);
     updateConnStatus('err');
+    // dirty 플래그는 유지 (다음 로드 시 로컬 데이터 보호)
   });
 }
 function updateConnStatus(state){
@@ -90,6 +102,7 @@ function updateConnStatus(state){
 var SHEETS_LS_KEY='trip_sheets_url';
 var CACHE_KEY='trip_data_cache';  // 데이터 캐시용
 var CACHE_TS_KEY='trip_cache_ts'; // 캐시 타임스탬프
+var CACHE_DIRTY_KEY='trip_data_dirty'; // 로컬 변경이 Sheets에 미확인 저장된 경우 표시
 var DEFAULT_SHEETS_URL='https://script.google.com/macros/s/AKfycbwzOXzciY5Rh6BEZn6kyjbogzoTwoD0SCCaCnTcZRVEYKJOPr-GcJF0CsOlxlhqYBX0vA/exec';
 // 최초 접속 시 기본 URL 자동 설정
 (function(){
@@ -148,9 +161,34 @@ function loadFromSheets(callback){
   if(!url||location.protocol==='file:'){
     if(callback)callback();return;
   }
+  // 로컬에 미확인 변경사항이 있으면 Sheets로 PUSH 후 정상 로드
+  var isDirty=false;
+  try{isDirty=!!localStorage.getItem(CACHE_DIRTY_KEY);}catch(e){}
   var led=document.getElementById('connLed');
   var txt=document.getElementById('connTxt');
-  if(led){led.className='conn-led chk';txt.textContent='동기화 중...';}
+  if(led){led.className='conn-led chk';txt.textContent=isDirty?'미저장 동기화 중...':'동기화 중...';}
+  if(isDirty){
+    // 로컬 데이터를 Sheets로 밀어넣고 dirty 해제 후 콜백
+    fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
+        projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
+        equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects})
+    }).then(function(r){return r.json();})
+    .then(function(data){
+      if(!data.error){
+        try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+        if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
+      } else {
+        if(led){led.className='conn-led err';txt.textContent='동기화 실패';}
+      }
+      if(callback)callback();
+    })
+    .catch(function(){
+      if(led){led.className='conn-led err';txt.textContent='동기화 실패';}
+      if(callback)callback();
+    });
+    return;
+  }
   fetch(url+'?action=load')
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
@@ -168,9 +206,8 @@ function loadFromSheets(callback){
       if(data.schedules&&data.schedules.length){
         S.schedules=data.schedules.map(function(sc){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-          // Sheets에서 hidden이 "TRUE"/"FALSE" 문자열로 오는 경우 변환
-          if(typeof sc.hidden === 'string'){
-            sc.hidden = sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          if(typeof sc.hidden==='string'){
+            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
           }
           return sc;
         });
@@ -181,7 +218,6 @@ function loadFromSheets(callback){
       if(data.equipUnits)S.equipUnits=data.equipUnits;
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
       if(data.equipProjects)S.equipProjects=data.equipProjects;
-      // 성공적으로 로드된 데이터를 캐시에 저장
       saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects});
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
@@ -189,7 +225,7 @@ function loadFromSheets(callback){
     .catch(function(err){
       console.warn('불러오기 실패:',err.message);
       if(led){led.className='conn-led err';txt.textContent='연결 실패';}
-      if(callback)callback(); // 실패해도 DEF 데이터로 렌더
+      if(callback)callback();
     });
 }
 
@@ -465,8 +501,7 @@ function renderGantt(){
       });
     });
   });
-  var _gs=document.getElementById('gscroll');
-  _gs.scrollLeft=Math.max(0,tpx()-Math.floor(_gs.clientWidth/2));
+  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-120);
 }
 
 function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();}
@@ -1692,6 +1727,16 @@ function toggleEquipCollapse(siteId){
   _equipCollapsed[siteId]=!_equipCollapsed[siteId];
   renderEquipTab();
 }
+function collapseAllEquip(){
+  ensureEquipSiteOrder();
+  S.equipSiteOrder.forEach(function(id){_equipCollapsed[id]=true;});
+  S.equipUnits.forEach(function(u){_equipCollapsed[u.siteId]=true;});
+  renderEquipTab();
+}
+function expandAllEquip(){
+  _equipCollapsed={};
+  renderEquipTab();
+}
 
 /* ── sticky 좌측 오프셋 보정 (라인/호기/양산시작/메모 4열) ── */
 function fixEquipStickyOffsets(){
@@ -1829,10 +1874,14 @@ function _renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems){
   html+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
     +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')">':'>')
     +(unit.lineName||'')+'</td>';
+  // 프로젝트 없는 사이트 직속 호기에만 유형 배지 표시 (프로젝트 호기는 프로젝트 행에서 표시)
+  var isNoProj=!(unit.equipProjectId&&(S.equipProjects||[]).find(function(p){return p.id===unit.equipProjectId;}));
+  var uType=isNoProj?(unit.unitType||'납품셋업'):null;
+  var uTypeBadge=uType?'<span class="eq-type-badge" style="font-size:9px;padding:1px 5px;background:'+(PROJ_TYPE_COLOR[uType]||'#1a55bb')+'">'+uType+'</span>':'';
   html+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
     +' style="left:0;border-right:1px solid #3a3a44;font-weight:500;'+unitBg+'"'
     +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
-    +(unit.unitName||'')+pctBar+'</td>';
+    +uTypeBadge+(unit.unitName||'')+pctBar+'</td>';
   if(msDateItem){
     html+=renderEquipCellSticky((unit.cells||{})[msDateItem.id],e,unit.id,msDateItem.id,
       'eq-col-msdate','left:0;border-right:1px solid #3a3a44');
@@ -2431,6 +2480,10 @@ function openEditEquipUnit(unitId){
     return '<option value="'+s.id+'"'+(s.id===unit.siteId?' selected':'')+'>'+s.name+'</option>';
   }).join('');
   var projOpts=_equipProjOpts(unit.siteId,unit.equipProjectId||'');
+  // 프로젝트에 속하지 않는 사이트 직속 호기일 때 유형 선택 표시
+  var hasProj=!!(unit.equipProjectId&&(S.equipProjects||[]).find(function(p){return p.id===unit.equipProjectId;}));
+  var typeRow=hasProj?'':'<div class="fg"><label class="fl">유형</label>'
+    +'<select id="eq_edit_unit_type">'+_projTypeOpts(unit.unitType||'납품셋업')+'</select></div>';
   mw('<div class="mtit">라인 / 호기 수정</div>'
     +'<div class="fg"><label class="fl">사이트</label>'
     +'<select id="eq_edit_unit_site" onchange="_updateEditUnitProjSelect(\''+unitId+'\')">'+siteOpts+'</select></div>'
@@ -2440,6 +2493,7 @@ function openEditEquipUnit(unitId){
     +'<input type="text" id="eq_edit_unit_line" value="'+(unit.lineName||'')+'" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
     +'<div class="fg"><label class="fl">호기명</label>'
     +'<input type="text" id="eq_edit_unit_name" value="'+(unit.unitName||'')+'" autocorrect="off" autocomplete="off" spellcheck="false"></div>'
+    +typeRow
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveEditEquipUnit(\''+unitId+'\')">저장</button>'
@@ -2460,9 +2514,11 @@ function saveEditEquipUnit(unitId){
   var un=document.getElementById('eq_edit_unit_name').value.trim();
   if(!un){alert('호기명을 입력해주세요.');return;}
   var projEl=document.getElementById('eq_edit_unit_proj');
+  var typeEl=document.getElementById('eq_edit_unit_type');
   unit.siteId=newSiteId;
   unit.equipProjectId=projEl?projEl.value||null:null;
   unit.lineName=ln;unit.unitName=un;
+  if(typeEl) unit.unitType=typeEl.value||'납품셋업';
   saveData();cm();renderEquipTab();
 }
 
