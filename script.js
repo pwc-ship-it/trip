@@ -501,7 +501,7 @@ function renderGantt(){
       });
     });
   });
-  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-120);
+  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-200);
 }
 
 function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();}
@@ -668,7 +668,7 @@ function openEditWt(id){var w=S.workTasks.find(function(x){return x.id===id;});i
 /* 출장 모달 */
 function showSM(ex){
   var ie=!!ex;
-  var so=S.sites.map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+  var so=S.sites.filter(function(s){return S.projects.some(function(p){return p.siteId===s.id;});}).map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
   var po='<option value="">사이트를 먼저 선택하세요</option>';
   if(ie){var pr=S.projects.find(function(p){return p.id===ex.projectId;});if(pr)po=S.projects.filter(function(p){return p.siteId===pr.siteId;}).map(function(p){return '<option value="'+p.id+'"'+(p.id===ex.projectId?' selected':'')+'>'+p.name+'</option>';}).join('');}
   var curType=ie?(ex.type||'hq'):'hq';
@@ -883,7 +883,14 @@ function addSite(){
 function delSite(id){
   if(!confirm('사이트와 관련 항목을 모두 삭제합니까?'))return;
   var pids=S.projects.filter(function(p){return p.siteId===id;}).map(function(p){return p.id;});
-  S.projects=S.projects.filter(function(p){return p.siteId!==id;});S.schedules=S.schedules.filter(function(s){return pids.indexOf(s.projectId)<0;});S.events=S.events.filter(function(e){return pids.indexOf(e.projectId)<0;});S.sites=S.sites.filter(function(s){return s.id!==id;});
+  S.projects=S.projects.filter(function(p){return p.siteId!==id;});
+  S.schedules=S.schedules.filter(function(s){return pids.indexOf(s.projectId)<0;});
+  S.events=S.events.filter(function(e){return pids.indexOf(e.projectId)<0;});
+  S.sites=S.sites.filter(function(s){return s.id!==id;});
+  // 설비 데이터도 함께 정리
+  S.equipSiteOrder=(S.equipSiteOrder||[]).filter(function(sid){return sid!==id;});
+  S.equipProjects=(S.equipProjects||[]).filter(function(p){return p.siteId!==id;});
+  S.equipUnits=(S.equipUnits||[]).filter(function(u){return u.siteId!==id;});
   saveData();showSiteM();renderAll();
 }
 
@@ -2017,8 +2024,9 @@ function renderEquipGrid(){
   var bodyHtml='';
   siteIds.forEach(function(siteId){
     var site=S.sites.find(function(s){return s.id===siteId;});
-    var siteName=site?site.name:siteId;
-    var siteColor=site?site.color:'#555';
+    if(!site) return; // 삭제된 사이트는 표시하지 않음
+    var siteName=site.name;
+    var siteColor=site.color;
     var personnel=getOnSitePersonnel(siteId);
     var personnelHtml='';
     if(personnel.length){
