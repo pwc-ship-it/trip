@@ -35,6 +35,12 @@
               <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
             </div>
           </div>
+          <input type="text" id="ganttSearchInput" class="gantt-search" placeholder="담당자 검색..." oninput="ganttSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div style="display:flex;gap:2px">
+            <button class="btn active" id="zoomBtn_week" onclick="setGanttZoom('week')">주</button>
+            <button class="btn" id="zoomBtn_biweek" onclick="setGanttZoom('biweek')">격주</button>
+            <button class="btn" id="zoomBtn_month" onclick="setGanttZoom('month')">월</button>
+          </div>
           <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
           <button class="btn" onclick="openModal('site')">사이트 관리</button>
           <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>

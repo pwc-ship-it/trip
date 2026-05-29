@@ -220,6 +220,9 @@ function barCls(sc){
 
 /* ── 타임라인 ── */
 var WPX=42,_months=[],_totPx=0,_sd=null;
+var _ganttZoom='week'; // 'week'|'biweek'|'month'
+var _ganttSearch='';   // 담당자명 검색
+var WPX_MAP={'week':42,'biweek':22,'month':12};
 function calcRange(){
   var minD=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1),maxD=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,0);
   var all=[];S.schedules.forEach(function(s){all.push(s.start);all.push(s.end);});S.events.forEach(function(e){all.push(e.date);});
@@ -227,6 +230,7 @@ function calcRange(){
   return{start:minD,end:maxD};
 }
 function initTL(){
+  WPX=WPX_MAP[_ganttZoom]||42;
   var r=calcRange();_sd=new Date(r.start);_sd.setHours(0,0,0,0);_months=[];
   var cur=new Date(r.start.getFullYear(),r.start.getMonth(),1);
   while(cur<=r.end){var y=cur.getFullYear(),m=cur.getMonth()+1,days=new Date(y,m,0).getDate();_months.push({y:y,m:m,days:days,weeks:Math.ceil(days/7),label:(m===1?y+'년 ':'')+m+'월'});cur=new Date(y,m,1);}
@@ -250,9 +254,11 @@ function renderHeader(){
 function renderSidebar(){
   var el=document.getElementById('siteList');el.innerHTML='';
   // 전체 보기
+  var _today=TODAY;var _tiso=_today.getFullYear()+'-'+String(_today.getMonth()+1).padStart(2,'0')+'-'+String(_today.getDate()).padStart(2,'0');
+  function _sVisible(s){var isPast=s.end&&s.end<_tiso;return (!s.hidden&&!isPast)||S.showHidden;}
   var allDiv=document.createElement('div');
   allDiv.className='sit-all'+(S.filterSite==='all'?' on':'');
-  var totalCnt=S.schedules.filter(function(s){return !s.hidden||S.showHidden;}).length;
+  var totalCnt=S.schedules.filter(_sVisible).length;
   allDiv.innerHTML='<div class="sdot" style="background:#666"></div><span class="sname">전체 보기</span><span class="scnt">'+totalCnt+'</span>';
   allDiv.onclick=function(){S.filterSite='all';renderAll();};
   el.appendChild(allDiv);
@@ -262,10 +268,20 @@ function renderSidebar(){
   groups.forEach(function(grp){
     var grpSites=S.sites.filter(function(s){return (s.groupId||'_none')===grp.id;});
     if(!grpSites.length)return;
-    var lbl=document.createElement('div');lbl.className='grplbl';lbl.textContent=grp.name;
+    var grpKey='g:'+grp.id;
+    var grpCnt=S.schedules.filter(function(sc){
+      var p=S.projects.find(function(p){return p.id===sc.projectId;});
+      if(!p)return false;
+      var site=S.sites.find(function(s){return s.id===p.siteId;});
+      return site&&(site.groupId||'_none')===grp.id&&_sVisible(sc);
+    }).length;
+    var lbl=document.createElement('div');
+    lbl.className='grplbl'+(S.filterSite===grpKey?' on':'');
+    lbl.innerHTML=grp.name+'<span class="scnt grp-cnt">'+grpCnt+'</span>';
+    lbl.onclick=(function(gk){return function(){S.filterSite=gk;renderAll();};})(grpKey);
     el.appendChild(lbl);
     grpSites.forEach(function(site){
-      var cnt=S.schedules.filter(function(s){var p=S.projects.find(function(p){return p.id===s.projectId;});return p&&p.siteId===site.id&&(!s.hidden||S.showHidden);}).length;
+      var cnt=S.schedules.filter(function(s){var p=S.projects.find(function(p){return p.id===s.projectId;});return p&&p.siteId===site.id&&_sVisible(s);}).length;
       var d=document.createElement('div');d.className='sit'+(S.filterSite===site.id?' on':'');
       d.innerHTML='<div class="sdot" style="background:'+site.color+'"></div><span class="sname">'+site.name+'</span><span class="scnt">'+cnt+'</span>';
       d.onclick=(function(sid){return function(){S.filterSite=sid;renderAll();};})(site.id);
@@ -356,11 +372,27 @@ function assignWtLanes(wts){
 
 function renderGantt(){
   var body=document.getElementById('gbody');body.innerHTML='';
+  // 오늘 날짜 문자열 (과거 일정 판별용)
+  var _td=TODAY;var todayISO=_td.getFullYear()+'-'+String(_td.getMonth()+1).padStart(2,'0')+'-'+String(_td.getDate()).padStart(2,'0');
   // S.sites 순서 기준으로 프로젝트 정렬
   var siteOrder={};S.sites.forEach(function(s,i){siteOrder[s.id]=i;});
   var projs=S.projects.filter(function(p){
-    if(S.filterSite!=='all'&&p.siteId!==S.filterSite)return false;
-    var hasVisible=S.schedules.some(function(s){return s.projectId===p.id&&(!s.hidden||S.showHidden);});
+    // 사이트/그룹 필터
+    if(S.filterSite!=='all'){
+      if(S.filterSite.slice(0,2)==='g:'){
+        var gid=S.filterSite.slice(2);
+        var pSite=S.sites.find(function(s){return s.id===p.siteId;});
+        if(!pSite||(pSite.groupId||'_none')!==gid)return false;
+      } else if(p.siteId!==S.filterSite){return false;}
+    }
+    // 과거 일정도 숨김 처리 (종료일 < 오늘)
+    var hasVisible=S.schedules.some(function(s){
+      if(s.projectId!==p.id)return false;
+      var isPast=s.end&&s.end<todayISO;
+      if(!((!s.hidden&&!isPast)||S.showHidden))return false;
+      if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
+      return true;
+    });
     var hasEvent=S.events.some(function(e){return e.projectId===p.id;});
     var hasWork=S.workTasks.some(function(w){return w.projectId===p.id;});
     return hasVisible||hasEvent||hasWork;
@@ -370,7 +402,13 @@ function renderGantt(){
   var ri=0;
   projs.forEach(function(proj){
     var site=S.sites.find(function(s){return s.id===proj.siteId;});var sc=site?site.color:'#666';
-    var scheds=S.schedules.filter(function(s){return s.projectId===proj.id&&(!s.hidden||S.showHidden);});
+    var scheds=S.schedules.filter(function(s){
+      if(s.projectId!==proj.id)return false;
+      var isPast=s.end&&s.end<todayISO;
+      if(!((!s.hidden&&!isPast)||S.showHidden))return false;
+      if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
+      return true;
+    });
     var evts=S.events.filter(function(e){return e.projectId===proj.id;});
     var wts=S.workTasks.filter(function(w){return w.projectId===proj.id;}).map(function(w){return JSON.parse(JSON.stringify(w));});
     // 작업 레인 배정
@@ -427,10 +465,20 @@ function renderGantt(){
       });
     });
   });
-  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-120);
+  var _gs=document.getElementById('gscroll');
+  _gs.scrollLeft=Math.max(0,tpx()-Math.floor(_gs.clientWidth/2));
 }
 
 function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();}
+function setGanttZoom(z){_ganttZoom=z;renderAll();_updateZoomBtns();}
+function _updateZoomBtns(){
+  ['week','biweek','month'].forEach(function(z){
+    var btn=document.getElementById('zoomBtn_'+z);
+    if(btn) btn.className='btn'+(z===_ganttZoom?' active':'');
+  });
+}
+function ganttSearch(v){_ganttSearch=v.trim().toLowerCase();renderGantt();}
+
 
 /* ── 모달 ── */
 var _selCol='purple',_dragIdx=null;
@@ -1521,6 +1569,9 @@ function renderPersonTimeline(trips, colSpan){
 ════════════════════════════════════════════ */
 var _equipEditMode=false;
 var _equipFilterSite='all';
+var _equipCollapsed={};
+var PROJ_TYPE_COLOR={'납품셋업':'#1a55bb','개조':'#aa6000','이설':'#1a7a3a','개발':'#7a1a99'};
+var PROJ_TYPES=['납품셋업','개조','이설','개발'];
 var _dragEquipSiteId=null;
 
 /* ── 설비 탭 사이트 순서 헬퍼 ── */
@@ -1635,6 +1686,10 @@ function renderEquipSidebar(){
 
 function setEquipFilter(siteId){
   _equipFilterSite=siteId;
+  renderEquipTab();
+}
+function toggleEquipCollapse(siteId){
+  _equipCollapsed[siteId]=!_equipCollapsed[siteId];
   renderEquipTab();
 }
 
@@ -1923,11 +1978,24 @@ function renderEquipGrid(){
           return '<span class="eq-chip '+(p.type||'hq')+'">'+p.name+'</span>';
         }).join('')+'</span>';
     }
+    var collapsed=!!_equipCollapsed[siteId];
+    var sitePct=calcSiteProgress(siteId);
+    var sitePctStr=sitePct!==null?sitePct+'%':'—';
+    var sitePctColor=sitePct===100?'#2a8a40':(sitePct>=70?'#1a6bbf':'#b87a10');
+    var collapseBtn='<button class="eq-collapse-btn" onclick="toggleEquipCollapse(\''+siteId+'\')">'+(collapsed?'▶':'▼')+'</button>';
+    var collapsedInfo=collapsed
+      ?'<span class="eq-site-pct" style="color:'+sitePctColor+'">'+sitePctStr+'</span>'
+       +'<div class="eq-site-pbar"><div class="eq-site-pbar-fill" style="width:'+(sitePct||0)+'%;background:'+sitePctColor+'"></div></div>'
+      :'';
     // 사이트 구분 행 — 4열 colspan sticky로 사이트명/출장자 고정
     bodyHtml+='<tr class="eq-site-row">'
       +'<td colspan="4" style="position:sticky;left:0;z-index:25;border-left:4px solid '+siteColor+'">'
+      +'<div class="eq-site-inner">'
+      +collapseBtn
       +'<span style="color:#f0f0f8;font-size:14px;font-weight:700;letter-spacing:.04em">'+siteName+'</span>'
-      +personnelHtml+'</td>'
+      +collapsedInfo
+      +personnelHtml
+      +'</div></td>'
       +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#1a1a26;border-top:2px solid #2a2a3a"></td>':'')
       +'</tr>';
 
@@ -1939,9 +2007,13 @@ function renderEquipGrid(){
         var projUnits=siteUnits.filter(function(u){return u.equipProjectId===proj.id;});
         var projPct=calcProjectProgress(proj.id);
         var projPctStr=projPct!==null?projPct+'%':'—';
+        var pType=proj.projType||'납품셋업';
+        var pTypeColor=PROJ_TYPE_COLOR[pType]||'#1a55bb';
+        var typeBadge='<span class="eq-type-badge" style="background:'+pTypeColor+'">'+pType+'</span>';
         bodyHtml+='<tr class="eq-project-row">'
           +'<td colspan="4" class="eq-proj-sticky" style="position:sticky;left:0;z-index:22;background:#16162a;'
           +'border-top:1px solid #2a2a40;border-left:3px solid #4a4a6a;border-bottom:1px solid #2a2a40;">'
+          +typeBadge
           +'<span class="eq-proj-name">'+proj.name+'</span>'
           +'<span class="eq-proj-pct">'+projPctStr+'</span>'
           +(e?'<button class="eq-item-edit-btn" onclick="openEditEquipProject(\''+proj.id+'\')">수정</button>'
@@ -1949,13 +2021,15 @@ function renderEquipGrid(){
           +'</td>'
           +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#16162a;border-top:1px solid #2a2a40;border-bottom:1px solid #2a2a40"></td>':'')
           +'</tr>';
-        projUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
+        if(!collapsed){
+          projUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
+        }
       });
       // 미지정 호기
       var unassigned=siteUnits.filter(function(u){
         return !u.equipProjectId||!siteProjects.find(function(p){return p.id===u.equipProjectId;});
       });
-      if(unassigned.length){
+      if(unassigned.length&&!collapsed){
         bodyHtml+='<tr class="eq-project-row unassigned">'
           +'<td colspan="'+(4+scrollColCount)+'" style="position:sticky;left:0;z-index:22;background:#141422;'
           +'border-top:1px solid #2a2a3a;border-bottom:1px solid #2a2a3a;'
@@ -1964,8 +2038,10 @@ function renderEquipGrid(){
         unassigned.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
       }
     } else {
-      // 기존 방식
-      siteUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
+      // 기존 방식 (프로젝트 없음 - 납품셋업 기본 배지 표시)
+      if(!collapsed){
+        siteUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
+      }
     }
   });
 
@@ -2092,6 +2168,11 @@ function saveUnitMemo(unitId,clear){
 }
 
 /* ── 프로젝트 CRUD ── */
+function _projTypeOpts(sel){
+  return PROJ_TYPES.map(function(t){
+    return '<option value="'+t+'"'+(t===(sel||'납품셋업')?' selected':'')+'>'+t+'</option>';
+  }).join('');
+}
 function openAddEquipProject(){
   ensureEquipSiteOrder();
   var available=S.sites.filter(function(s){return S.equipSiteOrder.indexOf(s.id)>=0;});
@@ -2103,6 +2184,8 @@ function openAddEquipProject(){
     +'<div class="fg"><label class="fl">프로젝트명</label>'
     +'<input type="text" id="eq_proj_name" placeholder="예: Phase 1" autocorrect="off" autocomplete="off" spellcheck="false"'
     +' onkeydown="if(event.key===\'Enter\')saveAddEquipProject()"></div>'
+    +'<div class="fg"><label class="fl">유형</label>'
+    +'<select id="eq_proj_type">'+_projTypeOpts()+'</select></div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveAddEquipProject()">추가</button>'
@@ -2112,8 +2195,9 @@ function openAddEquipProject(){
 function saveAddEquipProject(){
   var siteId=document.getElementById('eq_proj_site').value;
   var name=document.getElementById('eq_proj_name').value.trim();
+  var projType=document.getElementById('eq_proj_type').value||'납품셋업';
   if(!name){alert('프로젝트명을 입력해주세요.');return;}
-  S.equipProjects.push({id:'ep'+Date.now(),siteId:siteId,name:name});
+  S.equipProjects.push({id:'ep'+Date.now(),siteId:siteId,name:name,projType:projType});
   saveData();cm();renderEquipGrid();
 }
 function openEditEquipProject(projectId){
@@ -2123,6 +2207,8 @@ function openEditEquipProject(projectId){
     +'<div class="fg"><label class="fl">프로젝트명</label>'
     +'<input type="text" id="eq_edit_proj_name" value="'+proj.name+'" autocorrect="off" autocomplete="off" spellcheck="false"'
     +' onkeydown="if(event.key===\'Enter\')saveEditEquipProject(\''+projectId+'\')"></div>'
+    +'<div class="fg"><label class="fl">유형</label>'
+    +'<select id="eq_edit_proj_type">'+_projTypeOpts(proj.projType||'납품셋업')+'</select></div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveEditEquipProject(\''+projectId+'\')">저장</button>'
@@ -2133,8 +2219,10 @@ function saveEditEquipProject(projectId){
   var proj=S.equipProjects.find(function(p){return p.id===projectId;});
   if(!proj) return;
   var name=document.getElementById('eq_edit_proj_name').value.trim();
+  var projType=document.getElementById('eq_edit_proj_type').value||'납품셋업';
   if(!name){alert('프로젝트명을 입력해주세요.');return;}
   proj.name=name;
+  proj.projType=projType;
   saveData();cm();renderEquipGrid();
 }
 function delEquipProject(projectId){
