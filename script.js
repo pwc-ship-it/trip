@@ -259,7 +259,7 @@ var WPX=42,_months=[],_totPx=0,_sd=null;
 var _ganttZoom='week'; // 'week'|'biweek'|'month'
 var _ganttSearch='';   // 담당자명 검색
 var WPX_MAP={'week':42,'biweek':22,'month':12};
-var GANTT_TODAY_OFFSET=200; // 오늘날짜 스크롤 오프셋(px). 값↑ → 오늘이 왼쪽, 값↓ → 오늘이 오른쪽
+var GANTT_TODAY_OFFSET=300; // 오늘날짜 스크롤 오프셋(px). 값↑ → 오늘이 왼쪽, 값↓ → 오늘이 오른쪽
 function calcRange(){
   var minD=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1),maxD=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,0);
   var all=[];S.schedules.forEach(function(s){all.push(s.start);all.push(s.end);});S.events.forEach(function(e){all.push(e.date);});
