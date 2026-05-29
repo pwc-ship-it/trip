@@ -15,10 +15,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .btn.warn{background:#7a5500;color:#fff;border-color:#5a3d00}
 .btn.active{background:#534AB7;color:#fff;border-color:#3C3489}
 /* 범례 */
-.leg{display:flex;align-items:center;border:1px solid #3a3a44;border-radius:5px;overflow:hidden}
-.legg{display:flex;align-items:center}
+.leg{display:flex;align-items:center;border:1px solid #3a3a44;border-radius:5px;overflow:hidden;flex-shrink:0}
+.legg{display:flex;align-items:center;flex-shrink:0}
 .legl{font-size:10px;color:#666;padding:0 6px;border-right:1px solid #3a3a44;white-space:nowrap;line-height:26px}
-.legi{display:flex;align-items:center;gap:3px;padding:3px 7px;border-right:1px solid #3a3a44;font-size:10px;color:#b0b0b8}
+.legi{display:flex;align-items:center;gap:3px;padding:3px 7px;border-right:1px solid #3a3a44;font-size:10px;color:#b0b0b8;white-space:nowrap}
 .legi:last-child{border-right:none}
 .legd{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 .legs{width:1.5px;background:#555;align-self:stretch}
