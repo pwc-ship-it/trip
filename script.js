@@ -1045,10 +1045,10 @@ function fmtDate(d){
 }
 
 // 미주 누적 체류일이 targetDays 미만으로 떨어지는 최초 날짜 + 그날 이후 연속 가능 일수
-function calcUsNextSafeDate(trips, targetDays){
+function calcUsNextSafeDate(trips, targetDays, inclCanada){
   var r365=getRolling12();
   var usedSet={};
-  trips.filter(function(t){return t.region==='americas';}).forEach(function(t){
+  trips.filter(function(t){return t.region==='americas'||(inclCanada&&t.region==='canada');}).forEach(function(t){
     var s=new Date(Math.max(pd(t.start),r365.start));
     var e=new Date(Math.min(pd(t.end),r365.end));
     if(s>e) return;
@@ -1283,7 +1283,7 @@ function calcUsRisk(trips){
   // 위험: 고객사 가이드 한도 초과
   if(amDays>US_GUIDE_ANNUAL){
     status='danger';
-    reasons.push('연 누적 '+amDays+'일 (한도 '+US_GUIDE_ANNUAL+'일 초과)');
+    reasons.push('12M 누적 '+amDays+'일 (한도 '+US_GUIDE_ANNUAL+'일 초과)');
   }
   if(maxSingle>US_GUIDE_SINGLE){
     status='danger';
@@ -1294,7 +1294,7 @@ function calcUsRisk(trips){
     // 주의: 한도 80% 이상
     if(amDays>=Math.round(US_GUIDE_ANNUAL*0.8)){
       status='warn';
-      reasons.push('연 누적 '+amDays+'일 (한도 '+US_GUIDE_ANNUAL+'일의 80%)');
+      reasons.push('12M 누적 '+amDays+'일 (한도 '+US_GUIDE_ANNUAL+'일의 80%)');
     }
     if(amDays>koreaDays){
       if(status==='safe') status='warn';
@@ -1315,7 +1315,7 @@ function calcUsRisk(trips){
     ?reasons.join(' | ')
     :'이상 없음 (미주 '+amDays+'일 / 연 한도 '+US_GUIDE_ANNUAL+'일)';
 
-  var subText='누적 '+amDays+'/'+US_GUIDE_ANNUAL+'일';
+  var subText='12M 누적 '+amDays+'/'+US_GUIDE_ANNUAL+'일';
   if(amDays>US_GUIDE_ANNUAL){
     var nd=calcUsNextSafeDate(trips,US_GUIDE_ANNUAL);
     if(nd){
@@ -1471,29 +1471,47 @@ function runFeasibilityCheck(){
 
   if(region==='americas'){
     var inclCanada=document.getElementById('pfCanada')&&document.getElementById('pfCanada').checked;
-    var extra=inclCanada?['canada']:null;
-    var r=calcFeasibleDays(person.trips,'americas',start,end,365,extra);
     var baseLabel=inclCanada?'미국+캐나다 합산 기준':'미국 기준';
     var singleOk=planDays<=US_GUIDE_SINGLE;
-    var annualOk=r.total<=US_GUIDE_ANNUAL;
-    var annualWarn=r.total>Math.round(US_GUIDE_ANNUAL*0.8);
     var singleWarn=planDays>Math.round(US_GUIDE_SINGLE*0.8);
-    var maxSingleRemain=US_GUIDE_SINGLE;
-    var maxAnnualRemain=Math.max(0,US_GUIDE_ANNUAL-r.existing);
-    var maxAvail=Math.min(maxSingleRemain,maxAnnualRemain);
-    if(!singleOk||!annualOk){
+    // 오늘 기준 12M 롤링 누적 (테이블 미국 가이드와 동일 방식)
+    var r365=getRolling12();
+    var curSet={};
+    person.trips.filter(function(t){return t.region==='americas'||(inclCanada&&t.region==='canada');}).forEach(function(t){
+      var s=new Date(Math.max(pd(t.start),r365.start));
+      var e=new Date(Math.min(pd(t.end),r365.end));
+      if(s>e) return;
+      for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+        curSet[cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate()]=true;
+    });
+    var currentDays=Object.keys(curSet).length;
+    var annualOver=currentDays>US_GUIDE_ANNUAL;
+    var tripTotal=currentDays+planDays;
+    var annualWarn=!annualOver&&(tripTotal>Math.round(US_GUIDE_ANNUAL*0.8));
+    if(!singleOk||annualOver){
       html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
       html+='<span style="color:#e84040;font-size:11px"> ';
       if(!singleOk) html+='1회 한도 초과 ('+planDays+'일 > '+US_GUIDE_SINGLE+'일). ';
-      if(!annualOk) html+='연 누적 '+r.total+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
-      html+='최대 가능: '+maxAvail+'일 <span style="color:#666">('+baseLabel+')</span></span>';
-      if(!annualOk&&singleOk){var nextDate=calcNextFeasibleDate(person.trips,'americas',planDays,365,US_GUIDE_ANNUAL,extra);if(nextDate)html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';}
-    } else if(singleWarn||annualWarn){
+      if(annualOver) html+='12M 누적 '+currentDays+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
+      html+='<span style="color:#666">('+baseLabel+')</span></span>';
+      if(annualOver&&singleOk){
+        var nd=calcUsNextSafeDate(person.trips,US_GUIDE_ANNUAL,inclCanada);
+        if(nd){
+          html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시작: '+fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능';
+          if(planDays<=nd.consecutiveDays) html+=' · 이번 출장('+planDays+'일) 가능';
+          else html+=' · 이번 출장('+planDays+'일)은 최대 '+nd.consecutiveDays+'일 초과';
+          html+='</span>';
+        }
+      }
+    } else if(singleWarn||annualWarn||(tripTotal>US_GUIDE_ANNUAL)){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
-      html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일). 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
+      html+='<span style="color:#e8a020;font-size:11px"> 가능 (12M 누적 '+currentDays+'일 + 이번 출장 '+planDays+'일 = '+tripTotal+'/'+US_GUIDE_ANNUAL+'일). ';
+      if(tripTotal>US_GUIDE_ANNUAL) html+='이번 출장 포함 시 '+(tripTotal-US_GUIDE_ANNUAL)+'일 초과. ';
+      else html+='잔여 '+(US_GUIDE_ANNUAL-tripTotal)+'일. ';
+      html+='<span style="color:#666">('+baseLabel+')</span></span>';
     } else {
       html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
-      html+='<span style="color:#4aaa70;font-size:11px"> 예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일. 이번 출장 '+planDays+'일. 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
+      html+='<span style="color:#4aaa70;font-size:11px"> 12M 누적 '+currentDays+'일 + 이번 출장 '+planDays+'일 = '+tripTotal+'/'+US_GUIDE_ANNUAL+'일. 잔여 '+(US_GUIDE_ANNUAL-tripTotal)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
     }
   } else if(region==='europe'){
     var r=calcFeasibleDays(person.trips,'europe',start,end,180);
