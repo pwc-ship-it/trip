@@ -106,6 +106,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .bar-hq-done{background:#4a4a6a}.bar-hq-going{background:#2176cc}.bar-hq-plan{background:#0f9e6e}
 .bar-out-done{background:#5a4a2a}.bar-out-going{background:#cc8010}.bar-out-plan{background:#8a6e00}
 .barlbl{position:sticky;left:302px;display:inline-flex;align-items:center;font-size:10px;font-weight:500;color:#fff;white-space:nowrap;height:100%;pointer-events:none;z-index:7;padding:0 7px;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.barlbl-wk{position:absolute;left:4px;right:4px;display:flex;align-items:center;font-size:10px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:100%;pointer-events:none;z-index:7;text-shadow:0 1px 2px rgba(0,0,0,.5)}
 /* 이벤트 */
 .evln{position:absolute;top:0;bottom:0;width:2px;z-index:7;pointer-events:none}
 .evchip{position:absolute;top:3px;font-size:9px;font-weight:500;padding:1px 5px;border-radius:3px;white-space:nowrap;cursor:pointer;z-index:9;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);overflow:hidden;text-overflow:ellipsis}

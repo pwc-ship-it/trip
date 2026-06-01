@@ -131,7 +131,7 @@ function addWtBar(el,wt){
   bar.style.cssText='left:'+sp+'px;width:'+wp+'px;background:'+barColor+';opacity:'+(isDone?'.55':'1');
   bar.title=txt;
   bar.onclick=(function(id){return function(){openEditWt(id);};})(wt.id);
-  var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
+  var lbl=document.createElement('span');lbl.className='barlbl-wk';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
 }
 
 /* ── 간트 렌더 ── */
