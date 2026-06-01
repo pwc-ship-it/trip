@@ -786,16 +786,13 @@ function saveAddEquipUnit(){
 /* ── 사이트 선택 체크박스 HTML 생성 헬퍼 ── */
 function _buildSiteCheckboxesHtml(checkedIds){
   var allChecked=!checkedIds||checkedIds.length===0;
-  var activeSites={};
-  S.equipUnits.forEach(function(u){activeSites[u.siteId]=true;});
   var html='<div class="fg"><label class="fl">적용 사이트</label>'
     +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:6px">'
     +'<input type="checkbox" id="eq_site_all" onchange="_onEquipSiteAllChange()"'+(allChecked?' checked':'')+'>'
     +'<span style="font-size:12px">전체 공통 (모든 사이트)</span></label>'
     +'<div id="eq_site_groups" style="display:'+(allChecked?'none':'block')+';padding:6px 8px;background:#1a1a28;border:1px solid #3a3a50;border-radius:4px">';
   _EQUIP_SITE_GROUPS.forEach(function(grp){
-    var visibleIds=grp.ids.filter(function(id){return activeSites[id]||checkedIds&&checkedIds.indexOf(id)>=0;});
-    if(!visibleIds.length) return;
+    var visibleIds=grp.ids;
     html+='<div style="margin-bottom:4px"><span style="font-size:10px;color:#7a7aaa;margin-right:6px">'+grp.label+'</span>';
     visibleIds.forEach(function(id){
       var chk=(!allChecked&&checkedIds&&checkedIds.indexOf(id)>=0)?' checked':'';
