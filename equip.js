@@ -7,6 +7,14 @@ var _equipCollapsed={};
 var PROJ_TYPE_COLOR={'납품셋업':'#1a55bb','개조':'#aa6000','이설':'#1a7a3a','개발':'#7a1a99'};
 var PROJ_TYPES=['납품셋업','개조','이설','개발'];
 var _dragEquipSiteId=null;
+var _EQUIP_SITE_GROUPS=[
+  {label:'LG (미국)',   ids:['ESHD','ESMI','ESHG','MILS','UC2','BOSK_TN']},
+  {label:'LG (캐나다)', ids:['ESOT']},
+  {label:'현대JV',      ids:['현대JV']},
+  {label:'중국',        ids:['ESNA','ESNB','DSBJ','SDD']},
+  {label:'베트남',      ids:['SDV']},
+  {label:'유럽',        ids:['WA']},
+];
 
 /* ── 설비 탭 사이트 순서 헬퍼 ── */
 function ensureEquipSiteOrder(){
@@ -309,7 +317,12 @@ function renderEquipGrid(){
   var items=S.equipItems.slice().sort(function(a,b){return a.order-b.order;});
   // 양산시작(ei21)은 고정 열로 분리, 나머지가 스크롤 항목
   var msDateItem=items.find(function(i){return i.id==='ei21';});
-  var scrollItems=items.filter(function(i){return i.id!=='ei21';});
+  var scrollItems=items.filter(function(i){
+    if(i.id==='ei21') return false;
+    if(_equipFilterSite==='all') return true;
+    var s=i.siteIds;
+    return !s||s.length===0||s.indexOf(_equipFilterSite)>=0;
+  });
 
   // 필터링
   var allUnits=S.equipUnits.filter(function(u){
@@ -755,7 +768,10 @@ function saveAddEquipUnit(){
   var projEl=document.getElementById('eq_unit_proj');
   var equipProjectId=projEl?projEl.value||null:null;
   var initCells={};
-  S.equipItems.forEach(function(item){initCells[item.id]={type:'na',value:null};});
+  S.equipItems.forEach(function(item){
+    var s=item.siteIds;
+    if(!s||s.length===0||s.indexOf(siteId)>=0) initCells[item.id]={type:'na',value:null};
+  });
   S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,equipProjectId:equipProjectId,lineName:lineName,unitName:unitName,memo:'',cells:initCells});
   saveData();
   renderEquipGrid();
@@ -767,6 +783,44 @@ function saveAddEquipUnit(){
   if(fb){fb.style.display='';fb.textContent='"'+unitName+'" 추가됨';}
 }
 
+/* ── 사이트 선택 체크박스 HTML 생성 헬퍼 ── */
+function _buildSiteCheckboxesHtml(checkedIds){
+  var allChecked=!checkedIds||checkedIds.length===0;
+  var activeSites={};
+  S.equipUnits.forEach(function(u){activeSites[u.siteId]=true;});
+  var html='<div class="fg"><label class="fl">적용 사이트</label>'
+    +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:6px">'
+    +'<input type="checkbox" id="eq_site_all" onchange="_onEquipSiteAllChange()"'+(allChecked?' checked':'')+'>'
+    +'<span style="font-size:12px">전체 공통 (모든 사이트)</span></label>'
+    +'<div id="eq_site_groups" style="display:'+(allChecked?'none':'block')+';padding:6px 8px;background:#1a1a28;border:1px solid #3a3a50;border-radius:4px">';
+  _EQUIP_SITE_GROUPS.forEach(function(grp){
+    var visibleIds=grp.ids.filter(function(id){return activeSites[id]||checkedIds&&checkedIds.indexOf(id)>=0;});
+    if(!visibleIds.length) return;
+    html+='<div style="margin-bottom:4px"><span style="font-size:10px;color:#7a7aaa;margin-right:6px">'+grp.label+'</span>';
+    visibleIds.forEach(function(id){
+      var chk=(!allChecked&&checkedIds&&checkedIds.indexOf(id)>=0)?' checked':'';
+      html+='<label style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;cursor:pointer;font-size:11px">'
+        +'<input type="checkbox" class="eq-site-cb" value="'+id+'"'+chk+'>'+id+'</label>';
+    });
+    html+='</div>';
+  });
+  html+='</div></div>';
+  return html;
+}
+function _onEquipSiteAllChange(){
+  var allEl=document.getElementById('eq_site_all');
+  var grpEl=document.getElementById('eq_site_groups');
+  if(grpEl) grpEl.style.display=allEl&&allEl.checked?'none':'block';
+}
+function _collectSiteIds(){
+  var allEl=document.getElementById('eq_site_all');
+  if(allEl&&allEl.checked) return [];
+  var ids=[];
+  var cbs=document.querySelectorAll('.eq-site-cb:checked');
+  cbs.forEach(function(cb){ids.push(cb.value);});
+  return ids;
+}
+
 /* ── 항목 추가 ── */
 function openAddEquipItem(){
   var groups=['SAT','IT'];
@@ -775,13 +829,12 @@ function openAddEquipItem(){
   existGroups.forEach(function(g){if(groups.indexOf(g)<0)groups.push(g);});
   var opts='<option value="">없음</option>'+groups.map(function(g){return '<option value="'+g+'">'+g+'</option>';}).join('');
   mw('<div class="mtit">공정 항목 추가</div>'
-    +'<div class="fg" style="background:#1a2a1a;border:1px solid #2a5a2a;border-radius:5px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:#4aaa70">'
-    +'⚠ 이 항목은 <b>모든 사이트에 공통으로 추가</b>됩니다. 기존 호기에는 N/A로 자동 표시됩니다.</div>'
     +'<div class="fg"><label class="fl">항목명</label>'
     +'<input type="text" id="eq_item_name" placeholder="예: Final Check"></div>'
     +'<div class="fg"><label class="fl">그룹 (선택)</label>'
     +'<select id="eq_item_group">'+opts+'</select>'
     +'<input type="text" id="eq_item_group_custom" placeholder="새 그룹명 직접 입력" style="margin-top:5px"></div>'
+    +_buildSiteCheckboxesHtml(null)
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveAddEquipItem()">추가</button>'
@@ -793,13 +846,15 @@ function saveAddEquipItem(){
   if(!name){alert('항목명을 입력해주세요.');return;}
   var group=document.getElementById('eq_item_group_custom').value.trim()
     ||document.getElementById('eq_item_group').value||'';
+  var siteIds=_collectSiteIds();
   var maxOrder=0;
   S.equipItems.forEach(function(i){if(i.order>maxOrder)maxOrder=i.order;});
-  var newItem={id:'ei'+Date.now(),name:name,groupName:group,order:maxOrder+1};
+  var newItem={id:'ei'+Date.now(),name:name,groupName:group,order:maxOrder+1,siteIds:siteIds};
   S.equipItems.push(newItem);
   S.equipUnits.forEach(function(u){
     if(!u.cells) u.cells={};
-    u.cells[newItem.id]={type:'na',value:null};
+    var applicable=siteIds.length===0||siteIds.indexOf(u.siteId)>=0;
+    if(applicable) u.cells[newItem.id]={type:'na',value:null};
   });
   saveData();cm();renderEquipTab();
 }
@@ -819,6 +874,7 @@ function openEditEquipItem(itemId){
     +'<div class="fg"><label class="fl">그룹</label>'
     +'<select id="eq_edit_group"><option value=""'+(item.groupName?'':' selected')+'>없음</option>'+opts+'</select>'
     +'<input type="text" id="eq_edit_group_custom" placeholder="새 그룹명 직접 입력" style="margin-top:5px" value="'+(groups.indexOf(item.groupName)<0?item.groupName:'')+'"></div>'
+    +_buildSiteCheckboxesHtml(item.siteIds||[])
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
     +'<button class="btn sm pri" onclick="saveEditEquipItem(\''+itemId+'\')">저장</button>'
@@ -832,7 +888,16 @@ function saveEditEquipItem(itemId){
   if(!name){alert('항목명을 입력해주세요.');return;}
   var group=document.getElementById('eq_edit_group_custom').value.trim()
     ||document.getElementById('eq_edit_group').value||'';
-  item.name=name;item.groupName=group;
+  var newSiteIds=_collectSiteIds();
+  // 새로 추가된 사이트의 units에 cells 초기화 (기존 데이터는 유지)
+  S.equipUnits.forEach(function(u){
+    if(!u.cells) u.cells={};
+    var wasApplicable=!item.siteIds||item.siteIds.length===0||item.siteIds.indexOf(u.siteId)>=0;
+    var nowApplicable=newSiteIds.length===0||newSiteIds.indexOf(u.siteId)>=0;
+    if(!wasApplicable&&nowApplicable&&!u.cells[itemId])
+      u.cells[itemId]={type:'na',value:null};
+  });
+  item.name=name;item.groupName=group;item.siteIds=newSiteIds;
   saveData();cm();renderEquipTab();
 }
 
