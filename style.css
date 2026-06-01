@@ -343,6 +343,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .b1-safe{color:#4aaa70}
 .b1-warn{color:#e8a020}
 .b1-alert{color:#e84040;font-weight:600}
+/* ── 사이트관리 국가 섹션 헤더 ── */
+.sm-country-hdr{font-size:10px;font-weight:700;color:#8080b0;padding:6px 0 2px;border-bottom:1px solid #3a3a44;margin-bottom:3px;letter-spacing:0.5px}
 /* ── 출장 가능 여부 확인 폼 ── */
 .pm-feasible-form{display:flex;flex-direction:column;gap:6px;padding:8px 12px;background:#151520;border:1px solid #2a2a3a;border-radius:6px;margin-bottom:8px}
 .pm-feasible-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}

@@ -1,14 +1,20 @@
 /* ── 기본 더미 데이터 ── */
 var DEF = {
   "sites": [
-    {"id": "ESHD", "name": "ESHD", "color": "#1558a0", "groupId": "lges"},
-    {"id": "MILS", "name": "MILS", "color": "#2e6e18", "groupId": "lges"},
-    {"id": "UC2", "name": "UC2", "color": "#4a7a10", "groupId": "lges"},
-    {"id": "ESOT", "name": "ESOT", "color": "#7a4208", "groupId": "lges"},
-    {"id": "WA", "name": "WA", "color": "#8a2a10", "groupId": "lges"},
-    {"id": "ESHG", "name": "ESHG", "color": "#3C3489", "groupId": "lges"},
-    {"id": "ESNA", "name": "ESNA", "color": "#0a5e40", "groupId": "lges"},
-    {"id": "ESMI", "name": "ESMI", "color": "#72128c", "groupId": "lges"}
+    {"id": "ESHD",    "name": "ESHD",       "color": "#1558a0", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "ESMI",    "name": "ESMI",        "color": "#72128c", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "ESHG",    "name": "ESHG",        "color": "#3C3489", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "MILS",    "name": "MILS",        "color": "#2e6e18", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "UC2",     "name": "UC2",         "color": "#4a7a10", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "현대JV",  "name": "현대JV",      "color": "#1a6080", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "BOSK_TN", "name": "BOSK_TN",    "color": "#2a5040", "groupId": "lges", "country": "usa",     "region": "americas"},
+    {"id": "ESOT",    "name": "ESOT",        "color": "#7a4208", "groupId": "lges", "country": "canada",  "region": "canada"},
+    {"id": "ESNA",    "name": "ESNA",        "color": "#0a5e40", "groupId": "lges", "country": "china",   "region": "china"},
+    {"id": "ESNB",    "name": "ESNB",        "color": "#0e7050", "groupId": "lges", "country": "china",   "region": "china"},
+    {"id": "DSBJ",    "name": "DSBJ(소주)",  "color": "#1a8060", "groupId": "lges", "country": "china",   "region": "china"},
+    {"id": "SDD",     "name": "SDD(동관)",   "color": "#108050", "groupId": "lges", "country": "china",   "region": "china"},
+    {"id": "SDV",     "name": "SDV",         "color": "#806010", "groupId": "lges", "country": "vietnam", "region": "vietnam"},
+    {"id": "WA",      "name": "WA",          "color": "#8a2a10", "groupId": "lges", "country": "poland",  "region": "europe"}
   ],
   "projects": [
     {"id": "p1", "siteId": "ESHD", "name": "2세대 셋업+양산"},

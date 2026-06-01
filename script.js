@@ -788,63 +788,57 @@ function showSiteM(){
 
 function buildGrpSiteRows(){
   var el=document.getElementById('grpSiteRows');if(!el)return;el.innerHTML='';
-  S.groups.forEach(function(grp){
-    // 그룹 헤더 행
-    var gh=document.createElement('div');
-    gh.style.cssText='display:flex;align-items:center;gap:5px;padding:5px 0 3px;border-bottom:1px solid #3a3a44;margin-bottom:3px';
-    var ni=document.createElement('input');ni.type='text';ni.value=grp.name;
-    ni.style.cssText='flex:1;font-size:11px;font-weight:600;color:#ccc;padding:2px 5px';
-    ni.onchange=(function(gid){return function(){updGN(gid,this.value);};})(grp.id);
-    var db=document.createElement('button');db.className='btn sm red';db.textContent='그룹삭제';
-    db.onclick=(function(gid){return function(){delGroup(gid);};})(grp.id);
-    gh.appendChild(ni);gh.appendChild(db);el.appendChild(gh);
+  var COUNTRY_SECTIONS=[
+    {key:'usa',     label:'미국',   region:'americas'},
+    {key:'canada',  label:'캐나다', region:'canada'},
+    {key:'china',   label:'중국',   region:'china'},
+    {key:'vietnam', label:'베트남', region:'vietnam'},
+    {key:'poland',  label:'폴란드', region:'europe'},
+    {key:'korea',   label:'국내',   region:'other'}
+  ];
+  var regionOpts=[['americas','미주(미국)'],['canada','캐나다'],['europe','유럽'],['china','중국'],['vietnam','베트남'],['other','기타']];
 
-    // 그룹 내 사이트들
-    var grpSites=S.sites.filter(function(s){return (s.groupId||'_none')===grp.id;});
-    grpSites.forEach(function(site,si){
-      var row=document.createElement('div');row.className='mrow';row.style.paddingLeft='8px';row.draggable=true;
+  COUNTRY_SECTIONS.forEach(function(sec){
+    var secSites=S.sites.filter(function(s){
+      var c=s.country||'';
+      return c===sec.key || (!c && (s.region||'other')===sec.region);
+    });
+
+    // 섹션 헤더
+    var hdr=document.createElement('div');
+    hdr.className='sm-country-hdr';
+    hdr.textContent=sec.label;
+    el.appendChild(hdr);
+
+    if(!secSites.length){
+      var empty=document.createElement('div');
+      empty.style.cssText='font-size:10px;color:#555;padding:2px 8px 4px';
+      empty.textContent='(사이트 없음)';
+      el.appendChild(empty);
+      return;
+    }
+
+    secSites.forEach(function(site){
+      var row=document.createElement('div');row.className='mrow';row.style.paddingLeft='8px';
       var ic=document.createElement('input');ic.type='color';ic.value=site.color;
       ic.style.cssText='width:22px;height:22px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0';
       ic.onchange=(function(sid){return function(){updSC(sid,this.value);};})(site.id);
       var iname=document.createElement('input');iname.type='text';iname.value=site.name;
       iname.style.cssText='flex:1;min-width:60px;font-size:11px';
       iname.onchange=(function(sid){return function(){updSN(sid,this.value);};})(site.id);
-      // 그룹 변경 select
-      var gsel=document.createElement('select');
-      gsel.style.cssText='font-size:10px;padding:2px 3px;max-width:80px';
-      S.groups.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;if(g.id===grp.id)o.selected=true;gsel.appendChild(o);});
-      gsel.onchange=(function(sid){return function(){moveSiteGroup(sid,this.value);};})(site.id);
       // 지역 선택
       var rsel=document.createElement('select');
       rsel.title='출장일 집계 지역';
-      rsel.style.cssText='font-size:10px;padding:2px 3px;max-width:70px;color:#ccc';
-      var regionOpts=[['americas','미주'],['europe','유럽'],['china','중국'],['vietnam','베트남'],['other','기타']];
+      rsel.style.cssText='font-size:10px;padding:2px 3px;max-width:80px;color:#ccc';
       regionOpts.forEach(function(r){var o=document.createElement('option');o.value=r[0];o.textContent=r[1];if((site.region||'other')===r[0])o.selected=true;rsel.appendChild(o);});
       rsel.onchange=(function(sid){return function(){updSiteRegion(sid,this.value);};})(site.id);
       var btnP=document.createElement('button');btnP.className='btn sm';btnP.textContent='PJT+';
       btnP.onclick=(function(sid){return function(){addP(sid);};})(site.id);
       var btnD=document.createElement('button');btnD.className='btn sm red';btnD.textContent='삭제';
       btnD.onclick=(function(sid){return function(){delSite(sid);};})(site.id);
-      // 드래그
-      (function(siteId,siteIdx){
-        row.ondragstart=function(e){e.dataTransfer.effectAllowed='move';_dragIdx=siteIdx;};
-        row.ondragover=function(e){e.preventDefault();row.classList.add('dover');};
-        row.ondragleave=function(){row.classList.remove('dover');};
-        row.ondrop=function(e){
-          e.preventDefault();row.classList.remove('dover');
-          if(_dragIdx===null||_dragIdx===siteIdx){_dragIdx=null;return;}
-          var from=_dragIdx,to=siteIdx;_dragIdx=null;
-          var moved=S.sites.splice(from,1)[0];S.sites.splice(to,0,moved);
-          saveData();buildGrpSiteRows();renderAll();
-        };
-      })(site.id, S.sites.indexOf(site));
-      [ic,iname,gsel,rsel,btnP,btnD].forEach(function(el2){row.appendChild(el2);});
+      [ic,iname,rsel,btnP,btnD].forEach(function(el2){row.appendChild(el2);});
       el.appendChild(row);
     });
-    // 사이트 없을 때
-    if(!grpSites.length){var empty=document.createElement('div');empty.style.cssText='font-size:10px;color:#555;padding:3px 8px';empty.textContent='(사이트 없음)';el.appendChild(empty);}
-    // 그룹 간 간격
-    var gap=document.createElement('div');gap.style.height='8px';el.appendChild(gap);
   });
 }
 
@@ -959,10 +953,11 @@ function switchTab(tab){
    인원 출장일 관리
 ════════════════════════════════════════════ */
 
-var REGION_AMERICAS_IDS=['ESHD','ESMI','ESHG','MILS','ESOT','UC2','현대JV','BOSK_TN'];
+var REGION_AMERICAS_IDS=['ESHD','ESMI','ESHG','MILS','UC2','현대JV','BOSK_TN'];
+var REGION_CANADA_IDS=['ESOT'];
 var REGION_EUROPE_IDS=['WA','ESWA'];
-var REGION_CHINA_IDS=[];   // 사이트 관리에서 지역='china'로 설정된 사이트로 관리
-var REGION_VIETNAM_IDS=[]; // 사이트 관리에서 지역='vietnam'으로 설정된 사이트로 관리
+var REGION_CHINA_IDS=[];
+var REGION_VIETNAM_IDS=[];
 
 function getSiteRegion(siteId){
   // 사이트 데이터에 region 필드가 있으면 우선 사용
@@ -971,7 +966,8 @@ function getSiteRegion(siteId){
   // 하위 호환: 하드코딩 배열
   var sid=(siteId||'').toUpperCase();
   if(REGION_AMERICAS_IDS.map(function(x){return x.toUpperCase();}).indexOf(sid)>=0) return 'americas';
-  if(REGION_EUROPE_IDS.map(function(x){return x.toUpperCase();}).indexOf(sid)>=0) return 'europe';
+  if(REGION_CANADA_IDS.map(function(x){return x.toUpperCase();}).indexOf(sid)>=0)   return 'canada';
+  if(REGION_EUROPE_IDS.map(function(x){return x.toUpperCase();}).indexOf(sid)>=0)   return 'europe';
   return 'other';
 }
 
@@ -1404,8 +1400,14 @@ function togglePmType(type){
   renderPersonBody();
 }
 
+function pfRegionChange(val){
+  var wrap=document.getElementById('pfCanadaWrap');
+  if(wrap) wrap.style.display=(val==='americas'?'inline-flex':'none');
+}
+
 // 예정 출장 기간의 실제 일수를 계산 (기존 이력과 중복 제거)
-function calcFeasibleDays(trips, region, planStart, planEnd, windowDays){
+// extraRegions: 추가로 합산할 region 배열 (예: ['canada'])
+function calcFeasibleDays(trips, region, planStart, planEnd, windowDays, extraRegions){
   // 예정 종료일 기준 rolling window
   var winEnd=pd(planEnd);
   var winStart=new Date(winEnd);
@@ -1413,7 +1415,9 @@ function calcFeasibleDays(trips, region, planStart, planEnd, windowDays){
   var rolling={start:winStart,end:winEnd};
   // 기존 체류일
   var existSet={};
-  trips.filter(function(t){return t.region===region;}).forEach(function(t){
+  trips.filter(function(t){
+    return t.region===region||(extraRegions&&extraRegions.indexOf(t.region)>=0);
+  }).forEach(function(t){
     var s=new Date(Math.max(pd(t.start),rolling.start));
     var e=new Date(Math.min(pd(t.end),rolling.end));
     if(s>e) return;
@@ -1451,7 +1455,10 @@ function runFeasibilityCheck(){
   var html='';
 
   if(region==='americas'){
-    var r=calcFeasibleDays(person.trips,'americas',start,end,365);
+    var inclCanada=document.getElementById('pfCanada')&&document.getElementById('pfCanada').checked;
+    var extra=inclCanada?['canada']:null;
+    var r=calcFeasibleDays(person.trips,'americas',start,end,365,extra);
+    var baseLabel=inclCanada?'미국+캐나다 합산 기준':'미국 기준';
     var singleOk=planDays<=US_GUIDE_SINGLE;
     var annualOk=r.total<=US_GUIDE_ANNUAL;
     var annualWarn=r.total>Math.round(US_GUIDE_ANNUAL*0.8);
@@ -1464,13 +1471,13 @@ function runFeasibilityCheck(){
       html+='<span style="color:#e84040;font-size:11px"> ';
       if(!singleOk) html+='1회 한도 초과 ('+planDays+'일 > '+US_GUIDE_SINGLE+'일). ';
       if(!annualOk) html+='연 누적 '+r.total+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
-      html+='최대 가능: '+maxAvail+'일</span>';
+      html+='최대 가능: '+maxAvail+'일 <span style="color:#666">('+baseLabel+')</span></span>';
     } else if(singleWarn||annualWarn){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
-      html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일). 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일</span>';
+      html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일). 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
     } else {
       html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
-      html+='<span style="color:#4aaa70;font-size:11px"> 예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일. 이번 출장 '+planDays+'일. 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일</span>';
+      html+='<span style="color:#4aaa70;font-size:11px"> 예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일. 이번 출장 '+planDays+'일. 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
     }
   } else if(region==='europe'){
     var r=calcFeasibleDays(person.trips,'europe',start,end,180);
@@ -1585,7 +1592,8 @@ function renderPersonTab(){
   html+='<datalist id="pfPersonList">';
   allNames.sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(n){html+='<option value="'+escAttr(n)+'">';});
   html+='</datalist>';
-  html+='<select id="pfRegion" class="pm-fsel"><option value="americas">미국</option><option value="europe">유럽(솅겐)</option><option value="china">중국</option><option value="vietnam">베트남</option></select>';
+  html+='<select id="pfRegion" class="pm-fsel" onchange="pfRegionChange(this.value)"><option value="americas">미국</option><option value="europe">유럽(솅겐)</option><option value="china">중국</option><option value="vietnam">베트남</option></select>';
+  html+='<label id="pfCanadaWrap" style="display:none;align-items:center;gap:4px;font-size:11px;color:#a0a0c0;white-space:nowrap"><input type="checkbox" id="pfCanada"> 캐나다 합산</label>';
   html+='<input type="date" id="pfStart" class="pm-finp">';
   html+='<span style="font-size:11px;color:#666">~</span>';
   html+='<input type="date" id="pfEnd" class="pm-finp">';
