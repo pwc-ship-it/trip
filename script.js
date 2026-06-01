@@ -430,6 +430,7 @@ function renderGantt(){
       if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
       return true;
     });
+    if(_ganttSearch) return hasVisible;
     var hasEvent=S.events.some(function(e){return e.projectId===p.id;});
     var hasWork=S.workTasks.some(function(w){return w.projectId===p.id;});
     return hasVisible||hasEvent||hasWork;
@@ -446,8 +447,8 @@ function renderGantt(){
       if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
       return true;
     });
-    var evts=S.events.filter(function(e){return e.projectId===proj.id;});
-    var wts=S.workTasks.filter(function(w){
+    var evts=_ganttSearch?[]:S.events.filter(function(e){return e.projectId===proj.id;});
+    var wts=_ganttSearch?[]:S.workTasks.filter(function(w){
       if(w.projectId!==proj.id) return false;
       var isPast=w.end&&w.end<todayISO;
       return !isPast||S.showHidden;
@@ -1435,6 +1436,20 @@ function calcFeasibleDays(trips, region, planStart, planEnd, windowDays, extraRe
   return {existing:Object.keys(existSet).length,total:Object.keys(allSet).length,added:Object.keys(allSet).length-Object.keys(existSet).length};
 }
 
+// 출장 가능 시점: planDays 기간의 출장이 limit 이하가 되는 최초 날짜 탐색 (내일부터 최대 2년)
+function calcNextFeasibleDate(trips, region, planDays, windowDays, limit, extraRegions){
+  var s=new Date(TODAY);s.setDate(s.getDate()+1);
+  for(var i=0;i<730;i++){
+    var ts=new Date(s);ts.setDate(ts.getDate()+i);
+    var te=new Date(ts);te.setDate(te.getDate()+planDays-1);
+    var ss=ts.getFullYear()+'-'+String(ts.getMonth()+1).padStart(2,'0')+'-'+String(ts.getDate()).padStart(2,'0');
+    var es=te.getFullYear()+'-'+String(te.getMonth()+1).padStart(2,'0')+'-'+String(te.getDate()).padStart(2,'0');
+    var r=calcFeasibleDays(trips,region,ss,es,windowDays,extraRegions);
+    if(r.total<=limit) return ts;
+  }
+  return null;
+}
+
 function runFeasibilityCheck(){
   var personName=document.getElementById('pfPerson').value;
   var region=document.getElementById('pfRegion').value;
@@ -1472,6 +1487,7 @@ function runFeasibilityCheck(){
       if(!singleOk) html+='1회 한도 초과 ('+planDays+'일 > '+US_GUIDE_SINGLE+'일). ';
       if(!annualOk) html+='연 누적 '+r.total+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
       html+='최대 가능: '+maxAvail+'일 <span style="color:#666">('+baseLabel+')</span></span>';
+      if(!annualOk&&singleOk){var nextDate=calcNextFeasibleDate(person.trips,'americas',planDays,365,US_GUIDE_ANNUAL,extra);if(nextDate)html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';}
     } else if(singleWarn||annualWarn){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
       html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+US_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일). 잔여 '+(US_GUIDE_ANNUAL-r.total)+'일 <span style="color:#666">('+baseLabel+')</span></span>';
@@ -1486,6 +1502,7 @@ function runFeasibilityCheck(){
     if(!ok){
       html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
       html+='<span style="color:#e84040;font-size:11px"> 솅겐 180일 기준 '+r.total+'일 (90일 초과). 현재 사용 '+r.existing+'/90일. 최대 가능: '+Math.max(0,90-r.existing)+'일</span>';
+      var nextDate=calcNextFeasibleDate(person.trips,'europe',planDays,180,90,null);if(nextDate)html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';
     } else if(warn){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
       html+='<span style="color:#e8a020;font-size:11px"> 가능 (솅겐 180일 기준 '+r.total+'/90일). 잔여 '+(90-r.total)+'일</span>';
@@ -1505,6 +1522,7 @@ function runFeasibilityCheck(){
       if(!singleOk) html+='1회 한도 초과('+planDays+'/'+CN_GUIDE_SINGLE+'일). ';
       if(!annualOk) html+='연 세금거주자 도달('+r.total+'/'+CN_GUIDE_ANNUAL+'일). ';
       html+='</span>';
+      if(!annualOk&&singleOk){var nextDate=calcNextFeasibleDate(person.trips,'china',planDays,365,CN_GUIDE_ANNUAL-1,null);if(nextDate)html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';}
     } else if(singleWarn||annualWarn){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
       html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+CN_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일)</span>';
@@ -1524,6 +1542,7 @@ function runFeasibilityCheck(){
       if(!singleOk) html+='1회 한도 초과('+planDays+'/'+VN_GUIDE_SINGLE+'일). ';
       if(!annualOk) html+='연 세금거주자 도달('+r.total+'/'+VN_GUIDE_ANNUAL+'일). ';
       html+='</span>';
+      if(!annualOk&&singleOk){var nextDate=calcNextFeasibleDate(person.trips,'vietnam',planDays,365,VN_GUIDE_ANNUAL-1,null);if(nextDate)html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';}
     } else if(singleWarn||annualWarn){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
       html+='<span style="color:#e8a020;font-size:11px"> 가능 (예정 포함 연 누적 '+r.total+'/'+VN_GUIDE_ANNUAL+'일, 이번 출장 '+planDays+'일)</span>';
