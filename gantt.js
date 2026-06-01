@@ -135,20 +135,10 @@ function addWtBar(el,wt){
 }
 
 /* ── 간트 렌더 ── */
-/* 작업 레인 배정: 겹치는 작업은 별도 행으로 분리 */
+/* 작업 레인 배정: 홀짝 2레인 고정 배분 (1번째·3번째·5번째→레인0, 2번째·4번째·6번째→레인1) */
 function assignWtLanes(wts){
-  // wts: [{start,end,...}] → 각 wt에 lane 번호 부여
-  var lanes=[]; // lanes[i] = 마지막으로 끝난 날짜
-  wts.forEach(function(wt){
-    var assigned=false;
-    for(var i=0;i<lanes.length;i++){
-      if(wt.start>lanes[i]){ // 이 레인에 들어갈 수 있음
-        wt._lane=i;lanes[i]=wt.end;assigned=true;break;
-      }
-    }
-    if(!assigned){wt._lane=lanes.length;lanes.push(wt.end);}
-  });
-  return lanes.length;
+  wts.forEach(function(wt,i){wt._lane=i%2;});
+  return Math.min(2,wts.length);
 }
 
 function renderGantt(){
