@@ -784,20 +784,41 @@ function saveAddEquipUnit(){
 }
 
 /* ── 사이트 선택 체크박스 HTML 생성 헬퍼 ── */
+var _REGION_LABEL={'americas':'미주 (미국)','canada':'캐나다','china':'중국','vietnam':'베트남','europe':'유럽'};
+var _REGION_ORDER=['americas','canada','vietnam','china','europe'];
 function _buildSiteCheckboxesHtml(checkedIds){
   var allChecked=!checkedIds||checkedIds.length===0;
+  // S.sites 기반으로 region별 동적 그룹화
+  var regionMap={};
+  (S.sites||[]).forEach(function(site){
+    var r=site.region||'other';
+    if(!regionMap[r]) regionMap[r]=[];
+    regionMap[r].push(site);
+  });
+  // S.sites에 없지만 equip에 등록된 사이트도 포함
+  (S.equipSiteOrder||[]).forEach(function(sid){
+    var found=(S.sites||[]).some(function(s){return s.id===sid;});
+    if(!found){
+      if(!regionMap['other']) regionMap['other']=[];
+      regionMap['other'].push({id:sid,name:sid});
+    }
+  });
+  var orderedRegions=_REGION_ORDER.filter(function(r){return regionMap[r];});
+  if(regionMap['other']) orderedRegions.push('other');
+
   var html='<div class="fg"><label class="fl">적용 사이트</label>'
     +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:6px">'
     +'<input type="checkbox" id="eq_site_all" onchange="_onEquipSiteAllChange()"'+(allChecked?' checked':'')+'>'
     +'<span style="font-size:12px">전체 공통 (모든 사이트)</span></label>'
     +'<div id="eq_site_groups" style="display:'+(allChecked?'none':'block')+';padding:6px 8px;background:#1a1a28;border:1px solid #3a3a50;border-radius:4px">';
-  _EQUIP_SITE_GROUPS.forEach(function(grp){
-    var visibleIds=grp.ids;
-    html+='<div style="margin-bottom:4px"><span style="font-size:10px;color:#7a7aaa;margin-right:6px">'+grp.label+'</span>';
-    visibleIds.forEach(function(id){
-      var chk=(!allChecked&&checkedIds&&checkedIds.indexOf(id)>=0)?' checked':'';
+  orderedRegions.forEach(function(region){
+    var sites=regionMap[region];
+    var label=_REGION_LABEL[region]||region;
+    html+='<div style="margin-bottom:4px"><span style="font-size:10px;color:#7a7aaa;margin-right:6px">'+label+'</span>';
+    sites.forEach(function(site){
+      var chk=(!allChecked&&checkedIds&&checkedIds.indexOf(site.id)>=0)?' checked':'';
       html+='<label style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;cursor:pointer;font-size:11px">'
-        +'<input type="checkbox" class="eq-site-cb" value="'+id+'"'+chk+'>'+id+'</label>';
+        +'<input type="checkbox" class="eq-site-cb" value="'+site.id+'"'+chk+'>'+site.name+'</label>';
     });
     html+='</div>';
   });
