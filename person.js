@@ -92,11 +92,11 @@ function fmtDate(d){
     +String(d.getDate()).padStart(2,'0');
 }
 
-// 미주 누적 체류일이 targetDays 미만으로 떨어지는 최초 날짜 + 그날 이후 연속 가능 일수
-function calcUsNextSafeDate(trips, targetDays, inclCanada){
+// 특정 지역 12M 누적이 targetDays 미만으로 떨어지는 최초 날짜 + 그날 이후 연속 가능 일수 (공통)
+function calcNextSafeDateForRegion(trips, region, targetDays, extraRegion){
   var r365=getRolling12();
   var usedSet={};
-  trips.filter(function(t){return t.region==='americas'||(inclCanada&&t.region==='canada');}).forEach(function(t){
+  trips.filter(function(t){return t.region===region||(extraRegion&&t.region===extraRegion);}).forEach(function(t){
     var s=new Date(Math.max(pd(t.start),r365.start));
     var e=new Date(Math.min(pd(t.end),r365.end));
     if(s>e) return;
@@ -105,20 +105,21 @@ function calcUsNextSafeDate(trips, targetDays, inclCanada){
   });
   var sorted=Object.keys(usedSet).map(function(k){return usedSet[k];})
     .sort(function(a,b){return a-b;});
-  var amDays=sorted.length;
-  if(amDays<targetDays) return null;
-  var anchorDate=sorted[amDays-targetDays];
+  var days=sorted.length;
+  if(days<targetDays) return null;
+  var anchorDate=sorted[days-targetDays];
   var next=new Date(anchorDate);
   next.setDate(next.getDate()+365);
-  // 해소 날짜 이후 연속으로 만료되는 일수 계산 (consecutive expiry = 추가로 생기는 일수)
-  // sorted[amDays-targetDays]부터 sorted[amDays-targetDays+N]까지 1일 간격이면 N일씩 연속 생성
   var consecutiveDays=1;
-  for(var i=amDays-targetDays+1;i<amDays;i++){
-    var diff=Math.round((sorted[i]-sorted[i-1])/86400000);
-    if(diff===1) consecutiveDays++;
+  for(var i=days-targetDays+1;i<days;i++){
+    if(Math.round((sorted[i]-sorted[i-1])/86400000)===1) consecutiveDays++;
     else break;
   }
   return {date:next,consecutiveDays:consecutiveDays};
+}
+// 미주 전용 래퍼 (하위 호환)
+function calcUsNextSafeDate(trips, targetDays, inclCanada){
+  return calcNextSafeDateForRegion(trips,'americas',targetDays,inclCanada?'canada':null);
 }
 
 // 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
@@ -318,6 +319,8 @@ function calcVietnamRisk(trips){
 // 고객사 가이드: 1회 90일 / 연 150일 한도
 var US_GUIDE_SINGLE=90;   // 1회 최대 체류일
 var US_GUIDE_ANNUAL=150;  // 연간 최대 누적 체류일
+var CA_GUIDE_SINGLE=90;   // 캐나다 1회 최대 체류일
+var CA_GUIDE_ANNUAL=150;  // 캐나다 연간 최대 누적 체류일
 
 function calcUsRisk(trips){
   var r365=getRolling12();
@@ -549,6 +552,8 @@ function runFeasibilityCheck(){
         html+='<span style="color:#e84040;font-size:11px"> 12M 누적 '+currentDays+'일 > 한도 '+US_GUIDE_ANNUAL+'일.';
         if(nd) html+=' (최대 가능: '+nd.consecutiveDays+'일)';
         html+=' <span style="color:#666">('+baseLabel+')</span></span>';
+        var nextDate=calcNextFeasibleDate(person.trips,'americas',planDays,365,US_GUIDE_ANNUAL,inclCanada?['canada']:null);
+        if(nextDate) html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시점: '+fmtDate(nextDate)+'</span>';
       } else if(pd(start)>=nd.date){
         // ② 가능: 요청 시작일이 이미 가능 기간 안에 있음
         html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
@@ -627,6 +632,51 @@ function runFeasibilityCheck(){
       html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
       html+='<span style="color:#4aaa70;font-size:11px"> 예정 포함 연 누적 '+r.total+'/'+VN_GUIDE_ANNUAL+'일. 이번 출장 '+planDays+'일</span>';
     }
+  } else if(region==='canada'){
+    var singleOk=planDays<=CA_GUIDE_SINGLE;
+    var singleWarn=planDays>Math.round(CA_GUIDE_SINGLE*0.8);
+    var r365=getRolling12();
+    var curSet={};
+    person.trips.filter(function(t){return t.region==='canada';}).forEach(function(t){
+      var s=new Date(Math.max(pd(t.start),r365.start));
+      var e=new Date(Math.min(pd(t.end),r365.end));
+      if(s>e) return;
+      for(var cur=new Date(s);cur<=e;cur.setDate(cur.getDate()+1))
+        curSet[cur.getFullYear()+'-'+cur.getMonth()+'-'+cur.getDate()]=true;
+    });
+    var currentDays=Object.keys(curSet).length;
+    var annualOver=currentDays>CA_GUIDE_ANNUAL;
+    var tripTotal=currentDays+planDays;
+    var annualWarn=!annualOver&&(tripTotal>Math.round(CA_GUIDE_ANNUAL*0.8));
+    if(!singleOk){
+      html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
+      html+='<span style="color:#e84040;font-size:11px"> 1회 한도 초과 ('+planDays+'일 > '+CA_GUIDE_SINGLE+'일). (캐나다 기준)</span>';
+    } else if(annualOver){
+      var nd=calcNextSafeDateForRegion(person.trips,'canada',CA_GUIDE_ANNUAL,null);
+      if(!nd||planDays>nd.consecutiveDays){
+        html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
+        html+='<span style="color:#e84040;font-size:11px"> 12M 누적 '+currentDays+'일 > 한도 '+CA_GUIDE_ANNUAL+'일.';
+        if(nd) html+=' (최대 가능: '+nd.consecutiveDays+'일)';
+        html+=' (캐나다 기준)</span>';
+      } else if(pd(start)>=nd.date){
+        html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
+        html+='<span style="color:#4aaa70;font-size:11px"> 12M 누적 '+currentDays+'일 (현재 초과, 출장 시작일 기준 해소). ';
+        html+=fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능 · 이번 출장('+planDays+'일) 가능 (캐나다 기준)</span>';
+      } else {
+        html='<span class="pm-feasible-badge pm-feasible-warn">날짜 조정</span>';
+        html+='<span style="color:#e8a020;font-size:11px"> 12M 누적 '+currentDays+'일 > 한도 '+CA_GUIDE_ANNUAL+'일. ';
+        html+='출장 가능 시작: '+fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능 · 이번 출장('+planDays+'일) 가능 (캐나다 기준)</span>';
+      }
+    } else if(singleWarn||annualWarn||(tripTotal>CA_GUIDE_ANNUAL)){
+      html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
+      html+='<span style="color:#e8a020;font-size:11px"> 가능 (12M 누적 '+currentDays+'일 + 이번 출장 '+planDays+'일 = '+tripTotal+'/'+CA_GUIDE_ANNUAL+'일). ';
+      if(tripTotal>CA_GUIDE_ANNUAL) html+='이번 출장 포함 시 '+(tripTotal-CA_GUIDE_ANNUAL)+'일 초과. ';
+      else html+='잔여 '+(CA_GUIDE_ANNUAL-tripTotal)+'일. ';
+      html+='(캐나다 기준)</span>';
+    } else {
+      html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
+      html+='<span style="color:#4aaa70;font-size:11px"> 12M 누적 '+currentDays+'일 + 이번 출장 '+planDays+'일 = '+tripTotal+'/'+CA_GUIDE_ANNUAL+'일. 잔여 '+(CA_GUIDE_ANNUAL-tripTotal)+'일 (캐나다 기준)</span>';
+    }
   }
   resultEl.innerHTML=html;
 }
@@ -688,7 +738,7 @@ function renderPersonTab(){
   html+='<datalist id="pfPersonList">';
   allNames.sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(n){html+='<option value="'+escAttr(n)+'">';});
   html+='</datalist>';
-  html+='<select id="pfRegion" class="pm-fsel" onchange="pfRegionChange(this.value)"><option value="americas">미국</option><option value="europe">유럽(솅겐)</option><option value="china">중국</option><option value="vietnam">베트남</option></select>';
+  html+='<select id="pfRegion" class="pm-fsel" onchange="pfRegionChange(this.value)"><option value="americas">미국</option><option value="canada">캐나다</option><option value="europe">유럽(솅겐)</option><option value="china">중국</option><option value="vietnam">베트남</option></select>';
   html+='<label id="pfCanadaWrap" style="display:none;align-items:center;gap:4px;font-size:11px;color:#a0a0c0;white-space:nowrap"><input type="checkbox" id="pfCanada"> 캐나다 합산</label>';
   html+='<input type="date" id="pfStart" class="pm-finp">';
   html+='<span style="font-size:11px;color:#666">~</span>';
@@ -738,7 +788,7 @@ function renderPersonTab(){
 
 // 정렬 버튼 HTML 조각 생성 (컨트롤바 내 정렬 버튼 업데이트에 재사용)
 function buildSortBtnsHtml(){
-  var sortBtns=[['name','이름'],['americas','미주(12M)'],['europe','유럽(12M)'],['china','중국(12M)'],['vietnam','베트남(12M)'],['total','전체해외(12M)'],['korea12m','국내(12M)'],['koreaCur','현재국내']];
+  var sortBtns=[['name','이름'],['americas','미국(12M)'],['canada','캐나다(12M)'],['europe','유럽(12M)'],['china','중국(12M)'],['vietnam','베트남(12M)'],['total','전체해외(12M)'],['korea12m','국내(12M)'],['koreaCur','현재국내']];
   var h='<span style="font-size:10px;color:#555">정렬</span>';
   sortBtns.forEach(function(b){
     var isOn=_pmSortKey===b[0];
@@ -798,6 +848,7 @@ function renderPersonBody(){
     var v;
     if(_pmSortKey==='name')        v=a.localeCompare(b,'ko');
     else if(_pmSortKey==='americas') v=calcRegionDays12M(pa.trips,'americas',rolling12)-calcRegionDays12M(pb.trips,'americas',rolling12);
+    else if(_pmSortKey==='canada')   v=calcRegionDays12M(pa.trips,'canada',rolling12)-calcRegionDays12M(pb.trips,'canada',rolling12);
     else if(_pmSortKey==='europe')   v=calcRegionDays12M(pa.trips,'europe',rolling12)-calcRegionDays12M(pb.trips,'europe',rolling12);
     else if(_pmSortKey==='china')    v=calcRegionDays12M(pa.trips,'china',rolling12)-calcRegionDays12M(pb.trips,'china',rolling12);
     else if(_pmSortKey==='vietnam')  v=calcRegionDays12M(pa.trips,'vietnam',rolling12)-calcRegionDays12M(pb.trips,'vietnam',rolling12);
@@ -821,7 +872,8 @@ function renderPersonTable(persons, nameList, rolling12){
   }
   html+=thS('name','이름');
   html+='<th>현재위치</th>';
-  html+=thS('americas','미주(12M)');
+  html+=thS('americas','미국(12M)');
+  html+=thS('canada','캐나다(12M)');
   html+=thS('europe','유럽(12M)');
   html+=thS('china','중국(12M)');
   html+=thS('vietnam','베트남(12M)');
@@ -841,8 +893,8 @@ function renderPersonTable(persons, nameList, rolling12){
 
   html+='</tbody></table>';
   html+='<div style="font-size:10px;color:#707080;padding:8px 4px;margin-top:4px">'
-    +'* 출장일: 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). '
-    +'미국 고객사 가이드: 1회 '+US_GUIDE_SINGLE+'일 / 연 '+US_GUIDE_ANNUAL+'일. '
+    +'* 출장일: 롤링 12개월(오늘 기준 최근 1년) 기준 체류일 (중복 제거). 미국·캐나다는 별도 표시. '
+    +'미국 고객사 가이드: 1회 '+US_GUIDE_SINGLE+'일 / 연 '+US_GUIDE_ANNUAL+'일 (캐나다 합산 여부는 출장 가능 여부 확인에서 선택). '
     +'유럽 솅겐: 롤링 180일 기준 90일. '
     +'중국/베트남: 1회 90일 / 연 183일(세금거주자). '
     +'※ 미국 입국심사는 미국 체류일만 카운트하나, 장기 해외 체류 반복 시 "거주 의심" 우려 가능.'
@@ -854,6 +906,7 @@ function renderPersonRow(name, person, rolling12){
   var trips=person.trips;
   var loc=getCurrentLocation(trips);
   var amDays=calcRegionDays12M(trips,'americas',rolling12);
+  var caDays=calcRegionDays12M(trips,'canada',rolling12);
   var euDays=calcRegionDays12M(trips,'europe',rolling12);
   var cnDays=calcRegionDays12M(trips,'china',rolling12);
   var vnDays=calcRegionDays12M(trips,'vietnam',rolling12);
@@ -890,9 +943,12 @@ function renderPersonRow(name, person, rolling12){
     html+='<td><span style="font-size:12px;color:#4aaa70;font-weight:500">🇰🇷 국내</span></td>';
   }
 
-  // 미주(12M)
+  // 미국(12M)
   var amCls=usRisk.status==='danger'?'b1-alert':usRisk.status==='warn'?'b1-warn':'';
   html+='<td style="text-align:center"><span class="pm-days-big '+(amCls)+'" style="font-size:16px">'+amDays+'</span><span class="pm-days-unit"> 일</span></td>';
+
+  // 캐나다(12M)
+  html+='<td style="text-align:center"><span class="pm-days-big" style="font-size:16px">'+caDays+'</span><span class="pm-days-unit"> 일</span></td>';
 
   // 유럽(12M)
   html+='<td style="text-align:center"><span class="pm-days-big" style="font-size:16px">'+euDays+'</span><span class="pm-days-unit"> 일</span></td>';
@@ -986,7 +1042,7 @@ function renderPersonTimeline(trips, colSpan){
     var stHtml=statusHtml(t.status);
     rows+='<div class="pm-tl-trip">'
       +'<span class="pm-trip-site" style="background:'+t.siteColor+'">'+t.siteName+'</span>'
-      +'<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#1e1e2a;color:#b0b0b8">'+(t.region==='americas'?'미주':t.region==='europe'?'유럽':t.region==='china'?'중국':t.region==='vietnam'?'베트남':'기타')+'</span>'
+      +'<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#1e1e2a;color:#b0b0b8">'+(t.region==='americas'?'미국':t.region==='canada'?'캐나다':t.region==='europe'?'유럽':t.region==='china'?'중국':t.region==='vietnam'?'베트남':'기타')+'</span>'
       +'<span style="flex:1;color:#a0a0a8;font-size:11px">'+fmtFull(t.start)+' → '+fmtFull(t.end)+'</span>'
       +'<span style="min-width:50px;text-align:right;color:#c8c8d4">'+t.days+'일</span>'
       +stHtml
@@ -1010,5 +1066,5 @@ function renderPersonTimeline(trips, colSpan){
     }
   }
 
-  return '<tr class="pm-expand-row"><td colspan="13"><div class="pm-timeline">'+rows+'</div></td></tr>';
+  return '<tr class="pm-expand-row"><td colspan="14"><div class="pm-timeline">'+rows+'</div></td></tr>';
 }
