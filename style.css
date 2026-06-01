@@ -344,7 +344,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .b1-warn{color:#e8a020}
 .b1-alert{color:#e84040;font-weight:600}
 /* ── 출장 가능 여부 확인 폼 ── */
-.pm-feasible-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#151520;border:1px solid #2a2a3a;border-radius:6px;margin-bottom:8px}
+.pm-feasible-form{display:flex;flex-direction:column;gap:6px;padding:8px 12px;background:#151520;border:1px solid #2a2a3a;border-radius:6px;margin-bottom:8px}
+.pm-feasible-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
 .pm-feasible-title{font-size:11px;font-weight:600;color:#8080a0;white-space:nowrap;flex-shrink:0}
 .pm-fsel{padding:3px 6px;font-size:11px;background:#1e1e28;border:1px solid #3a3a44;border-radius:4px;color:#d0d0e0}
 .pm-finp{padding:3px 6px;font-size:11px;background:#1e1e28;border:1px solid #3a3a44;border-radius:4px;color:#d0d0e0}

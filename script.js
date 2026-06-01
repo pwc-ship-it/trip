@@ -1579,15 +1579,18 @@ function renderPersonTab(){
 
   // ── 출장 예정 체류 가능 여부 확인 폼
   html+='<div class="pm-feasible-form" id="pmFeasibleForm">';
+  html+='<div class="pm-feasible-row">';
   html+='<span class="pm-feasible-title">✈ 출장 가능 여부 확인</span>';
-  html+='<select id="pfPerson" class="pm-fsel" style="min-width:100px"><option value="">-- 인원 선택 --</option>';
-  allNames.sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(n){html+='<option value="'+escAttr(n)+'">'+n+'</option>';});
-  html+='</select>';
+  html+='<input type="text" id="pfPerson" class="pm-finp" list="pfPersonList" placeholder="이름 검색..." autocomplete="off" style="min-width:110px">';
+  html+='<datalist id="pfPersonList">';
+  allNames.sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(n){html+='<option value="'+escAttr(n)+'">';});
+  html+='</datalist>';
   html+='<select id="pfRegion" class="pm-fsel"><option value="americas">미국</option><option value="europe">유럽(솅겐)</option><option value="china">중국</option><option value="vietnam">베트남</option></select>';
   html+='<input type="date" id="pfStart" class="pm-finp">';
   html+='<span style="font-size:11px;color:#666">~</span>';
   html+='<input type="date" id="pfEnd" class="pm-finp">';
   html+='<button class="btn sm pri" onclick="runFeasibilityCheck()">확인</button>';
+  html+='</div>';
   html+='<div id="pfResult" class="pm-feasible-result"></div>';
   html+='</div>';
 
