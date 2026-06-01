@@ -1047,7 +1047,7 @@ function fmtDate(d){
     +String(d.getDate()).padStart(2,'0');
 }
 
-// 미주 누적 체류일이 targetDays 미만으로 떨어지는 최초 날짜 (롤링 365일 기준)
+// 미주 누적 체류일이 targetDays 미만으로 떨어지는 최초 날짜 + 그날 이후 연속 가능 일수
 function calcUsNextSafeDate(trips, targetDays){
   var r365=getRolling12();
   var usedSet={};
@@ -1065,7 +1065,15 @@ function calcUsNextSafeDate(trips, targetDays){
   var anchorDate=sorted[amDays-targetDays];
   var next=new Date(anchorDate);
   next.setDate(next.getDate()+365);
-  return next;
+  // 해소 날짜 이후 연속으로 만료되는 일수 계산 (consecutive expiry = 추가로 생기는 일수)
+  // sorted[amDays-targetDays]부터 sorted[amDays-targetDays+N]까지 1일 간격이면 N일씩 연속 생성
+  var consecutiveDays=1;
+  for(var i=amDays-targetDays+1;i<amDays;i++){
+    var diff=Math.round((sorted[i]-sorted[i-1])/86400000);
+    if(diff===1) consecutiveDays++;
+    else break;
+  }
+  return {date:next,consecutiveDays:consecutiveDays};
 }
 
 // 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
@@ -1313,10 +1321,16 @@ function calcUsRisk(trips){
   var subText='누적 '+amDays+'/'+US_GUIDE_ANNUAL+'일';
   if(amDays>US_GUIDE_ANNUAL){
     var nd=calcUsNextSafeDate(trips,US_GUIDE_ANNUAL);
-    if(nd) subText+=' · 해소 '+fmtDate(nd);
+    if(nd){
+      var c=nd.consecutiveDays;
+      subText+=' · '+fmtDate(nd.date)+'부터 '+c+'일 가능';
+    }
   } else if(amDays>=Math.round(US_GUIDE_ANNUAL*0.8)){
     var nd=calcUsNextSafeDate(trips,US_GUIDE_ANNUAL);
-    if(nd) subText+=' · 해제 '+fmtDate(nd);
+    if(nd){
+      var c=nd.consecutiveDays;
+      subText+=' · '+fmtDate(nd.date)+'부터 '+c+'일 가능';
+    }
   }
 
   return {status:status,amDays:amDays,maxSingle:maxSingle,tooltip:tooltip,subText:subText};
