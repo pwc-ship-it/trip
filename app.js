@@ -255,20 +255,22 @@ function barCls(sc){
 }
 
 /* ── 시작 ── */
-// 접속 시 DEF 기본 데이터로 초기화 후 Sheets에서 최신 데이터 로드
-loadData();
-renderAll(); // 캐시/DEF 데이터로 즉시 표시
-loadFromSheets(function(){
-  renderAll(); // Sheets 최신 데이터로 교체
+// 모든 스크립트 로드 후 실행 (renderAll 등이 gantt.js에 정의되므로 DOMContentLoaded 사용)
+document.addEventListener('DOMContentLoaded', function(){
+  loadData();
+  renderAll(); // 캐시/DEF 데이터로 즉시 표시
+  loadFromSheets(function(){
+    renderAll(); // Sheets 최신 데이터로 교체
+  });
+  // Apps Script 워밍업 - 4분마다 ping으로 콜드 스타트 방지
+  (function keepWarm(){
+    var url=getSheetsUrl();
+    if(!url||location.protocol==='file:')return;
+    setInterval(function(){
+      fetch(url+'?action=ping').catch(function(){});
+    }, 4*60*1000); // 4분
+  })();
 });
-// Apps Script 워밍업 - 4분마다 ping으로 콜드 스타트 방지
-(function keepWarm(){
-  var url=getSheetsUrl();
-  if(!url||location.protocol==='file:')return;
-  setInterval(function(){
-    fetch(url+'?action=ping').catch(function(){});
-  }, 4*60*1000); // 4분
-})();
 
 /* ════════════════════════════════════════════
    탭 전환
