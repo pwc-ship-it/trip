@@ -1488,20 +1488,31 @@ function runFeasibilityCheck(){
     var annualOver=currentDays>US_GUIDE_ANNUAL;
     var tripTotal=currentDays+planDays;
     var annualWarn=!annualOver&&(tripTotal>Math.round(US_GUIDE_ANNUAL*0.8));
-    if(!singleOk||annualOver){
+    if(!singleOk){
+      // 1회 체류 한도 초과 — 무조건 불가
       html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
-      html+='<span style="color:#e84040;font-size:11px"> ';
-      if(!singleOk) html+='1회 한도 초과 ('+planDays+'일 > '+US_GUIDE_SINGLE+'일). ';
-      if(annualOver) html+='12M 누적 '+currentDays+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
-      html+='<span style="color:#666">('+baseLabel+')</span></span>';
-      if(annualOver&&singleOk){
-        var nd=calcUsNextSafeDate(person.trips,US_GUIDE_ANNUAL,inclCanada);
-        if(nd){
-          html+='<br><span style="color:#a0a0a8;font-size:11px"> 출장 가능 시작: '+fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능';
-          if(planDays<=nd.consecutiveDays) html+=' · 이번 출장('+planDays+'일) 가능';
-          else html+=' · 이번 출장('+planDays+'일)은 최대 '+nd.consecutiveDays+'일 초과';
-          html+='</span>';
-        }
+      html+='<span style="color:#e84040;font-size:11px"> 1회 한도 초과 ('+planDays+'일 > '+US_GUIDE_SINGLE+'일). <span style="color:#666">('+baseLabel+')</span></span>';
+    } else if(annualOver){
+      // 오늘 기준 12M 초과 — 요청 날짜 기준으로 3가지 케이스 구별
+      var nd=calcUsNextSafeDate(person.trips,US_GUIDE_ANNUAL,inclCanada);
+      if(!nd||planDays>nd.consecutiveDays){
+        // ① 진짜 불가: 가능한 날 없거나 요청 일수가 연속 가용일 초과
+        html='<span class="pm-feasible-badge pm-feasible-ng">불가</span>';
+        html+='<span style="color:#e84040;font-size:11px"> 12M 누적 '+currentDays+'일 > 한도 '+US_GUIDE_ANNUAL+'일.';
+        if(nd) html+=' (최대 가능: '+nd.consecutiveDays+'일)';
+        html+=' <span style="color:#666">('+baseLabel+')</span></span>';
+      } else if(pd(start)>=nd.date){
+        // ② 가능: 요청 시작일이 이미 가능 기간 안에 있음
+        html='<span class="pm-feasible-badge pm-feasible-ok">가능</span>';
+        html+='<span style="color:#4aaa70;font-size:11px"> 12M 누적 '+currentDays+'일 (현재 초과, 출장 시작일 기준 해소). ';
+        html+=fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능 · 이번 출장('+planDays+'일) 가능';
+        html+=' <span style="color:#666">('+baseLabel+')</span></span>';
+      } else {
+        // ③ 날짜 조정: 시작일만 조정하면 가능 (오늘은 초과지만 곧 해소)
+        html='<span class="pm-feasible-badge pm-feasible-warn">날짜 조정</span>';
+        html+='<span style="color:#e8a020;font-size:11px"> 12M 누적 '+currentDays+'일 > 한도 '+US_GUIDE_ANNUAL+'일. ';
+        html+='출장 가능 시작: '+fmtDate(nd.date)+'부터 '+nd.consecutiveDays+'일 가능 · 이번 출장('+planDays+'일) 가능';
+        html+=' <span style="color:#666">('+baseLabel+')</span></span>';
       }
     } else if(singleWarn||annualWarn||(tripTotal>US_GUIDE_ANNUAL)){
       html='<span class="pm-feasible-badge pm-feasible-warn">주의</span>';
