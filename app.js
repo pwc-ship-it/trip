@@ -3,7 +3,7 @@ var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a'};
 
 /* ── 상태 ── */
-var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[]};
+var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[]};
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function normDate(s){
@@ -37,6 +37,8 @@ function loadData(){
         S.equipUnits=d.equipUnits||[];
         S.equipSiteOrder=d.equipSiteOrder||[];
         S.equipProjects=d.equipProjects||[];
+        S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
+        S.visionEquips=d.visionEquips||[];
         return;
       }
     }
@@ -46,6 +48,7 @@ function loadData(){
   S.groups=def.groups||[];S.sites=def.sites;S.projects=def.projects;
   S.schedules=def.schedules;S.events=def.events;S.workTasks=def.workTasks||[];
   S.equipItems=def.equipItems||[];S.equipUnits=def.equipUnits||[];
+  S.visionTemplate=def.visionTemplate||{categories:[]};S.visionEquips=def.visionEquips||[];
 }
 function saveCache(data){
   try{
@@ -55,7 +58,7 @@ function saveCache(data){
 }
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
-  var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects};
+  var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
   saveCache(snapshot);
   // 로컬 변경이 Sheets에 아직 미확인 상태임을 표시
   try{localStorage.setItem(CACHE_DIRTY_KEY,'1');}catch(e){}
@@ -69,7 +72,8 @@ function saveData(){
   fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
       projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects})
+      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
+      visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
   }).then(function(r){return r.json();})
   .then(function(data){
     if(data.error){console.warn('자동저장 실패:',data.error);updateConnStatus('err');}
@@ -172,7 +176,8 @@ function loadFromSheets(callback){
     fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
         projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-        equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects})
+        equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
+        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
     }).then(function(r){return r.json();})
     .then(function(data){
       if(!data.error){
@@ -198,7 +203,10 @@ function loadFromSheets(callback){
         var oldSites=S.sites;
         S.sites=data.sites.map(function(ns){
           var old=oldSites.find(function(os){return os.id===ns.id;});
+          var def=DEF.sites.find(function(ds){return ds.id===ns.id;});
           if(!ns.groupId&&old&&old.groupId)ns.groupId=old.groupId;
+          if(!ns.country){if(old&&old.country)ns.country=old.country;else if(def&&def.country)ns.country=def.country;}
+          if(!ns.region){if(old&&old.region)ns.region=old.region;else if(def&&def.region)ns.region=def.region;}
           return ns;
         });
       }
@@ -218,7 +226,9 @@ function loadFromSheets(callback){
       if(data.equipUnits)S.equipUnits=data.equipUnits;
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
       if(data.equipProjects)S.equipProjects=data.equipProjects;
-      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects});
+      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length)S.visionTemplate=data.visionTemplate;
+      if(data.visionEquips)S.visionEquips=data.visionEquips;
+      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
     })
@@ -281,11 +291,15 @@ function switchTab(tab){
   document.getElementById('view_gantt').style.display=tab==='gantt'?'flex':'none';
   document.getElementById('view_person').style.display=tab==='person'?'flex':'none';
   document.getElementById('view_equip').style.display=tab==='equip'?'flex':'none';
+  document.getElementById('view_vision').style.display=tab==='vision'?'flex':'none';
   document.getElementById('tab_gantt').className='tab-btn'+(tab==='gantt'?' on':'');
   document.getElementById('tab_person').className='tab-btn'+(tab==='person'?' on':'');
   document.getElementById('tab_equip').className='tab-btn'+(tab==='equip'?' on':'');
+  document.getElementById('tab_vision').className='tab-btn'+(tab==='vision'?' on':'');
   document.getElementById('ganttTools').style.display=tab==='gantt'?'flex':'none';
   document.getElementById('equipTools').style.display=tab==='equip'?'flex':'none';
+  document.getElementById('visionTools').style.display=tab==='vision'?'flex':'none';
   if(tab==='person') renderPersonTab();
   if(tab==='equip') renderEquipTab();
+  if(tab==='vision') renderVisionTab();
 }
