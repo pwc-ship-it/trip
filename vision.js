@@ -1413,6 +1413,82 @@ function exportVisionCSV(){
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+/* ══════════════════════════════════════════
+   CSV 양식 다운로드 (일괄 입력용 빈 양식)
+══════════════════════════════════════════ */
+function openVisionCsvTemplate(){
+  var typeItem=_findItemById('vi_type');
+  var types=typeItem?(typeItem.options||[]):[];
+  if(!types.length){alert('먼저 기본정보-Type에서 Vision Type을 등록해주세요.');return;}
+  mw('<div class="mtit">CSV 양식 다운로드</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:10px">'+
+      'Excel에서 작성 후 "CSV 가져오기"로 일괄 등록할 수 있습니다.<br>'+
+      '등록할 최대 수량을 입력하면 그에 맞는 컬럼이 생성됩니다.'+
+    '</div>'+
+    '<div class="fg"><label class="fl">Camera 수 (Type별 최대)</label>'+
+      '<input type="number" id="vt_cam_n" value="4" min="0" max="20" style="width:60px"> 대</div>'+
+    '<div class="fg"><label class="fl">Illumination 수 (Type별 최대)</label>'+
+      '<input type="number" id="vt_illum_n" value="4" min="0" max="20" style="width:60px"> 개</div>'+
+    '<div class="fg"><label class="fl">Board 수 (보드별 최대)</label>'+
+      '<input type="number" id="vt_board_n" value="2" min="0" max="10" style="width:60px"> 개</div>'+
+    '<div class="fg"><label class="fl">SSD/HDD 수 (최대)</label>'+
+      '<input type="number" id="vt_ssd_n" value="3" min="0" max="10" style="width:60px"> 개</div>'+
+    '<div class="fg"><label class="fl">LAN카드 수 (최대)</label>'+
+      '<input type="number" id="vt_lan_n" value="2" min="0" max="10" style="width:60px"> 개</div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button>'+
+    '<button class="btn sm pri" onclick="_doDownloadVisionCsvTemplate()">⬇ 양식 다운로드</button></div>');
+}
+
+function _doDownloadVisionCsvTemplate(){
+  var camN=Math.max(0,parseInt(document.getElementById('vt_cam_n').value)||0);
+  var illumN=Math.max(0,parseInt(document.getElementById('vt_illum_n').value)||0);
+  var boardN=Math.max(0,parseInt(document.getElementById('vt_board_n').value)||0);
+  var ssdN=Math.max(0,parseInt(document.getElementById('vt_ssd_n').value)||0);
+  var lanN=Math.max(0,parseInt(document.getElementById('vt_lan_n').value)||0);
+  var typeItem=_findItemById('vi_type');
+  var types=typeItem?(typeItem.options||[]):[];
+  var allItems=_viAllItems();
+  var fixedIds=['vi_site','vi_line','vi_unit','vi_type'];
+  var headers=['site','line','unit','type'];
+  allItems.forEach(function(item){
+    if(fixedIds.indexOf(item.id)>=0)return;
+    switch(item.type){
+      case 'spec-qty':
+        headers.push(item.id+'_spec');headers.push(item.id+'_qty');break;
+      case 'type-camera':
+        types.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          for(var ci=0;ci<camN;ci++){headers.push(item.id+'_'+tk+'_'+(ci+1)+'_model');headers.push(item.id+'_'+tk+'_'+(ci+1)+'_sn');}
+        });break;
+      case 'type-illum':
+        types.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          for(var ci=0;ci<illumN;ci++){headers.push(item.id+'_'+tk+'_'+(ci+1)+'_model');headers.push(item.id+'_'+tk+'_'+(ci+1)+'_sn');}
+        });break;
+      case 'board-multi':
+        for(var bi=0;bi<boardN;bi++){headers.push(item.id+'_'+(bi+1)+'_model');headers.push(item.id+'_'+(bi+1)+'_board');headers.push(item.id+'_'+(bi+1)+'_fw');}
+        break;
+      case 'ssd-multi':
+        for(var ri=0;ri<ssdN;ri++){headers.push(item.id+'_'+(ri+1)+'_cap');headers.push(item.id+'_'+(ri+1)+'_qty');headers.push(item.id+'_'+(ri+1)+'_drive');}
+        break;
+      case 'lancard-multi':
+        for(var ri2=0;ri2<lanN;ri2++){headers.push(item.id+'_'+(ri2+1)+'_speed');headers.push(item.id+'_'+(ri2+1)+'_ports');headers.push(item.id+'_'+(ri2+1)+'_purpose');}
+        break;
+      case 'camera-multi':break;
+      default:headers.push(item.id);
+    }
+  });
+  var emptyRow=headers.map(function(){return '';});
+  var csv=[headers,emptyRow,emptyRow,emptyRow].map(function(r){
+    return r.map(function(c){var s=String(c||'');return (s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',');
+  }).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='vision_template_'+_viToday()+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  cm();
+}
+
 function openVisionCsvImport(){
   var fi=document.getElementById('viCsvFileInput'); if(fi)fi.click();
 }
