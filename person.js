@@ -962,7 +962,7 @@ function renderPersonRow(name, person, rolling12){
   html+='<td style="text-align:center"><span class="pm-days-big '+vnCls+'" style="font-size:16px">'+vnDays+'</span><span class="pm-days-unit"> 일</span></td>';
 
   // 전체해외(12M)
-  html+='<td style="text-align:center"><span style="font-size:16px;font-weight:700;color:#e8e8ec">'+totalDays+'</span><span class="pm-days-unit"> 일</span></td>';
+  html+='<td style="text-align:center"><span class="pm-days-big" style="font-size:16px;font-weight:700">'+totalDays+'</span><span class="pm-days-unit"> 일</span></td>';
 
   // 현재국내
   var curColor=koreaCur===0?(loc.onTrip?'#606070':'#e84040'):(koreaCur<30?'#e8a020':'#4aaa70');

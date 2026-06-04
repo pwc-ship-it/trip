@@ -273,9 +273,9 @@ function _renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems){
   var pctBar,unitBg='';
   if(unitPct===100){
     pctBar='<div style="font-size:11px;font-weight:600;color:#4aaa70;margin-top:2px">완료 ✓</div>';
-    unitBg='background:#091810;';
+    unitBg='background:var(--bg-eq-done);';
   } else {
-    pctBar='<div style="font-size:11px;color:#b0b0c0;margin-top:2px">'+unitPct+'%</div>';
+    pctBar='<div style="font-size:11px;color:var(--tx-muted);margin-top:2px">'+unitPct+'%</div>';
   }
   var html='<tr class="'+rowCls+'">';
   html+='<td class="eq-td-fix eq-col-line'+(e?' editable':'')+'" style="left:0;min-width:0;white-space:nowrap;text-align:left"'
@@ -286,7 +286,7 @@ function _renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems){
   var uType=isNoProj?(unit.unitType||'납품셋업'):null;
   var uTypeBadge=uType?'<span class="eq-type-badge" style="font-size:9px;padding:1px 5px;background:'+(PROJ_TYPE_COLOR[uType]||'#1a55bb')+'">'+uType+'</span>':'';
   html+='<td class="eq-td-fix eq-col-unit'+(e?' editable':'')+'"'
-    +' style="left:0;border-right:1px solid #3a3a44;font-weight:500;'+unitBg+'"'
+    +' style="left:0;border-right:1px solid var(--bd-main);font-weight:500;'+unitBg+'"'
     +(e?' onclick="openEditEquipUnit(\''+unit.id+'\')"':'')+'>'
     +uTypeBadge+(unit.unitName||'')+pctBar+'</td>';
   if(msDateItem){
@@ -376,12 +376,12 @@ function renderEquipGrid(){
       summaryHtml+='<div class="eq-summary-card">'
         +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
         +'<div style="width:4px;height:28px;border-radius:2px;background:'+site.color+';flex-shrink:0"></div>'
-        +'<span style="font-size:13px;font-weight:700;color:#e8e8ec">'+site.name+'</span>'
+        +'<span style="font-size:13px;font-weight:700">'+site.name+'</span>'
         +'</div>'
-        +'<div style="font-size:24px;font-weight:700;color:#e8e8ec;line-height:1">'+pct+'%</div>'
-        +'<div style="margin:6px 0 3px;background:#1e1e2a;border-radius:3px;height:5px;overflow:hidden">'
+        +'<div style="font-size:24px;font-weight:700;line-height:1">'+pct+'%</div>'
+        +'<div style="margin:6px 0 3px;background:var(--bd-light);border-radius:3px;height:5px;overflow:hidden">'
         +'<div style="height:100%;border-radius:3px;background:'+barColor+';width:'+pct+'%"></div></div>'
-        +'<div style="font-size:10px;color:#a0a0b0;margin-top:3px">'+doneCount+' / '+units.length+' 호기 완료</div>'
+        +'<div style="font-size:10px;color:var(--tx-muted);margin-top:3px">'+doneCount+' / '+units.length+' 호기 완료</div>'
         +projSubHtml
         +'</div>';
     });
@@ -398,9 +398,9 @@ function renderEquipGrid(){
   var hdrRow='<tr>';
   // 고정 4열 헤더
   hdrRow+='<th class="eq-th fix-col eq-col-line" style="left:0;white-space:nowrap;min-width:40px">라인</th>';
-  hdrRow+='<th class="eq-th fix-col eq-col-unit" style="left:0;min-width:80px;width:80px;border-right:1px solid #3a3a44">호기</th>';
-  hdrRow+='<th class="eq-th fix-col eq-col-msdate" style="left:0;min-width:80px;width:80px;border-right:1px solid #3a3a44">'+(msDateItem?msDateItem.name:'양산시작')+'</th>';
-  hdrRow+='<th class="eq-th fix-col eq-col-memo" style="left:0;min-width:40px;width:40px;border-right:2px solid #555">메모</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-unit" style="left:0;min-width:80px;width:80px;border-right:1px solid var(--bd-main)">호기</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-msdate" style="left:0;min-width:80px;width:80px;border-right:1px solid var(--bd-main)">'+(msDateItem?msDateItem.name:'양산시작')+'</th>';
+  hdrRow+='<th class="eq-th fix-col eq-col-memo" style="left:0;min-width:40px;width:40px;border-right:2px solid var(--bd-strong)">메모</th>';
   // 스크롤 항목 헤더
   scrollItems.forEach(function(item,itemIdx){
     var g=item.groupName||'';
@@ -454,11 +454,11 @@ function renderEquipGrid(){
       +'<td colspan="4" style="position:sticky;left:0;z-index:25;border-left:4px solid '+siteColor+'">'
       +'<div class="eq-site-inner">'
       +collapseBtn
-      +'<span style="color:#f0f0f8;font-size:14px;font-weight:700;letter-spacing:.04em">'+siteName+'</span>'
+      +'<span style="font-size:14px;font-weight:700;letter-spacing:.04em">'+siteName+'</span>'
       +collapsedInfo
       +personnelHtml
       +'</div></td>'
-      +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#1a1a26;border-top:2px solid #2a2a3a"></td>':'')
+      +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:var(--bg-alt);border-top:2px solid var(--bd-light)"></td>':'')
       +'</tr>';
 
     var siteUnits=allUnits.filter(function(u){return u.siteId===siteId;});
@@ -473,15 +473,15 @@ function renderEquipGrid(){
         var pTypeColor=PROJ_TYPE_COLOR[pType]||'#1a55bb';
         var typeBadge='<span class="eq-type-badge" style="background:'+pTypeColor+'">'+pType+'</span>';
         bodyHtml+='<tr class="eq-project-row">'
-          +'<td colspan="4" class="eq-proj-sticky" style="position:sticky;left:0;z-index:22;background:#16162a;'
-          +'border-top:1px solid #2a2a40;border-left:3px solid #4a4a6a;border-bottom:1px solid #2a2a40;">'
+          +'<td colspan="4" class="eq-proj-sticky" style="position:sticky;left:0;z-index:22;background:var(--bg-deep);'
+          +'border-top:1px solid var(--bd-light);border-left:3px solid #4a4a6a;border-bottom:1px solid var(--bd-light);">'
           +typeBadge
           +'<span class="eq-proj-name">'+proj.name+'</span>'
           +'<span class="eq-proj-pct">'+projPctStr+'</span>'
           +(e?'<button class="eq-item-edit-btn" onclick="openEditEquipProject(\''+proj.id+'\')">수정</button>'
             +'<button class="eq-item-edit-btn" style="color:#c04040;border-color:#7a1010" onclick="delEquipProject(\''+proj.id+'\')">삭제</button>':'')
           +'</td>'
-          +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:#16162a;border-top:1px solid #2a2a40;border-bottom:1px solid #2a2a40"></td>':'')
+          +(scrollColCount>0?'<td colspan="'+scrollColCount+'" style="background:var(--bg-deep);border-top:1px solid var(--bd-light);border-bottom:1px solid var(--bd-light)"></td>':'')
           +'</tr>';
         if(!collapsed){
           projUnits.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
@@ -493,9 +493,9 @@ function renderEquipGrid(){
       });
       if(unassigned.length&&!collapsed){
         bodyHtml+='<tr class="eq-project-row unassigned">'
-          +'<td colspan="'+(4+scrollColCount)+'" style="position:sticky;left:0;z-index:22;background:#141422;'
-          +'border-top:1px solid #2a2a3a;border-bottom:1px solid #2a2a3a;'
-          +'color:#555566;font-size:11px;font-style:italic;padding:4px 10px 4px 20px">미지정</td>'
+          +'<td colspan="'+(4+scrollColCount)+'" style="position:sticky;left:0;z-index:22;background:var(--bg-deep);'
+          +'border-top:1px solid var(--bd-light);border-bottom:1px solid var(--bd-light);'
+          +'color:var(--tx-faint);font-size:11px;font-style:italic;padding:4px 10px 4px 20px">미지정</td>'
           +'</tr>';
         unassigned.forEach(function(unit,idx){bodyHtml+=_renderEquipUnitHtml(unit,idx,e,msDateItem,scrollItems);});
       }
@@ -537,13 +537,13 @@ function openEquipCellEdit(unitId,itemId){
     +'<div class="fg">'
     +'<label class="fl">상태</label>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#e8e8ec;cursor:pointer">'
+    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
     +'<input type="radio" name="eq_type" value="na"'+(t==='na'?' checked':'')+' onchange="equipCellTypeChange()"> N/A</label>'
-    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#e8e8ec;cursor:pointer">'
+    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
     +'<input type="radio" name="eq_type" value="date"'+(t==='date'?' checked':'')+' onchange="equipCellTypeChange()"> 시작예정일</label>'
-    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#e8e8ec;cursor:pointer">'
+    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
     +'<input type="radio" name="eq_type" value="percent"'+(t==='percent'?' checked':'')+' onchange="equipCellTypeChange()"> 진행율(%)</label>'
-    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#e8e8ec;cursor:pointer">'
+    +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
     +'<input type="radio" name="eq_type" value="done"'+(t==='done'?' checked':'')+' onchange="equipCellTypeChange()"> 완료(100%)</label>'
     +'</div></div>'
     +'<div class="fg" id="eq_val_wrap" style="'+(t==='na'?'display:none':'')+'"><label class="fl" id="eq_val_lbl">'+(t==='done'?'완료 일자 (선택)':(t==='date'?'예정일':'진행율(%)'))+'</label>'
@@ -611,8 +611,8 @@ function openEditUnitMemo(unitId){
   mw('<div class="mtit">호기 메모</div>'
     +'<div style="font-size:11px;color:#888;margin-bottom:10px">'+unit.unitName+'</div>'
     +'<div class="fg"><label class="fl">메모 내용</label>'
-    +'<textarea id="eq_memo_text" rows="4" style="width:100%;resize:vertical;background:#141420;'
-    +'color:#e0e0ec;border:1px solid #3a3a4e;border-radius:4px;padding:6px;font-size:12px">'
+    +'<textarea id="eq_memo_text" rows="4" style="width:100%;resize:vertical;background:var(--bg-input);'
+    +'color:var(--tx-primary);border:1px solid var(--bd-main);border-radius:4px;padding:6px;font-size:12px">'
     +memo+'</textarea></div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'
@@ -810,7 +810,7 @@ function _buildSiteCheckboxesHtml(checkedIds){
     +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:6px">'
     +'<input type="checkbox" id="eq_site_all" onchange="_onEquipSiteAllChange()"'+(allChecked?' checked':'')+'>'
     +'<span style="font-size:12px">전체 공통 (모든 사이트)</span></label>'
-    +'<div id="eq_site_groups" style="display:'+(allChecked?'none':'block')+';padding:6px 8px;background:#1a1a28;border:1px solid #3a3a50;border-radius:4px">';
+    +'<div id="eq_site_groups" style="display:'+(allChecked?'none':'block')+';padding:6px 8px;background:var(--bg-alt);border:1px solid var(--bd-main);border-radius:4px">';
   orderedRegions.forEach(function(region){
     var sites=regionMap[region];
     var label=_REGION_LABEL[region]||region;
@@ -924,7 +924,7 @@ function openDelEquipItem(itemId){
   var item=S.equipItems.find(function(i){return i.id===itemId;});
   if(!item) return;
   mw('<div class="mtit">항목 삭제</div>'
-    +'<div style="background:#2a0a0a;border:1px solid #7a1010;border-radius:5px;padding:10px 12px;font-size:12px;color:#e84040;margin-bottom:16px">'
+    +'<div style="background:var(--bg-danger,#2a0a0a);border:1px solid var(--bd-danger,#7a1010);border-radius:5px;padding:10px 12px;font-size:12px;color:#e84040;margin-bottom:16px">'
     +'⚠ <b>"'+item.name+'"</b> 항목을 삭제하면 <b>모든 사이트의 해당 항목 데이터가 영구 삭제</b>됩니다.'
     +'<br>이 작업은 되돌릴 수 없습니다.</div>'
     +'<div class="mfoot">'
@@ -1027,7 +1027,7 @@ function openCopyEquipUnit(fromUnitId){
     +'<div style="font-size:11px;color:#888;margin-bottom:12px">'
     +'<b>'+(from.lineName?from.lineName+' - ':'')+from.unitName+'</b>의 데이터를 복사할 대상을 선택하세요.'
     +'<br><span style="color:#cc8010">선택한 호기의 기존 데이터가 덮어쓰입니다.</span></div>'
-    +'<div style="max-height:200px;overflow-y:auto;border:1px solid #2a2a34;border-radius:5px;padding:8px 10px">'
+    +'<div style="max-height:200px;overflow-y:auto;border:1px solid var(--bd-light);border-radius:5px;padding:8px 10px">'
     +chkHtml+'</div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">취소</button>'

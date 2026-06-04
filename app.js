@@ -286,7 +286,7 @@ function showQR(){
     +'<div style="text-align:center;font-size:11px;color:#888;margin-bottom:14px;word-break:break-all">'+url+'</div>'
     +'<div class="mfoot" style="justify-content:center"><button class="btn sm" onclick="cm()">닫기</button></div>');
 }
-function showInd(msg){var d=document.createElement('div');d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e26;color:#e8e8ec;padding:20px 32px;border-radius:10px;border:1px solid #555;z-index:999;font-size:13px';d.textContent=msg;document.body.appendChild(d);return d;}
+function showInd(msg){var d=document.createElement('div');d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-panel);color:var(--tx-primary);padding:20px 32px;border-radius:10px;border:1px solid var(--bd-strong);z-index:999;font-size:13px';d.textContent=msg;document.body.appendChild(d);return d;}
 function hideInd(d){if(d&&d.parentNode)d.parentNode.removeChild(d);}
 function sheetsLoad(){
   // 수동 새로고침용 (연결 확인 버튼에서 사용)

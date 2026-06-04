@@ -220,7 +220,7 @@ function _renderGridView(main){
   var bodyHtml='';
   if(!equips.length){
     var span=3+dynCols.length;
-    bodyHtml='<tr><td colspan="'+span+'" class="vi-grid-empty">등록된 설비가 없습니다<br><span style="font-size:11px;color:#333">좌측 "+ 설비 추가"로 시작하세요</span></td></tr>';
+    bodyHtml='<tr><td colspan="'+span+'" class="vi-grid-empty">등록된 설비가 없습니다<br><span style="font-size:11px;color:var(--tx-muted)">좌측 "+ 설비 추가"로 시작하세요</span></td></tr>';
   } else {
     orderedSites.forEach(function(sid){
       var site=S.sites.find(function(s){return s.id===sid;});
@@ -307,9 +307,9 @@ function _renderDetailView(main){
   var equip=S.visionEquips.find(function(e){return e.id===_visionSelId;});
   if(!equip){ _visionView='grid'; _renderGridView(main); return; }
   main.innerHTML=
-    '<div class="vi-detail-toolbar" style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid #2a2a34;background:#18181e">'+
+    '<div class="vi-detail-toolbar" style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bd-light);background:var(--bg-panel)">'+
       '<button class="btn" onclick="backToVisionGrid()">← 목록으로</button>'+
-      '<span style="font-size:12px;font-weight:600;color:#c0c0e0;flex:1">'+_esc(_viEquipLabel(equip))+'</span>'+
+      '<span style="font-size:12px;font-weight:600;flex:1">'+_esc(_viEquipLabel(equip))+'</span>'+
       '<button class="btn pri" onclick="saveVisionEquipData()">저장</button>'+
       '<button class="btn" onclick="copyVisionEquip(\''+equip.id+'\')" title="복사">복사</button>'+
       '<button class="btn red" onclick="delVisionEquip(\''+equip.id+'\')">삭제</button>'+
@@ -317,7 +317,7 @@ function _renderDetailView(main){
     '<div class="vi-main-inner'+(_visionEditMode?' vi-tpl-on':'')+'" id="visionFormWrap" style="flex:1;overflow-y:auto;padding:16px 20px">'+
       _renderVisionEquipForm(equip)+
     '</div>'+
-    '<div class="vi-footer" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid #2a2a34;background:#18181e">'+
+    '<div class="vi-footer">'+
       '<span style="font-size:10px;color:#444" id="viSaveTs">'+
         (equip.updatedAt?'최종 저장: '+equip.updatedAt:'')+
       '</span>'+
@@ -329,8 +329,8 @@ function _renderVisionEquipForm(equip){
   var data=equip.data||{};
   var typeVal=data['vi_type'];
   _viCurrentTypes=Array.isArray(typeVal)?typeVal:(typeVal?[typeVal]:[]);
-  var html='<div class="vi-equip-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #2a2a34">'+
-    '<div style="flex:1;font-size:13px;font-weight:600;color:#e0e0ec">'+_viTypeBadges(typeVal)+' '+_esc(_viEquipLabel(equip))+'</div>'+
+  var html='<div class="vi-equip-hdr">'+
+    '<div style="flex:1;font-size:13px;font-weight:600">'+_viTypeBadges(typeVal)+' '+_esc(_viEquipLabel(equip))+'</div>'+
     '</div>';
   (S.visionTemplate.categories||[]).forEach(function(cat,ci){
     html+=_renderViCategory(cat,data,ci);
@@ -746,7 +746,7 @@ function _renderViCamEntry(wrapperId,cam,idx,total){
       '<div class="vi-cam-entry-row"><label>모델명</label><input type="text" class="vi-cam-model-inp" value="'+_esc(cam.model||'')+'"></div>'+
       '<div class="vi-cam-entry-row"><label>수량</label>'+
         '<input type="number" class="vi-cam-qty-inp qty-inp" min="0" max="99" value="'+count+'" oninput="_viCamQtyChange(\''+wrapperId+'\','+idx+',this.value)">'+
-        '<span style="font-size:10px;color:#555">대</span>'+
+        '<span style="font-size:10px;color:var(--tx-faint)">대</span>'+
       '</div>'+
       '<div class="vi-cam-sn-rows" id="'+wrapperId+'_cam'+idx+'_sns">'+snRows+'</div>'+
     '</div></div>';

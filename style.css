@@ -14,6 +14,9 @@
   --bg-grp:     #222230;
   --bg-wk:      #1a1e2a;
   --bg-wksec:   #151c2a;
+  --bg-eq-done: #091810;
+  --bg-danger:  #2a0a0a;
+  --bd-danger:  #7a1010;
   --bd-strong:  #555;
   --bd-main:    #3a3a44;
   --bd-light:   #2a2a34;
@@ -38,6 +41,9 @@
   --bg-grp:     #ebebf4;
   --bg-wk:      #eef0f8;
   --bg-wksec:   #e4e8f4;
+  --bg-eq-done: #d4f4d4;
+  --bg-danger:  #ffe8e8;
+  --bd-danger:  #dd8888;
   --bd-strong:  #b0b0c0;
   --bd-main:    #ccccda;
   --bd-light:   #d8d8e8;
@@ -684,7 +690,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 [data-theme="light"] .pm-expand-row td{background:var(--bg-deep)}
 [data-theme="light"] .vi-type-cam-sec-hdr,[data-theme="light"] .vi-type-illum-sec-hdr{color:var(--tx-second)}
 [data-theme="light"] .vi-board-entry-hdr{color:var(--tx-second)}
-[data-theme="light"] select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239090b8'/%3E%3C/svg%3E")}
+/* Vision 상세 toolbar */
+.vi-detail-toolbar{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bd-light);background:var(--bg-panel)}
 
 /* ═══════════════════════════════════════════
    모바일 유틸리티
