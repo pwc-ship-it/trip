@@ -93,10 +93,8 @@ var DEF = {
           {"id":"vi_unit",    "name":"호기",     "type":"text",        "order":2, "showInGrid":false},
           {"id":"vi_type",    "name":"Type",     "type":"multiselect", "order":3, "showInGrid":false,
            "options":["Notching","Delamination","Foil","NGMarking","DNC_Notching","DNC_Cutting"]},
-          {"id":"vi_sn",      "name":"S/N",      "type":"text",        "order":4, "showInGrid":true},
-          {"id":"vi_os",      "name":"OS",       "type":"text",        "order":5, "showInGrid":true},
-          {"id":"vi_license", "name":"라이센스", "type":"text",        "order":6, "showInGrid":false},
-          {"id":"vi_notes",   "name":"특이사항", "type":"textarea",    "order":7, "showInGrid":false}
+          {"id":"vi_sn",      "name":"S/N",      "type":"text",        "order":4, "showInGrid":false},
+          {"id":"vi_notes",   "name":"특이사항", "type":"textarea",    "order":5, "showInGrid":false}
         ]
       },
       {
@@ -112,12 +110,6 @@ var DEF = {
             "id":"vg_light","name":"ILLUMINATION","order":1,
             "items":[
               {"id":"vi_illumination","name":"Illumination","type":"type-illum","order":0,"showInGrid":false}
-            ]
-          },
-          {
-            "id":"vg_program","name":"PROGRAM","order":2,
-            "items":[
-              {"id":"vi_program","name":"Program","type":"type-program","order":0,"showInGrid":false}
             ]
           }
         ]

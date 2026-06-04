@@ -185,16 +185,14 @@ function renderVisionMain(){
    그리드 뷰
 ══════════════════════════════════════════ */
 function _renderGridView(main){
-  var dynCols=_getViDynCols();
-
-  /* 필터된 설비 */
+  /* ── 필터된 설비 ── */
   var equips=(S.visionEquips||[]).filter(function(e){
     if(_visionFilterType==='all')return true;
     var t=e.data&&e.data['vi_type']; var types=Array.isArray(t)?t:(t?[t]:[]);
     return types.indexOf(_visionFilterType)>=0;
   });
 
-  /* 사이트별 그룹 */
+  /* ── 사이트 그룹 ── */
   var bysite={}; var siteOrder=[];
   equips.forEach(function(e){
     var sid=e.siteId||'기타';
@@ -204,53 +202,177 @@ function _renderGridView(main){
   var orderedSites=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
   siteOrder.forEach(function(k){if(orderedSites.indexOf(k)<0)orderedSites.push(k);});
 
-  /* 헤더 */
-  var fixedLeft=0;
-  var colSite=100, colLine=90, colUnit=160;
-  var hdrHtml='<tr>'+
-    '<th class="vi-th fix-col" style="left:0;min-width:'+colSite+'px">사이트</th>'+
-    '<th class="vi-th fix-col" style="left:'+colSite+'px;min-width:'+colLine+'px">라인</th>'+
-    '<th class="vi-th fix-col" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">호기 / Type</th>'+
-    dynCols.map(function(c){
-      return '<th class="vi-th" style="min-width:120px">'+_esc(c.name)+'</th>';
+  /* ── Vision Types 수집 (템플릿 순서 기준) ── */
+  var typeItem=_findItemById('vi_type');
+  var allTypes=typeItem?(typeItem.options||[]):[];
+  var typeSet={}; var typeOrder=[];
+  allTypes.forEach(function(t){
+    var found=false;
+    equips.forEach(function(e){
+      var et=e.data&&e.data['vi_type']; var ts=Array.isArray(et)?et:(et?[et]:[]);
+      if(ts.indexOf(t)>=0)found=true;
+    });
+    if(found&&!typeSet[t]){typeSet[t]=true;typeOrder.push(t);}
+  });
+  equips.forEach(function(e){
+    var et=e.data&&e.data['vi_type']; var ts=Array.isArray(et)?et:(et?[et]:[]);
+    ts.forEach(function(t){if(!typeSet[t]){typeSet[t]=true;typeOrder.push(t);}});
+  });
+
+  /* ── 타입별 최대 수량 계산 ── */
+  var maxCam={}; var maxIllum={}; var maxPc={}; var maxTrig=0;
+  typeOrder.forEach(function(t){maxCam[t]=0;maxIllum[t]=0;maxPc[t]=0;});
+  equips.forEach(function(e){
+    var d=e.data||{};
+    if(d.vi_cameras&&typeof d.vi_cameras==='object'){
+      Object.keys(d.vi_cameras).forEach(function(t){if(Array.isArray(d.vi_cameras[t]))maxCam[t]=Math.max(maxCam[t]||0,d.vi_cameras[t].length);});
+    }
+    if(d.vi_illumination&&typeof d.vi_illumination==='object'){
+      Object.keys(d.vi_illumination).forEach(function(t){if(Array.isArray(d.vi_illumination[t]))maxIllum[t]=Math.max(maxIllum[t]||0,d.vi_illumination[t].length);});
+    }
+    if(Array.isArray(d.vi_board_trig))maxTrig=Math.max(maxTrig,d.vi_board_trig.length);
+    if(d.vi_pc&&typeof d.vi_pc==='object'){
+      Object.keys(d.vi_pc).forEach(function(t){if(Array.isArray(d.vi_pc[t]))maxPc[t]=Math.max(maxPc[t]||0,d.vi_pc[t].length);});
+    }
+  });
+
+  /* ── 동적 컬럼 정의 ── */
+  var colDefs=[];
+  typeOrder.forEach(function(t){
+    var mc=maxCam[t]||0;
+    for(var i=0;i<mc;i++){
+      var gl='Camera\n'+t; var gc='#1a3358';
+      colDefs.push({g:'cam',gLabel:gl,gColor:gc,typeName:t,idx:i,field:'model',label:'Cam'+(i+1)+' 모델'});
+      colDefs.push({g:'cam',gLabel:gl,gColor:gc,typeName:t,idx:i,field:'sn',   label:'Cam'+(i+1)+' S/N'});
+    }
+  });
+  typeOrder.forEach(function(t){
+    var mi=maxIllum[t]||0;
+    for(var i=0;i<mi;i++){
+      var gl='Illumination\n'+t; var gc='#1a3320';
+      colDefs.push({g:'illum',gLabel:gl,gColor:gc,typeName:t,idx:i,field:'model',label:'조명'+(i+1)+' 모델'});
+      colDefs.push({g:'illum',gLabel:gl,gColor:gc,typeName:t,idx:i,field:'sn',   label:'조명'+(i+1)+' S/N'});
+    }
+  });
+  if(maxTrig>0){
+    for(var ti2=0;ti2<maxTrig;ti2++){
+      var gl2='Trigger Board'; var gc2='#332010';
+      colDefs.push({g:'board',gLabel:gl2,gColor:gc2,idx:ti2,field:'model',label:(ti2+1)+' 모델'});
+      colDefs.push({g:'board',gLabel:gl2,gColor:gc2,idx:ti2,field:'board',label:(ti2+1)+' Board'});
+      colDefs.push({g:'board',gLabel:gl2,gColor:gc2,idx:ti2,field:'fw',   label:(ti2+1)+' FW'});
+    }
+  }
+  typeOrder.forEach(function(t){
+    var mp=maxPc[t]||0;
+    for(var pi=0;pi<mp;pi++){
+      var gl3='PC\n'+t; var gc3='#201a38';
+      var pn='PC'+(pi+1)+' ';
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'name',   label:pn+'이름'});
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'cpu',    label:'CPU'});
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'ram',    label:'RAM'});
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'program',label:'Program'});
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'os',     label:'OS'});
+      colDefs.push({g:'pc',gLabel:gl3,gColor:gc3,typeName:t,pcIdx:pi,field:'license',label:'License'});
+    }
+  });
+
+  /* ── 그룹 span 계산 ── */
+  var grpSpans=[]; var prevGLabel=null;
+  colDefs.forEach(function(c){
+    if(c.gLabel===prevGLabel){grpSpans[grpSpans.length-1].span++;}
+    else{grpSpans.push({label:c.gLabel,color:c.gColor||'',span:1});prevGLabel=c.gLabel;}
+  });
+
+  /* ── 헤더 2단 ── */
+  var colSite=90,colLine=80,colUnit=140;
+  var hdr1='<tr>'+
+    '<th class="vi-th fix-col" rowspan="2" style="left:0;min-width:'+colSite+'px">사이트</th>'+
+    '<th class="vi-th fix-col" rowspan="2" style="left:'+colSite+'px;min-width:'+colLine+'px">라인</th>'+
+    '<th class="vi-th fix-col" rowspan="2" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">호기 / Type</th>'+
+    '<th class="vi-th" rowspan="2" style="min-width:80px">S/N</th>'+
+    '<th class="vi-th" rowspan="2" style="min-width:75px;font-size:10px">최종변경</th>'+
+    grpSpans.map(function(g){
+      return '<th class="vi-th vi-th-grp" colspan="'+g.span+'" style="'+(g.color?'background:'+g.color+';':'')+'white-space:pre-line;font-size:10px">'+_esc(g.label)+'</th>';
+    }).join('')+
+  '</tr>';
+  var hdr2='<tr>'+
+    colDefs.map(function(c){
+      return '<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">'+_esc(c.label)+'</th>';
     }).join('')+
   '</tr>';
 
-  /* 행 */
+  /* ── 데이터 행 ── */
+  var totalCols=5+colDefs.length;
   var bodyHtml='';
   if(!equips.length){
-    var span=3+dynCols.length;
-    bodyHtml='<tr><td colspan="'+span+'" class="vi-grid-empty">등록된 설비가 없습니다<br><span style="font-size:11px;color:var(--tx-muted)">좌측 "+ 설비 추가"로 시작하세요</span></td></tr>';
+    bodyHtml='<tr><td colspan="'+totalCols+'" class="vi-grid-empty">등록된 설비가 없습니다<br><span style="font-size:11px;color:var(--tx-dim)">좌측 "+ 설비 추가"로 시작하세요</span></td></tr>';
   } else {
     orderedSites.forEach(function(sid){
       var site=S.sites.find(function(s){return s.id===sid;});
       var sname=site?site.name:sid; var scolor=site?site.color:'#555';
-      var span=3+dynCols.length;
-      bodyHtml+='<tr class="vi-site-grp-row"><td colspan="'+span+'" style="color:'+scolor+';border-left:3px solid '+scolor+'">'+_esc(sname)+' ('+bysite[sid].length+')</td></tr>';
+      bodyHtml+='<tr class="vi-site-grp-row"><td colspan="'+totalCols+'" style="color:'+scolor+';border-left:3px solid '+scolor+'">'+_esc(sname)+' ('+bysite[sid].length+')</td></tr>';
       bysite[sid].forEach(function(e){
-        var line=_esc((e.data&&e.data['vi_line'])||'');
-        var unit=_esc((e.data&&e.data['vi_unit'])||'');
-        var typeVal=e.data&&e.data['vi_type'];
+        var d=e.data||{};
+        var line=_esc(d['vi_line']||'');
+        var unit=_esc(d['vi_unit']||'');
+        var sn=_esc(d['vi_sn']||'');
+        var typeVal=d['vi_type'];
         var typeBadges=_viTypeBadges(typeVal);
         var updTip=e.updatedAt?'최종 변경: '+e.updatedAt:'변경 이력 없음';
         bodyHtml+='<tr class="vi-grid-row" onclick="openVisionDetail(\''+e.id+'\')" title="'+_esc(updTip)+'">'+
           '<td class="vi-td fix-col" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>'+
           '<td class="vi-td fix-col" style="left:'+colSite+'px;min-width:'+colLine+'px">'+line+'</td>'+
           '<td class="vi-td fix-col" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">'+
-            (typeBadges?typeBadges+' ':'')+unit+
-          '</td>'+
-          dynCols.map(function(c){
-            return '<td class="vi-td">'+_esc(_viGridCellValue(e,c))+'</td>';
-          }).join('')+
+            (typeBadges?typeBadges+' ':'')+unit+'</td>'+
+          '<td class="vi-td" style="min-width:80px;white-space:nowrap">'+sn+'</td>'+
+          '<td class="vi-td" style="min-width:75px;white-space:nowrap;font-size:10px;color:var(--tx-dim)">'+_esc(e.updatedAt||'')+'</td>'+
+          colDefs.map(function(c){return '<td class="vi-td" style="min-width:88px;white-space:nowrap">'+_esc(_getDetailedCellValue(d,c))+'</td>';}).join('')+
         '</tr>';
       });
     });
   }
 
-  main.innerHTML=
-    '<div class="vi-grid-wrap">'+
-      '<table class="vi-grid"><thead>'+hdrHtml+'</thead><tbody>'+bodyHtml+'</tbody></table>'+
-    '</div>';
+  main.innerHTML='<div class="vi-grid-wrap"><table class="vi-grid"><thead>'+hdr1+hdr2+'</thead><tbody>'+bodyHtml+'</tbody></table></div>';
+}
+
+function _getDetailedCellValue(d,c){
+  try{
+    switch(c.g){
+      case 'cam':{
+        var arr=d.vi_cameras; if(!arr||typeof arr!=='object')return '';
+        var ents=arr[c.typeName]; if(!Array.isArray(ents)||ents.length<=c.idx)return '';
+        return ents[c.idx][c.field]||'';
+      }
+      case 'illum':{
+        var arr2=d.vi_illumination; if(!arr2||typeof arr2!=='object')return '';
+        var ents2=arr2[c.typeName]; if(!Array.isArray(ents2)||ents2.length<=c.idx)return '';
+        return ents2[c.idx][c.field]||'';
+      }
+      case 'board':{
+        var trig=d.vi_board_trig; if(!Array.isArray(trig)||trig.length<=c.idx)return '';
+        return trig[c.idx][c.field]||'';
+      }
+      case 'pc':{
+        var pcd=d.vi_pc; if(!pcd||typeof pcd!=='object')return '';
+        var pes=pcd[c.typeName]; if(!Array.isArray(pes)||pes.length<=c.pcIdx)return '';
+        var pc=pes[c.pcIdx]; if(!pc)return '';
+        switch(c.field){
+          case 'name': return pc.name||'';
+          case 'cpu':  return pc.cpu?(pc.cpu.spec||''):'';
+          case 'ram':
+            if(!Array.isArray(pc.ram)||!pc.ram.length)return '';
+            return pc.ram.map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', ');
+          case 'program':
+            if(!Array.isArray(pc.program)||!pc.program.length)return '';
+            return pc.program.map(function(p){return p.name+(p.version?' '+p.version:'');}).join('; ');
+          case 'os':      return pc.os||'';
+          case 'license': return pc.license||'';
+          default: return '';
+        }
+      }
+      default: return '';
+    }
+  }catch(ex){return '';}
 }
 
 function _viGridCellValue(equip, item){
@@ -661,6 +783,9 @@ function _renderViPcEntry(baseId,ti,pi,e){
       _viPcSubSec(eid,'lancard','LANCARD',e.lancard||[])+
       _viPcSubSec(eid,'fg','FRAME GRABBER',e.fg||[])+
       _viPcSubSec(eid,'sync','SYNC BOARD',e.sync||[])+
+      _viPcSubSec(eid,'program','PROGRAM',e.program||[])+
+      _viPcSpecRowText('OS','vi-pc-os',e.os||'')+
+      _viPcSpecRowText('LICENSE','vi-pc-license',e.license||'')+
     '</div></div>';
 }
 
@@ -670,6 +795,13 @@ function _viPcSpecRow(lbl,specCls,qtyCls,specVal,qtyVal,ph){
     '<input type="text" class="'+specCls+' spec-inp" value="'+_esc(specVal||'')+'"'+(ph?' placeholder="'+_esc(ph)+'"':'')+'>'+
     '<input type="number" class="'+qtyCls+' qty-inp" value="'+_esc(String(qtyVal||''))+'" min="0">'+
     '<span class="qty-lbl">EA</span>'+
+  '</div>';
+}
+
+function _viPcSpecRowText(lbl,cls,val){
+  return '<div class="vi-pc-spec-row">'+
+    '<span class="vi-pc-f-lbl">'+_esc(lbl)+'</span>'+
+    '<input type="text" class="'+cls+' spec-inp" value="'+_esc(val||'')+'">'+
   '</div>';
 }
 
@@ -691,6 +823,9 @@ function _viPcSubRowFields(sub,r){
   r=r||{};
   var del='<button class="vi-pc-sub-del" onclick="_viPcSubDel(this)">✕</button>';
   switch(sub){
+    case 'program':
+      return '<input type="text" placeholder="프로그램명" value="'+_esc(r.name||'')+'">'+
+        '<input type="text" placeholder="버전 (예: v1.0.0)" value="'+_esc(r.version||'')+'">'+del;
     case 'ram':
       return '<input type="text" placeholder="예: DDR5-4800 16GB" style="flex:2" value="'+_esc(r.capacity||'')+'">'+
         '<input type="number" class="qty-inp" min="0" placeholder="수량(EA)" value="'+_esc(String(r.qty||''))+'">'+del;
@@ -754,7 +889,10 @@ function _collectViPcEntry(el){
     hdd:subRows('hdd',['capacity','qty','drive']),
     lancard:subRows('lancard',['speed','ports','purpose']),
     fg:subRows('fg',['model','board','fw']),
-    sync:subRows('sync',['model','board','fw'])
+    sync:subRows('sync',['model','board','fw']),
+    program:subRows('program',['name','version']),
+    os:g('vi-pc-os'),
+    license:g('vi-pc-license')
   };
 }
 

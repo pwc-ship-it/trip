@@ -635,6 +635,10 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-board-entry-field input:focus{border-color:#1a6bbf}
 /* ── empty state ── */
 .vi-type-empty{padding:10px 12px;font-size:11px;color:var(--tx-dim);background:var(--bg-deep);border:1px dashed var(--bd-main);border-radius:4px;text-align:center}
+/* ── 다중 헤더 그리드 ── */
+.vi-th-grp{white-space:pre-line;text-align:center;border-bottom:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85)}
+.vi-grid thead tr:first-child .vi-th:not(.vi-th-grp){background:var(--bg-panel)}
+.vi-grid thead tr:last-child .vi-th{font-size:10px;font-weight:400;background:var(--bg-deep)}
 /* ── type-program ── */
 .vi-type-prog{display:flex;flex-direction:column;gap:8px}
 .vi-type-prog-sec{border:1px solid var(--bd-main);border-radius:5px;overflow:hidden}

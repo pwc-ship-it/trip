@@ -97,6 +97,18 @@ function _migrateVisionTemplate(){
       boardCat.groups=boardCat.groups.filter(function(g){return g.id!=='vg_fg'&&g.id!=='vg_sync';});
     }
   })();
+  // Migration 7: vi_os/vi_license → 기본정보에서 제거, vg_program → Vision에서 제거
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var basic=cats.find(function(c){return c.id==='vc_basic';});
+    if(basic&&basic.items){
+      basic.items=basic.items.filter(function(i){return i.id!=='vi_os'&&i.id!=='vi_license';});
+    }
+    var vis=cats.find(function(c){return c.id==='vc_vision';});
+    if(vis&&vis.groups){
+      vis.groups=vis.groups.filter(function(g){return g.id!=='vg_program';});
+    }
+  })();
 }
 
 function loadData(){
