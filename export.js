@@ -314,3 +314,4 @@ function _buildEquipXCell(exCell,cell,defaultBg,todayStr){
   }
   exCell.value='';
   _xStyle(exCell,{bg:defaultBg,fg:'#c8c8d4',align:'center'});
+}
