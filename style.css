@@ -660,9 +660,11 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-type-pc-entry-body{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
 .vi-pc-spec-row{display:flex;align-items:center;gap:6px;font-size:11px}
 .vi-pc-spec-row .vi-pc-f-lbl{width:80px;flex-shrink:0;color:var(--tx-dim);font-size:11px}
-.vi-pc-spec-row .spec-inp{flex:1;min-width:0;width:auto!important;padding:5px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+/* PC entry 내 모든 input에서 .vi-item-input의 width:100% 강제 해제 */
+.vi-type-pc-entry input[type="text"],.vi-type-pc-entry input[type="number"]{width:auto!important}
+.vi-pc-spec-row .spec-inp{flex:1 1 0%!important;min-width:50px;padding:5px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
 .vi-pc-spec-row .spec-inp:focus{border-color:#1a6bbf}
-.vi-pc-spec-row .qty-inp{width:42px;flex:none;text-align:center;padding:5px 4px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-spec-row .qty-inp{flex:0 0 42px!important;width:42px!important;text-align:center;padding:5px 4px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
 .vi-pc-spec-row .qty-inp:focus{border-color:#1a6bbf}
 .vi-type-pc-entry-hdr{padding:4px 10px;background:var(--bg-deep);font-size:11px;font-weight:600;color:var(--tx-sub);display:flex;align-items:center;gap:8px}
 .vi-pc-entry-num{flex-shrink:0;font-size:11px;color:var(--tx-dim)}
