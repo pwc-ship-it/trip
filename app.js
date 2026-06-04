@@ -58,6 +58,27 @@ function _migrateVisionTemplate(){
     var ram=pcCat.items.find(function(i){return i.id==='vi_ram';});
     if(ram&&!ram.specPlaceholder) ram.specPlaceholder='예: DDR5-4800 16GB';
   })();
+  // Migration 4: vg_program 누락 시 Vision 카테고리에 추가
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var visCat=cats.find(function(c){return c.id==='vc_vision';});
+    if(!visCat||!visCat.groups)return;
+    if(visCat.groups.find(function(g){return g.id==='vg_program';}))return;
+    var defVis=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_vision';});
+    if(!defVis||!defVis.groups)return;
+    var defProg=defVis.groups.find(function(g){return g.id==='vg_program';});
+    if(!defProg)return;
+    visCat.groups.push(deepCopy(defProg));
+  })();
+  // Migration 5: vi_notes(특이사항) 누락 시 기본정보에 추가
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var basic=cats.find(function(c){return c.id==='vc_basic';});
+    if(!basic||!basic.items)return;
+    if(basic.items.find(function(i){return i.id==='vi_notes';}))return;
+    var maxOrder=basic.items.reduce(function(m,i){return Math.max(m,i.order||0);},-1);
+    basic.items.push({id:'vi_notes',name:'특이사항',type:'textarea',order:maxOrder+1,showInGrid:false});
+  })();
 }
 
 function loadData(){

@@ -635,6 +635,24 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-board-entry-field input:focus{border-color:#1a6bbf}
 /* ── empty state ── */
 .vi-type-empty{padding:10px 12px;font-size:11px;color:var(--tx-dim);background:var(--bg-deep);border:1px dashed var(--bd-main);border-radius:4px;text-align:center}
+/* ── type-program ── */
+.vi-type-prog{display:flex;flex-direction:column;gap:8px}
+.vi-type-prog-sec{border:1px solid var(--bd-main);border-radius:5px;overflow:hidden}
+.vi-type-prog-sec-hdr{padding:5px 10px;font-size:11px;font-weight:700;background:var(--bg-deep);letter-spacing:.03em}
+.vi-type-prog-entries{display:flex;flex-direction:column;padding:0 8px 4px}
+.vi-type-prog-entry-hdr{display:flex;gap:6px;padding:4px 0 2px;font-size:10px;color:var(--tx-dim);border-bottom:1px solid var(--bd-main);margin-bottom:2px}
+.vi-type-prog-entry-hdr span:nth-child(1){flex:2}.vi-type-prog-entry-hdr span:nth-child(2){flex:1}.vi-type-prog-entry-hdr span:nth-child(3){width:24px;flex-shrink:0}
+.vi-type-prog-entry{display:flex;align-items:center;gap:6px;padding:3px 0}
+.vi-type-prog-entry input{padding:4px 7px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-type-prog-entry input:focus{border-color:#1a6bbf}
+.vi-type-prog-name{flex:2;min-width:0}.vi-type-prog-ver{flex:1;min-width:0}
+.vi-prog-del-btn{width:24px;flex-shrink:0;background:none;border:none;cursor:pointer;color:#5a2020;font-size:14px;line-height:1;padding:0}
+.vi-prog-del-btn:hover{color:#e84040}
+.vi-prog-add-btn{margin:4px 8px 6px;font-size:10px;padding:4px 10px;color:#5a5aaa;background:none;border:1px dashed #3a3a60;border-radius:4px;cursor:pointer}
+.vi-prog-add-btn:hover{background:#1a1a30;color:#9090cc}
+/* ── 특이사항 textarea ── */
+.vi-notes-area{width:100%;padding:6px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit;resize:vertical;min-height:70px;line-height:1.5;box-sizing:border-box}
+.vi-notes-area:focus{border-color:#1a6bbf}
 /* 열 설정 모달 */
 .vi-col-settings-list{max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
 .vi-col-cat-hdr{font-size:10px;font-weight:700;color:var(--tx-faint);padding:8px 4px 3px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--bd-light);margin-bottom:2px}

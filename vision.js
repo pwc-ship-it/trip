@@ -232,7 +232,8 @@ function _renderGridView(main){
         var unit=_esc((e.data&&e.data['vi_unit'])||'');
         var typeVal=e.data&&e.data['vi_type'];
         var typeBadges=_viTypeBadges(typeVal);
-        bodyHtml+='<tr class="vi-grid-row" onclick="openVisionDetail(\''+e.id+'\')">'+
+        var updTip=e.updatedAt?'최종 변경: '+e.updatedAt:'변경 이력 없음';
+        bodyHtml+='<tr class="vi-grid-row" onclick="openVisionDetail(\''+e.id+'\')" title="'+_esc(updTip)+'">'+
           '<td class="vi-td fix-col" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>'+
           '<td class="vi-td fix-col" style="left:'+colSite+'px;min-width:'+colLine+'px">'+line+'</td>'+
           '<td class="vi-td fix-col" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">'+
@@ -266,6 +267,11 @@ function _viGridCellValue(equip, item){
       if(!val||typeof val!=='object'||Array.isArray(val))return '';
       var total2=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total2+=val[k].length;});
       return total2?total2+'개':'';
+    }
+    case 'type-program':{
+      if(!val||typeof val!=='object'||Array.isArray(val))return '';
+      var total3=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total3+=val[k].length;});
+      return total3?total3+'개':'';
     }
     case 'board-multi':
       if(!Array.isArray(val)||!val.length)return '';
@@ -310,6 +316,7 @@ function _renderDetailView(main){
     '<div class="vi-detail-toolbar" style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bd-light);background:var(--bg-panel)">'+
       '<button class="btn" onclick="backToVisionGrid()">← 목록으로</button>'+
       '<span style="font-size:12px;font-weight:600;flex:1">'+_esc(_viEquipLabel(equip))+'</span>'+
+      (equip.updatedAt?'<span class="vi-updated-dt" style="font-size:10px;color:var(--tx-dim);white-space:nowrap">최종 변경: <strong style="color:var(--tx-sub)">'+_esc(equip.updatedAt)+'</strong></span>':'')+
       '<button class="btn pri" onclick="saveVisionEquipData()">저장</button>'+
       '<button class="btn" onclick="copyVisionEquip(\''+equip.id+'\')" title="복사">복사</button>'+
       '<button class="btn red" onclick="delVisionEquip(\''+equip.id+'\')">삭제</button>'+
@@ -318,8 +325,8 @@ function _renderDetailView(main){
       _renderVisionEquipForm(equip)+
     '</div>'+
     '<div class="vi-footer">'+
-      '<span style="font-size:10px;color:#444" id="viSaveTs">'+
-        (equip.updatedAt?'최종 저장: '+equip.updatedAt:'')+
+      '<span style="font-size:10px;color:var(--tx-dim)" id="viSaveTs">'+
+        (equip.updatedAt?'저장됨: '+equip.updatedAt:'')+
       '</span>'+
     '</div>';
 }
@@ -401,11 +408,13 @@ function _renderViInput(item,val){
     case 'multiselect': return _renderViMultisel(item,val,id);
     case 'type-camera': return _renderViTypeCamera(item,val,id);
     case 'type-illum': return _renderViTypeIllum(item,val,id);
+    case 'type-program': return _renderViTypeProgram(item,val,id);
     case 'board-multi': return _renderViBoardMulti(item,val,id);
     case 'camera-multi': return _renderViCameraMulti(item,val,id);
     case 'spec-qty': return _renderViSpecQty(item,val,id);
     case 'ssd-multi': return _renderViSsdMulti(item,val,id);
     case 'lancard-multi': return _renderViLancardMulti(item,val,id);
+    case 'textarea': return '<textarea id="'+id+'" class="vi-notes-area" rows="4" placeholder="특이사항 입력...">'+_esc(String(val||''))+'</textarea>';
     default: return '<input type="text" id="'+id+'" value="'+_esc(String(val||''))+'" placeholder="입력...">';
   }
 }
@@ -529,6 +538,16 @@ function _viTypeManagerChange(){
       illumWrap.parentNode.replaceChild(tmp2.firstChild,illumWrap);
     }
   }
+  var progItem=_findItemById('vi_program');
+  if(progItem){
+    var progWrap=document.getElementById('viinp_vi_program');
+    if(progWrap){
+      var progData=_collectViTypeProgFromDom(progWrap);
+      var tmp3=document.createElement('div');
+      tmp3.innerHTML=_renderViTypeProgram(progItem,progData,'viinp_vi_program');
+      progWrap.parentNode.replaceChild(tmp3.firstChild,progWrap);
+    }
+  }
 }
 
 function _collectViTypeCamFromDom(wrap){
@@ -556,6 +575,76 @@ function _collectViTypeIllumFromDom(wrap){
       var m=el.querySelector('.vi-type-illum-model');
       var s=el.querySelector('.vi-type-illum-sn');
       return {model:m?m.value:'',sn:s?s.value:''};
+    });
+  });
+  return result;
+}
+
+/* ══════════════════════════════════════════
+   type-program 렌더 (Type별 프로그램 버전 관리)
+══════════════════════════════════════════ */
+function _renderViTypeProgram(item,val,id){
+  var obj=(val&&typeof val==='object'&&!Array.isArray(val))?val:{};
+  if(!_viCurrentTypes||!_viCurrentTypes.length){
+    return '<div class="vi-type-empty" id="'+id+'">기본정보에서 Vision Type을 선택하면 Program 항목이 표시됩니다.</div>';
+  }
+  var html='<div class="vi-type-prog" id="'+id+'">';
+  _viCurrentTypes.forEach(function(t,ti){
+    var entries=Array.isArray(obj[t])?obj[t]:[];
+    var color=_viTypeColor(t);
+    var sectionId=id+'_t'+ti;
+    html+='<div class="vi-type-prog-sec" data-type="'+_esc(t)+'" data-idx="'+ti+'">'+
+      '<div class="vi-type-prog-sec-hdr" style="border-left:3px solid '+color+';color:'+color+'">'+_esc(t)+'</div>'+
+      '<div class="vi-type-prog-entries" id="'+sectionId+'_entries">';
+    if(entries.length){
+      html+='<div class="vi-type-prog-entry-hdr"><span>프로그램명</span><span>버전</span><span></span></div>';
+      entries.forEach(function(e){
+        html+='<div class="vi-type-prog-entry">'+
+          '<input type="text" class="vi-type-prog-name" value="'+_esc(e.name||'')+'" placeholder="프로그램명">'+
+          '<input type="text" class="vi-type-prog-ver" value="'+_esc(e.version||'')+'" placeholder="예: v1.0.0">'+
+          '<button class="vi-prog-del-btn" onclick="_viTypeProgramDelEntry(this)" title="삭제">✕</button>'+
+        '</div>';
+      });
+    }
+    html+='</div>'+
+      '<button class="vi-prog-add-btn" onclick="_viTypeProgramAdd(\''+id+'\','+ti+')">+ 프로그램 추가</button>'+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function _viTypeProgramAdd(id,ti){
+  var container=document.getElementById(id+'_t'+ti+'_entries'); if(!container)return;
+  if(!container.querySelector('.vi-type-prog-entry-hdr')){
+    var hdr=document.createElement('div'); hdr.className='vi-type-prog-entry-hdr';
+    hdr.innerHTML='<span>프로그램명</span><span>버전</span><span></span>';
+    container.appendChild(hdr);
+  }
+  var div=document.createElement('div'); div.className='vi-type-prog-entry';
+  div.innerHTML='<input type="text" class="vi-type-prog-name" value="" placeholder="프로그램명">'+
+    '<input type="text" class="vi-type-prog-ver" value="" placeholder="예: v1.0.0">'+
+    '<button class="vi-prog-del-btn" onclick="_viTypeProgramDelEntry(this)" title="삭제">✕</button>';
+  container.appendChild(div);
+}
+
+function _viTypeProgramDelEntry(btn){
+  var entry=btn.parentNode;
+  var container=entry.parentNode;
+  container.removeChild(entry);
+  if(!container.querySelector('.vi-type-prog-entry')) container.innerHTML='';
+}
+
+function _collectViTypeProgFromDom(wrap){
+  var result={};
+  var secs=wrap.querySelectorAll('.vi-type-prog-sec');
+  Array.prototype.forEach.call(secs,function(sec){
+    var t=sec.getAttribute('data-type'); if(!t)return;
+    var entries=sec.querySelectorAll('.vi-type-prog-entry');
+    result[t]=Array.prototype.map.call(entries,function(el){
+      var n=el.querySelector('.vi-type-prog-name');
+      var v=el.querySelector('.vi-type-prog-ver');
+      return {name:n?n.value:'',version:v?v.value:''};
     });
   });
   return result;
@@ -904,7 +993,13 @@ function saveVisionEquipData(){
   if(matchSite)equip.siteId=matchSite.id;
   saveData();
   var ts=document.getElementById('viSaveTs');
-  if(ts)ts.textContent='최종 저장: '+equip.updatedAt;
+  if(ts)ts.textContent='저장됨: '+equip.updatedAt;
+  // 툴바 최종 변경일도 갱신
+  var toolbar=document.querySelector('.vi-detail-toolbar');
+  if(toolbar){
+    var dtSpan=toolbar.querySelector('.vi-updated-dt');
+    if(dtSpan) dtSpan.innerHTML='최종 변경: <strong style="color:var(--tx-sub)">'+_esc(equip.updatedAt)+'</strong>';
+  }
   renderVisionSidebar();
 }
 
@@ -985,6 +1080,11 @@ function _collectViField(item){
         return {model:f1?f1.value:'',board:f2?f2.value:'',fw:f3?f3.value:''};
       });
     }
+    case 'type-program':{
+      var wrap=document.getElementById(id); if(!wrap)return {};
+      return _collectViTypeProgFromDom(wrap);
+    }
+    case 'textarea':{ var el=document.getElementById(id); return el?el.value:''; }
     case 'ssd-multi': return _collectMultiTable(id+'_tbl',['capacity','qty','drive']);
     case 'lancard-multi': return _collectMultiTable(id+'_tbl',['speed','ports','purpose']);
     default:{ var el=document.getElementById(id); return el?el.value:''; }
@@ -1202,6 +1302,8 @@ var _VI_TYPES=[
   {val:'text',lbl:'텍스트'},{val:'multiselect',lbl:'복수 선택 (체크박스)'},
   {val:'type-camera',lbl:'카메라 (Type별 그룹)'},
   {val:'type-illum',lbl:'조명 (Type별 그룹)'},
+  {val:'type-program',lbl:'프로그램 (Type별 그룹)'},
+  {val:'textarea',lbl:'텍스트 (여러 줄)'},
   {val:'board-multi',lbl:'Board (수량→상세 입력)'},
   {val:'camera-multi',lbl:'카메라 (다중 모델+S/N)'},
   {val:'spec-qty',lbl:'사양+수량'},{val:'ssd-multi',lbl:'SSD/HDD (용량/수량/드라이브)'},
@@ -1319,6 +1421,19 @@ function exportVisionCSV(){
           }
         });
         break;}
+      case 'type-program':{
+        var tpTypeItem=_findItemById('vi_type');
+        var tpTypes=tpTypeItem?(tpTypeItem.options||[]):[];
+        tpTypes.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          var maxN=0;
+          S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(v&&v[t]&&Array.isArray(v[t]))maxN=Math.max(maxN,v[t].length);});
+          for(var ci=0;ci<maxN;ci++){
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_name'); colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_name',item:item,sub:'tprog_name',t:t,ci:ci});
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_ver');  colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_ver', item:item,sub:'tprog_ver', t:t,ci:ci});
+          }
+        });
+        break;}
       case 'board-multi':{
         var maxBd=0;
         S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(Array.isArray(v))maxBd=Math.max(maxBd,v.length);});
@@ -1386,6 +1501,8 @@ function exportVisionCSV(){
         case 'tcam_sn':   row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].sn:'');    break;
         case 'tillum_model': row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].model:''); break;
         case 'tillum_sn':    row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].sn:'');    break;
+        case 'tprog_name':   row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].name:'');   break;
+        case 'tprog_ver':    row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].version:'');break;
         case 'brd_model': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].model:''); break;
         case 'brd_board': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].board:''); break;
         case 'brd_fw':    row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].fw:'');    break;
@@ -1475,7 +1592,13 @@ function _doDownloadVisionCsvTemplate(){
       case 'lancard-multi':
         for(var ri2=0;ri2<lanN;ri2++){headers.push(item.id+'_'+(ri2+1)+'_speed');headers.push(item.id+'_'+(ri2+1)+'_ports');headers.push(item.id+'_'+(ri2+1)+'_purpose');}
         break;
+      case 'type-program':
+        types.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          for(var ci=0;ci<4;ci++){headers.push(item.id+'_'+tk+'_'+(ci+1)+'_name');headers.push(item.id+'_'+tk+'_'+(ci+1)+'_ver');}
+        });break;
       case 'camera-multi':break;
+      case 'textarea':headers.push(item.id);break;
       default:headers.push(item.id);
     }
   });
@@ -1562,6 +1685,20 @@ function _parseAndImportVisionCSV(text){
             if(entries.length)tiRes[t]=entries;
           });
           if(Object.keys(tiRes).length)equip.data[item.id]=tiRes; break;}
+        case 'type-program':{
+          var tpImpTypeItem=_findItemById('vi_type');
+          var tpImpTypes=tpImpTypeItem?(tpImpTypeItem.options||[]):[];
+          var tpRes={};
+          tpImpTypes.forEach(function(t){
+            var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+            var entries=[]; var ci=0;
+            while(rmap[item.id+'_'+tk+'_'+(ci+1)+'_name']!==undefined){
+              entries.push({name:rmap[item.id+'_'+tk+'_'+(ci+1)+'_name']||'',version:rmap[item.id+'_'+tk+'_'+(ci+1)+'_ver']||''});
+              ci++;
+            }
+            if(entries.length)tpRes[t]=entries;
+          });
+          if(Object.keys(tpRes).length)equip.data[item.id]=tpRes; break;}
         case 'board-multi':{
           var bdRows=[]; var bi=0;
           while(rmap[item.id+'_'+(bi+1)+'_model']!==undefined){
