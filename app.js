@@ -34,7 +34,11 @@ function loadData(){
         S.events=d.events||[];
         S.workTasks=d.workTasks||[];
         S.equipItems=(d.equipItems&&d.equipItems.length)?d.equipItems:deepCopy(DEF.equipItems||[]);
-        S.equipUnits=d.equipUnits||[];
+        // string 오염된 cells 차단: 정상 객체만 유지
+        S.equipUnits=(d.equipUnits||[]).map(function(u){
+          if(u.cells&&typeof u.cells!=='object') u.cells={};
+          return u;
+        });
         S.equipSiteOrder=d.equipSiteOrder||[];
         S.equipProjects=d.equipProjects||[];
         S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
@@ -223,7 +227,20 @@ function loadFromSheets(callback){
       if(data.events)S.events=data.events;
       if(data.workTasks)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
       if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
-      if(data.equipUnits)S.equipUnits=data.equipUnits;
+      if(data.equipUnits){
+        // 안전 병합: Sheets cells 우선, 없으면 로컬 cells 보존 (string 오염 차단)
+        var _prevUnits=S.equipUnits||[];
+        S.equipUnits=data.equipUnits.map(function(su){
+          var hasCells=su.cells&&typeof su.cells==='object'&&!Array.isArray(su.cells)&&Object.keys(su.cells).length>0;
+          if(!hasCells){
+            var local=_prevUnits.find(function(lu){return lu.id===su.id;});
+            // 로컬 cells가 정상 객체인 경우에만 사용 (string 오염 무시)
+            if(local&&typeof local.cells==='object'&&!Array.isArray(local.cells)&&Object.keys(local.cells).length>0)
+              su.cells=local.cells;
+          }
+          return su;
+        });
+      }
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
       if(data.equipProjects)S.equipProjects=data.equipProjects;
       if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length)S.visionTemplate=data.visionTemplate;
