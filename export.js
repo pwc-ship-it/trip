@@ -19,6 +19,7 @@ function _doDownloadExcel(){
   _buildGanttSheet(wb);
   _buildPersonSheet(wb);
   _buildEquipSheet(wb);
+  _buildVisionSheet(wb);
   wb.xlsx.writeBuffer().then(function(buf){
     var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     var url=URL.createObjectURL(blob);
@@ -314,4 +315,115 @@ function _buildEquipXCell(exCell,cell,defaultBg,todayStr){
   }
   exCell.value='';
   _xStyle(exCell,{bg:defaultBg,fg:'#c8c8d4',align:'center'});
+}
+
+/* ── Sheet 4: 이력관리 ── */
+function _buildVisionSheet(wb){
+  if(!S.visionEquips||!S.visionEquips.length) return;
+  var ws=wb.addWorksheet('이력관리');
+
+  // 모든 템플릿 항목 수집 (순서대로)
+  var allItems=[];
+  (S.visionTemplate.categories||[]).forEach(function(cat){
+    if(cat.groups){
+      cat.groups.forEach(function(grp){
+        (grp.items||[]).forEach(function(item){
+          allItems.push({item:item, catName:cat.name, grpName:grp.name});
+        });
+      });
+    } else {
+      (cat.items||[]).forEach(function(item){
+        allItems.push({item:item, catName:cat.name, grpName:null});
+      });
+    }
+  });
+
+  // 헤더: 사이트 + 각 항목
+  var hdrs=[{label:'사이트',w:12},{label:'라인',w:10},{label:'호기',w:14},{label:'Type',w:20}];
+  var skipIds=['vi_site','vi_line','vi_unit','vi_type'];
+  allItems.forEach(function(x){
+    if(skipIds.indexOf(x.item.id)>=0) return;
+    var lbl=(x.grpName?x.grpName+' > ':'')+x.item.name;
+    hdrs.push({label:lbl, w:18, itemId:x.item.id, itemType:x.item.type});
+  });
+
+  ws.columns=hdrs.map(function(h){return {width:h.w};});
+  ws.views=[{state:'frozen',ySplit:1}];
+
+  var hRow=ws.getRow(1);
+  hdrs.forEach(function(h,i){
+    var cell=hRow.getCell(i+1);
+    cell.value=h.label;
+    _xStyle(cell,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true,wrap:true});
+  });
+  hRow.height=28;
+
+  // 사이트별 그룹
+  var bysite={};
+  S.visionEquips.forEach(function(e){
+    var sid=e.siteId||'기타';
+    if(!bysite[sid])bysite[sid]=[];
+    bysite[sid].push(e);
+  });
+  var siteOrder=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
+  Object.keys(bysite).forEach(function(k){if(siteOrder.indexOf(k)<0)siteOrder.push(k);});
+
+  var rIdx=2;
+  siteOrder.forEach(function(sid){
+    var site=S.sites.find(function(s){return s.id===sid;});
+    var siteName=site?site.name:sid;
+    var siteColor=site?site.color:'#555555';
+
+    // 사이트 구분행
+    ws.mergeCells(rIdx,1,rIdx,hdrs.length);
+    var sepCell=ws.getRow(rIdx).getCell(1);
+    sepCell.value=siteName;
+    _xStyle(sepCell,{bg:siteColor,fg:'#ffffff',bold:true,align:'left'});
+    ws.getRow(rIdx).height=18;
+    rIdx++;
+
+    bysite[sid].forEach(function(e,idx){
+      var d=e.data||{};
+      var bg=idx%2===0?'#1c1c24':'#181820';
+      var row=ws.getRow(rIdx);
+
+      // 고정 4열
+      var typeVal=d['vi_type'];
+      var typeStr=Array.isArray(typeVal)?typeVal.join(', '):(typeVal||'');
+      [d['vi_site']||siteName, d['vi_line']||'', d['vi_unit']||'', typeStr].forEach(function(v,i){
+        var cell=row.getCell(i+1);
+        cell.value=v;
+        _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:i===0?'center':'left'});
+      });
+
+      // 항목별 열
+      var colIdx=5;
+      hdrs.slice(4).forEach(function(h){
+        var val=d[h.itemId];
+        var cell=row.getCell(colIdx);
+        var displayVal='';
+        if(val!==undefined&&val!==null&&val!==''){
+          if(h.itemType==='multiselect') displayVal=Array.isArray(val)?val.join(', '):(val||'');
+          else if(h.itemType==='camera-multi'){
+            if(Array.isArray(val)){
+              displayVal=val.map(function(c){
+                return c.model+(c.count?'×'+c.count:'')+(c.sns&&c.sns.filter(Boolean).length?' ['+c.sns.filter(Boolean).join(', ')+']':'');
+              }).join(' / ');
+            }
+          }
+          else if(h.itemType==='spec-qty') displayVal=(val.spec||'')+(val.qty?' ×'+val.qty:'');
+          else if(h.itemType==='ssd-multi'||h.itemType==='lancard-multi'){
+            if(Array.isArray(val)) displayVal=val.map(function(r){return Object.values(r).filter(Boolean).join('/');}).join(', ');
+          }
+          else displayVal=String(val);
+        }
+        cell.value=displayVal;
+        _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:'left',wrap:true});
+        colIdx++;
+      });
+
+      row.height=17;
+      rIdx++;
+    });
+  });
 }

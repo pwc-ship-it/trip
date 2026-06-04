@@ -193,15 +193,25 @@ function getSheetsUrl(){try{return localStorage.getItem(SHEETS_LS_KEY)||'';}catc
 function setSheetsUrl(u){try{localStorage.setItem(SHEETS_LS_KEY,u);}catch(e){}}
 function openSheetsSettings(){
   var cur=getSheetsUrl();
-  var displayUrl = cur || DEFAULT_SHEETS_URL;
-  mw('<div class="mtit">⚙ Sheets 설정</div>'
-    +'<div style="font-size:12px;color:#b0b0b8;margin-bottom:12px">Apps Script 웹앱 URL을 입력하세요.</div>'
+  var displayUrl=cur||DEFAULT_SHEETS_URL;
+  mw('<div class="mtit">⚙ 설정 / 데이터 관리</div>'
+    +'<div style="font-size:11px;font-weight:600;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Sheets 연동</div>'
+    +'<div style="font-size:12px;color:#b0b0b8;margin-bottom:8px">Apps Script 웹앱 URL을 입력하세요.</div>'
     +'<div class="fg"><label class="fl">URL</label>'
     +'<input type="text" id="sheets_url" value="'+displayUrl+'" style="font-size:11px"></div>'
-    +'<div class="mfoot">'
+    +'<div style="display:flex;gap:6px;margin-bottom:16px">'
     +'<button class="btn sm warn" onclick="resetSheetsUrl()">기본값</button>'
-    +'<button class="btn sm" onclick="cm()">취소</button>'
-    +'<button class="btn sm pri" onclick="saveSheetsUrl()">저장</button>'
+    +'<button class="btn sm pri" onclick="saveSheetsUrl()">URL 저장</button>'
+    +'</div>'
+    +'<div style="border-top:1px solid #2a2a34;padding-top:12px;margin-bottom:8px">'
+    +'<div style="font-size:11px;font-weight:600;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">데이터 백업 / 복원</div>'
+    +'<div style="font-size:11px;color:#777;margin-bottom:10px">전체 데이터(간트·인원·설비·이력)를 JSON 파일로 백업하거나 복원합니다.<br>중요한 작업 전 반드시 백업을 권장합니다.</div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<button class="btn sm gsh" onclick="cm();downloadDataBackup()">💾 JSON 백업 다운로드</button>'
+    +'<button class="btn sm" onclick="cm();restoreFromBackupFile()">↩ 백업 파일로 복원</button>'
+    +'</div></div>'
+    +'<div class="mfoot">'
+    +'<button class="btn sm" onclick="cm()">닫기</button>'
     +'</div>');
 }
 function saveSheetsUrl(){
