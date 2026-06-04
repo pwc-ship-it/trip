@@ -43,6 +43,25 @@ function loadData(){
         S.equipProjects=d.equipProjects||[];
         S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
         S.visionEquips=d.visionEquips||[];
+        // 구형 템플릿(vi_cameras=camera-multi) 감지 시 신형으로 자동 마이그레이션
+        (function(){
+          var cats=S.visionTemplate.categories||[];
+          var visCat=cats.find(function(c){return c.id==='vc_vision';});
+          if(!visCat||!visCat.groups)return;
+          var camGrp=visCat.groups.find(function(g){return g.id==='vg_camera';});
+          if(!camGrp||!camGrp.items)return;
+          var camItem=camGrp.items.find(function(i){return i.id==='vi_cameras';});
+          if(!camItem||camItem.type!=='camera-multi')return;
+          // 구형 감지 → 신형으로 교체 (Type 옵션만 보존)
+          var oldOpts=null;
+          var oldBasic=cats.find(function(c){return c.id==='vc_basic';});
+          if(oldBasic&&oldBasic.items){var ot=oldBasic.items.find(function(i){return i.id==='vi_type';});if(ot)oldOpts=ot.options;}
+          S.visionTemplate=deepCopy(DEF.visionTemplate);
+          if(oldOpts){
+            var nb=S.visionTemplate.categories.find(function(c){return c.id==='vc_basic';});
+            if(nb&&nb.items){var nt=nb.items.find(function(i){return i.id==='vi_type';});if(nt)nt.options=oldOpts;}
+          }
+        })();
         return;
       }
     }

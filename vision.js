@@ -9,13 +9,21 @@ var _visionSelId = null;
 var _visionFilterType = 'all';
 var _visionEditMode = false;
 var _viCollapsed = {};           // {siteId: true/false}
+var _viCurrentTypes = [];        // 현재 상세 폼의 선택된 Vision Type 목록
 
 /* Vision Type 색상 */
 var VI_TYPE_COLOR = {
   'Notching':    '#1a55bb','Delamination':'#1a7a3a','Foil':'#7a5500',
   'NGMarking':   '#7a1a99','DNC_Notching':'#0a6a7a','DNC_Cutting':'#7a3a10'
 };
-function _viTypeColor(t){ return VI_TYPE_COLOR[t]||'#3a3a5a'; }
+var VI_TYPE_PALETTE = ['#1a55bb','#1a7a3a','#7a5500','#7a1a99','#0a6a7a','#7a3a10','#5500aa','#aa3300','#005555','#5c6600','#006680','#8a4400'];
+function _viTypeColor(t){
+  if(VI_TYPE_COLOR[t]) return VI_TYPE_COLOR[t];
+  var item=_findItemById('vi_type');
+  var opts=item?(item.options||[]):[];
+  var i=opts.indexOf(t);
+  return i>=0?VI_TYPE_PALETTE[i%VI_TYPE_PALETTE.length]:'#3a3a5a';
+}
 
 /* ── 공통 유틸 ── */
 function _viId(){ return 've'+Date.now()+Math.floor(Math.random()*1000); }
@@ -249,6 +257,19 @@ function _viGridCellValue(equip, item){
   if(val===undefined||val===null||val==='')return '';
   switch(item.type){
     case 'multiselect': return Array.isArray(val)?val.join(', '):(val||'');
+    case 'type-camera':{
+      if(!val||typeof val!=='object'||Array.isArray(val))return '';
+      var total=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total+=val[k].length;});
+      return total?total+'대':'';
+    }
+    case 'type-illum':{
+      if(!val||typeof val!=='object'||Array.isArray(val))return '';
+      var total2=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total2+=val[k].length;});
+      return total2?total2+'개':'';
+    }
+    case 'board-multi':
+      if(!Array.isArray(val)||!val.length)return '';
+      return val.length+'개';
     case 'camera-multi':
       if(!Array.isArray(val)||!val.length)return '';
       var totalCams=val.reduce(function(s,c){return s+(parseInt(c.count)||0);},0);
@@ -307,6 +328,7 @@ function _renderDetailView(main){
 function _renderVisionEquipForm(equip){
   var data=equip.data||{};
   var typeVal=data['vi_type'];
+  _viCurrentTypes=Array.isArray(typeVal)?typeVal:(typeVal?[typeVal]:[]);
   var html='<div class="vi-equip-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #2a2a34">'+
     '<div style="flex:1;font-size:13px;font-weight:600;color:#e0e0ec">'+_viTypeBadges(typeVal)+' '+_esc(_viEquipLabel(equip))+'</div>'+
     '</div>';
@@ -374,8 +396,12 @@ function _renderViItemRow(catId,grpId,item,data,ci,gi,ii){
 /* ── 입력 타입 렌더 ── */
 function _renderViInput(item,val){
   var id='viinp_'+item.id;
+  if(item.id==='vi_type') return _renderViTypeManager(item,val,id);
   switch(item.type){
     case 'multiselect': return _renderViMultisel(item,val,id);
+    case 'type-camera': return _renderViTypeCamera(item,val,id);
+    case 'type-illum': return _renderViTypeIllum(item,val,id);
+    case 'board-multi': return _renderViBoardMulti(item,val,id);
     case 'camera-multi': return _renderViCameraMulti(item,val,id);
     case 'spec-qty': return _renderViSpecQty(item,val,id);
     case 'ssd-multi': return _renderViSsdMulti(item,val,id);
@@ -394,6 +420,303 @@ function _renderViMultisel(item,val,id){
   }).join('');
   var addBtn=_visionEditMode?'<button class="vi-ctrl-btn" onclick="openAddSelectOption(\''+item.id+'\')" style="border:1px dashed #3a3a5a;padding:3px 6px;font-size:10px">+ 옵션</button>':'';
   return '<div class="vi-multisel" id="'+id+'">'+opts+(addBtn?'<span style="display:inline-flex;align-items:center">'+addBtn+'</span>':'')+'</div>';
+}
+
+/* ══════════════════════════════════════════
+   Vision Type 관리 (기본정보 > Type)
+══════════════════════════════════════════ */
+function _renderViTypeManager(item,val,id){
+  var selected=Array.isArray(val)?val:(val?[val]:[]);
+  var opts=item.options||[];
+  var optsHtml=opts.map(function(o,oi){
+    var chk=selected.indexOf(o)>=0?' checked':'';
+    var color=_viTypeColor(o);
+    var oEsc=o.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div class="vi-type-mgr-row">'+
+      '<label class="vi-type-mgr-chk-lbl">'+
+        '<input type="checkbox" class="vi-ms-chk" value="'+_esc(o)+'"'+chk+' onchange="_viTypeManagerChange()">'+
+        '<span class="vi-type-badge" style="background:'+color+'">'+_esc(o)+'</span>'+
+      '</label>'+
+      '<button class="vi-type-mgr-btn" onclick="_openEditViType(\''+item.id+'\','+oi+')" title="수정">✏</button>'+
+      '<button class="vi-type-mgr-btn del" onclick="_doDelViType(\''+item.id+'\',\''+oEsc+'\')" title="삭제">✕</button>'+
+    '</div>';
+  }).join('');
+  return '<div class="vi-type-manager" id="'+id+'">'+
+    optsHtml+
+    '<div class="vi-type-mgr-add">'+
+      '<input type="text" id="vi_type_new_inp" class="vi-type-mgr-inp" placeholder="새 Vision Type 입력">'+
+      '<button class="vi-type-mgr-add-btn" onclick="_doAddViType(\''+item.id+'\')">+ 추가</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function _doAddViType(itemId){
+  var inp=document.getElementById('vi_type_new_inp'); if(!inp)return;
+  var val=inp.value.trim(); if(!val){alert('Type명을 입력해주세요.');return;}
+  var item=_findItemById(itemId); if(!item)return;
+  if(!item.options)item.options=[];
+  if(item.options.indexOf(val)>=0){alert('이미 존재하는 Type입니다.');return;}
+  item.options.push(val);
+  saveData(); renderVisionMain();
+}
+
+function _openEditViType(itemId,optIdx){
+  var item=_findItemById(itemId); if(!item||!item.options)return;
+  var oldVal=item.options[optIdx]; if(oldVal===undefined)return;
+  mw('<div class="mtit">Vision Type 수정</div>'+
+    '<div class="fg"><label class="fl">Type명</label><input type="text" id="vi_type_edit_inp" value="'+_esc(oldVal)+'"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button>'+
+    '<button class="btn sm pri" onclick="_doEditViType(\''+itemId+'\','+optIdx+')">저장</button></div>');
+}
+
+function _doEditViType(itemId,optIdx){
+  var item=_findItemById(itemId); if(!item||!item.options)return;
+  var oldVal=item.options[optIdx];
+  var inp=document.getElementById('vi_type_edit_inp'); if(!inp)return;
+  var newVal=inp.value.trim(); if(!newVal){alert('Type명을 입력해주세요.');return;}
+  if(newVal!==oldVal&&item.options.indexOf(newVal)>=0){alert('이미 존재하는 Type입니다.');return;}
+  item.options[optIdx]=newVal;
+  (S.visionEquips||[]).forEach(function(e){
+    if(!e.data)return;
+    var t=e.data['vi_type'];
+    if(Array.isArray(t)){var i=t.indexOf(oldVal);if(i>=0)t[i]=newVal;}
+    else if(t===oldVal){e.data['vi_type']=newVal;}
+    if(e.data['vi_cameras']&&typeof e.data['vi_cameras']==='object'&&!Array.isArray(e.data['vi_cameras'])){
+      if(e.data['vi_cameras'][oldVal]!==undefined){e.data['vi_cameras'][newVal]=e.data['vi_cameras'][oldVal];delete e.data['vi_cameras'][oldVal];}
+    }
+    if(e.data['vi_illumination']&&typeof e.data['vi_illumination']==='object'&&!Array.isArray(e.data['vi_illumination'])){
+      if(e.data['vi_illumination'][oldVal]!==undefined){e.data['vi_illumination'][newVal]=e.data['vi_illumination'][oldVal];delete e.data['vi_illumination'][oldVal];}
+    }
+  });
+  saveData(); cm(); renderVisionMain();
+}
+
+function _doDelViType(itemId,optVal){
+  if(!confirm('['+optVal+'] Type을 삭제하시겠습니까?\n기존 설비에서 이 Type 선택이 해제됩니다.'))return;
+  var item=_findItemById(itemId); if(!item||!item.options)return;
+  item.options=item.options.filter(function(o){return o!==optVal;});
+  (S.visionEquips||[]).forEach(function(e){
+    if(!e.data)return;
+    var t=e.data['vi_type'];
+    if(Array.isArray(t)){e.data['vi_type']=t.filter(function(x){return x!==optVal;});}
+    else if(t===optVal){e.data['vi_type']=[];}
+  });
+  saveData(); renderVisionMain();
+}
+
+/* Type 체크박스 변경 시 Camera/Illumination 섹션 실시간 업데이트 */
+function _viTypeManagerChange(){
+  var wrap=document.getElementById('viinp_vi_type'); if(!wrap)return;
+  var chks=wrap.querySelectorAll('.vi-ms-chk:checked');
+  _viCurrentTypes=Array.prototype.map.call(chks,function(c){return c.value;});
+  var camItem=_findItemById('vi_cameras');
+  if(camItem){
+    var camWrap=document.getElementById('viinp_vi_cameras');
+    if(camWrap){
+      var camData=_collectViTypeCamFromDom(camWrap);
+      var tmp=document.createElement('div');
+      tmp.innerHTML=_renderViTypeCamera(camItem,camData,'viinp_vi_cameras');
+      camWrap.parentNode.replaceChild(tmp.firstChild,camWrap);
+    }
+  }
+  var illumItem=_findItemById('vi_illumination');
+  if(illumItem){
+    var illumWrap=document.getElementById('viinp_vi_illumination');
+    if(illumWrap){
+      var illumData=_collectViTypeIllumFromDom(illumWrap);
+      var tmp2=document.createElement('div');
+      tmp2.innerHTML=_renderViTypeIllum(illumItem,illumData,'viinp_vi_illumination');
+      illumWrap.parentNode.replaceChild(tmp2.firstChild,illumWrap);
+    }
+  }
+}
+
+function _collectViTypeCamFromDom(wrap){
+  var result={};
+  var secs=wrap.querySelectorAll('.vi-type-cam-sec');
+  Array.prototype.forEach.call(secs,function(sec){
+    var t=sec.getAttribute('data-type'); if(!t)return;
+    var entries=sec.querySelectorAll('.vi-type-cam-entry');
+    result[t]=Array.prototype.map.call(entries,function(el){
+      var m=el.querySelector('.vi-type-cam-model');
+      var s=el.querySelector('.vi-type-cam-sn');
+      return {model:m?m.value:'',sn:s?s.value:''};
+    });
+  });
+  return result;
+}
+
+function _collectViTypeIllumFromDom(wrap){
+  var result={};
+  var secs=wrap.querySelectorAll('.vi-type-illum-sec');
+  Array.prototype.forEach.call(secs,function(sec){
+    var t=sec.getAttribute('data-type'); if(!t)return;
+    var entries=sec.querySelectorAll('.vi-type-illum-entry');
+    result[t]=Array.prototype.map.call(entries,function(el){
+      var m=el.querySelector('.vi-type-illum-model');
+      var s=el.querySelector('.vi-type-illum-sn');
+      return {model:m?m.value:'',sn:s?s.value:''};
+    });
+  });
+  return result;
+}
+
+/* ══════════════════════════════════════════
+   type-camera 렌더 (Type별 그룹)
+══════════════════════════════════════════ */
+function _renderViTypeCamera(item,val,id){
+  var obj=(val&&typeof val==='object'&&!Array.isArray(val))?val:{};
+  if(!_viCurrentTypes||!_viCurrentTypes.length){
+    return '<div class="vi-type-empty" id="'+id+'">기본정보에서 Vision Type을 선택하면 Camera 항목이 표시됩니다.</div>';
+  }
+  var html='<div class="vi-type-cam" id="'+id+'">';
+  _viCurrentTypes.forEach(function(t,ti){
+    var entries=Array.isArray(obj[t])?obj[t]:[];
+    var count=entries.length;
+    var color=_viTypeColor(t);
+    var sectionId=id+'_t'+ti;
+    html+='<div class="vi-type-cam-sec" data-type="'+_esc(t)+'" data-idx="'+ti+'">'+
+      '<div class="vi-type-cam-sec-hdr" style="border-left:3px solid '+color+';color:'+color+'">'+_esc(t)+'</div>'+
+      '<div class="vi-type-cam-count-row">'+
+        '<label>수량</label>'+
+        '<input type="number" class="vi-type-cam-count qty-inp" min="0" max="99" value="'+count+'" '+
+          'oninput="_viTypeCamCountChange(\''+id+'\','+ti+',this.value)">'+
+        '<span class="qty-lbl">대</span>'+
+      '</div>'+
+      '<div class="vi-type-cam-entries" id="'+sectionId+'_entries">';
+    for(var i=0;i<count;i++){
+      var e=entries[i]||{model:'',sn:''};
+      html+='<div class="vi-type-cam-entry">'+
+        '<span class="vi-type-cam-entry-num">'+(i+1)+'</span>'+
+        '<div class="vi-type-cam-entry-fields">'+
+          '<div class="vi-type-cam-field"><label>모델명</label><input type="text" class="vi-type-cam-model" value="'+_esc(e.model||'')+'"></div>'+
+          '<div class="vi-type-cam-field"><label>S/N</label><input type="text" class="vi-type-cam-sn" value="'+_esc(e.sn||'')+'"></div>'+
+        '</div></div>';
+    }
+    html+='</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function _viTypeCamCountChange(id,ti,val){
+  var count=Math.max(0,Math.min(99,parseInt(val)||0));
+  var container=document.getElementById(id+'_t'+ti+'_entries'); if(!container)return;
+  var current=container.querySelectorAll('.vi-type-cam-entry').length;
+  while(current>count){container.removeChild(container.lastChild);current--;}
+  while(current<count){
+    var div=document.createElement('div'); div.className='vi-type-cam-entry';
+    div.innerHTML='<span class="vi-type-cam-entry-num">'+(current+1)+'</span>'+
+      '<div class="vi-type-cam-entry-fields">'+
+        '<div class="vi-type-cam-field"><label>모델명</label><input type="text" class="vi-type-cam-model" value=""></div>'+
+        '<div class="vi-type-cam-field"><label>S/N</label><input type="text" class="vi-type-cam-sn" value=""></div>'+
+      '</div>';
+    container.appendChild(div); current++;
+  }
+}
+
+/* ══════════════════════════════════════════
+   type-illum 렌더 (Type별 그룹)
+══════════════════════════════════════════ */
+function _renderViTypeIllum(item,val,id){
+  var obj=(val&&typeof val==='object'&&!Array.isArray(val))?val:{};
+  if(!_viCurrentTypes||!_viCurrentTypes.length){
+    return '<div class="vi-type-empty" id="'+id+'">기본정보에서 Vision Type을 선택하면 Illumination 항목이 표시됩니다.</div>';
+  }
+  var html='<div class="vi-type-illum" id="'+id+'">';
+  _viCurrentTypes.forEach(function(t,ti){
+    var entries=Array.isArray(obj[t])?obj[t]:[];
+    var count=entries.length;
+    var color=_viTypeColor(t);
+    var sectionId=id+'_t'+ti;
+    html+='<div class="vi-type-illum-sec" data-type="'+_esc(t)+'" data-idx="'+ti+'">'+
+      '<div class="vi-type-illum-sec-hdr" style="border-left:3px solid '+color+';color:'+color+'">'+_esc(t)+'</div>'+
+      '<div class="vi-type-illum-count-row">'+
+        '<label>수량</label>'+
+        '<input type="number" class="vi-type-illum-count qty-inp" min="0" max="99" value="'+count+'" '+
+          'oninput="_viTypeIllumCountChange(\''+id+'\','+ti+',this.value)">'+
+        '<span class="qty-lbl">개</span>'+
+      '</div>'+
+      '<div class="vi-type-illum-entries" id="'+sectionId+'_entries">';
+    for(var i=0;i<count;i++){
+      var e=entries[i]||{model:'',sn:''};
+      html+='<div class="vi-type-illum-entry">'+
+        '<span class="vi-type-illum-entry-num">'+(i+1)+'</span>'+
+        '<div class="vi-type-illum-entry-fields">'+
+          '<div class="vi-type-illum-field"><label>모델명</label><input type="text" class="vi-type-illum-model" value="'+_esc(e.model||'')+'"></div>'+
+          '<div class="vi-type-illum-field"><label>S/N</label><input type="text" class="vi-type-illum-sn" value="'+_esc(e.sn||'')+'"></div>'+
+        '</div></div>';
+    }
+    html+='</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function _viTypeIllumCountChange(id,ti,val){
+  var count=Math.max(0,Math.min(99,parseInt(val)||0));
+  var container=document.getElementById(id+'_t'+ti+'_entries'); if(!container)return;
+  var current=container.querySelectorAll('.vi-type-illum-entry').length;
+  while(current>count){container.removeChild(container.lastChild);current--;}
+  while(current<count){
+    var div=document.createElement('div'); div.className='vi-type-illum-entry';
+    div.innerHTML='<span class="vi-type-illum-entry-num">'+(current+1)+'</span>'+
+      '<div class="vi-type-illum-entry-fields">'+
+        '<div class="vi-type-illum-field"><label>모델명</label><input type="text" class="vi-type-illum-model" value=""></div>'+
+        '<div class="vi-type-illum-field"><label>S/N</label><input type="text" class="vi-type-illum-sn" value=""></div>'+
+      '</div>';
+    container.appendChild(div); current++;
+  }
+}
+
+/* ══════════════════════════════════════════
+   board-multi 렌더 (수량→상세 입력)
+══════════════════════════════════════════ */
+function _renderViBoardMulti(item,val,id){
+  var entries=Array.isArray(val)&&val.length?val:[];
+  var count=entries.length;
+  var labels=item.labels||['모델명','BOARD 버전','FIRMWARE'];
+  var labelsJson=JSON.stringify(labels).replace(/"/g,'&quot;');
+  return '<div class="vi-board-multi" id="'+id+'" data-labels="'+labelsJson+'">'+
+    '<div class="vi-board-count-row">'+
+      '<label>수량</label>'+
+      '<input type="number" class="vi-board-count qty-inp" min="0" max="99" value="'+count+'" '+
+        'oninput="_viBoardCountChange(\''+id+'\',this.value)">'+
+      '<span class="qty-lbl">EA</span>'+
+    '</div>'+
+    '<div class="vi-board-entries" id="'+id+'_entries">'+
+      entries.map(function(e,i){return _renderViBoardEntry(labels,e,i);}).join('')+
+    '</div>'+
+  '</div>';
+}
+
+function _renderViBoardEntry(labels,e,idx){
+  e=e||{};
+  return '<div class="vi-board-entry">'+
+    '<div class="vi-board-entry-hdr">'+(idx+1)+'</div>'+
+    '<div class="vi-board-entry-fields">'+
+      '<div class="vi-board-entry-field"><label>'+_esc(labels[0]||'모델명')+'</label><input type="text" class="vi-board-f1" value="'+_esc(e.model||'')+'"></div>'+
+      '<div class="vi-board-entry-field"><label>'+_esc(labels[1]||'BOARD 버전')+'</label><input type="text" class="vi-board-f2" value="'+_esc(e.board||'')+'"></div>'+
+      '<div class="vi-board-entry-field"><label>'+_esc(labels[2]||'FIRMWARE')+'</label><input type="text" class="vi-board-f3" value="'+_esc(e.fw||'')+'"></div>'+
+    '</div></div>';
+}
+
+function _viBoardCountChange(id,val){
+  var count=Math.max(0,Math.min(99,parseInt(val)||0));
+  var container=document.getElementById(id+'_entries'); if(!container)return;
+  var wrap=document.getElementById(id); if(!wrap)return;
+  var labels;
+  try{labels=JSON.parse(wrap.getAttribute('data-labels').replace(/&quot;/g,'"'));}catch(ex){labels=['모델명','BOARD 버전','FIRMWARE'];}
+  var current=container.querySelectorAll('.vi-board-entry').length;
+  while(current>count){container.removeChild(container.lastChild);current--;}
+  while(current<count){
+    var tmp=document.createElement('div');
+    tmp.innerHTML=_renderViBoardEntry(labels,{},current);
+    container.appendChild(tmp.firstChild); current++;
+  }
+  Array.prototype.forEach.call(container.querySelectorAll('.vi-board-entry'),function(el,i){
+    var hdr=el.querySelector('.vi-board-entry-hdr'); if(hdr)hdr.textContent=i+1;
+  });
 }
 
 function _renderViCameraMulti(item,val,id){
@@ -621,6 +944,46 @@ function _collectViField(item){
       var s=document.getElementById(id+'_spec'), q=document.getElementById(id+'_qty');
       return {spec:s?s.value:'', qty:q?q.value:''};
     }
+    case 'type-camera':{
+      var wrap=document.getElementById(id); if(!wrap)return {};
+      var result={};
+      var secs=wrap.querySelectorAll('.vi-type-cam-sec');
+      Array.prototype.forEach.call(secs,function(sec){
+        var t=sec.getAttribute('data-type'); if(!t)return;
+        var entries=sec.querySelectorAll('.vi-type-cam-entry');
+        result[t]=Array.prototype.map.call(entries,function(el){
+          var m=el.querySelector('.vi-type-cam-model');
+          var s=el.querySelector('.vi-type-cam-sn');
+          return {model:m?m.value:'',sn:s?s.value:''};
+        });
+      });
+      return result;
+    }
+    case 'type-illum':{
+      var wrap=document.getElementById(id); if(!wrap)return {};
+      var result={};
+      var secs=wrap.querySelectorAll('.vi-type-illum-sec');
+      Array.prototype.forEach.call(secs,function(sec){
+        var t=sec.getAttribute('data-type'); if(!t)return;
+        var entries=sec.querySelectorAll('.vi-type-illum-entry');
+        result[t]=Array.prototype.map.call(entries,function(el){
+          var m=el.querySelector('.vi-type-illum-model');
+          var s=el.querySelector('.vi-type-illum-sn');
+          return {model:m?m.value:'',sn:s?s.value:''};
+        });
+      });
+      return result;
+    }
+    case 'board-multi':{
+      var wrap=document.getElementById(id); if(!wrap)return [];
+      var entries=wrap.querySelectorAll('.vi-board-entry');
+      return Array.prototype.map.call(entries,function(el){
+        var f1=el.querySelector('.vi-board-f1');
+        var f2=el.querySelector('.vi-board-f2');
+        var f3=el.querySelector('.vi-board-f3');
+        return {model:f1?f1.value:'',board:f2?f2.value:'',fw:f3?f3.value:''};
+      });
+    }
     case 'ssd-multi': return _collectMultiTable(id+'_tbl',['capacity','qty','drive']);
     case 'lancard-multi': return _collectMultiTable(id+'_tbl',['speed','ports','purpose']);
     default:{ var el=document.getElementById(id); return el?el.value:''; }
@@ -836,6 +1199,9 @@ function moveViGroup(catId,gi,dir){
 
 var _VI_TYPES=[
   {val:'text',lbl:'텍스트'},{val:'multiselect',lbl:'복수 선택 (체크박스)'},
+  {val:'type-camera',lbl:'카메라 (Type별 그룹)'},
+  {val:'type-illum',lbl:'조명 (Type별 그룹)'},
+  {val:'board-multi',lbl:'Board (수량→상세 입력)'},
   {val:'camera-multi',lbl:'카메라 (다중 모델+S/N)'},
   {val:'spec-qty',lbl:'사양+수량'},{val:'ssd-multi',lbl:'SSD/HDD (용량/수량/드라이브)'},
   {val:'lancard-multi',lbl:'랜카드 (속도/PORT/목적)'}
@@ -926,6 +1292,41 @@ function exportVisionCSV(){
       case 'spec-qty':
         headers.push(item.id+'_spec'); headers.push(item.id+'_qty');
         colMap.push({h:item.id+'_spec',item:item,sub:'spec'}); colMap.push({h:item.id+'_qty',item:item,sub:'qty'}); break;
+      case 'type-camera':{
+        var tcTypeItem=_findItemById('vi_type');
+        var tcTypes=(tcTypeItem?tcTypeItem.options||[]):[];
+        tcTypes.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          var maxN=0;
+          S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(v&&v[t]&&Array.isArray(v[t]))maxN=Math.max(maxN,v[t].length);});
+          for(var ci=0;ci<maxN;ci++){
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_model'); colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_model',item:item,sub:'tcam_model',t:t,ci:ci});
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_sn');    colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_sn',   item:item,sub:'tcam_sn',   t:t,ci:ci});
+          }
+        });
+        break;}
+      case 'type-illum':{
+        var tiTypeItem=_findItemById('vi_type');
+        var tiTypes=(tiTypeItem?tiTypeItem.options||[]):[];
+        tiTypes.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          var maxN=0;
+          S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(v&&v[t]&&Array.isArray(v[t]))maxN=Math.max(maxN,v[t].length);});
+          for(var ci=0;ci<maxN;ci++){
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_model'); colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_model',item:item,sub:'tillum_model',t:t,ci:ci});
+            headers.push(item.id+'_'+tk+'_'+(ci+1)+'_sn');    colMap.push({h:item.id+'_'+tk+'_'+(ci+1)+'_sn',   item:item,sub:'tillum_sn',  t:t,ci:ci});
+          }
+        });
+        break;}
+      case 'board-multi':{
+        var maxBd=0;
+        S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(Array.isArray(v))maxBd=Math.max(maxBd,v.length);});
+        for(var bi=0;bi<maxBd;bi++){
+          headers.push(item.id+'_'+(bi+1)+'_model'); colMap.push({h:item.id+'_'+(bi+1)+'_model',item:item,sub:'brd_model',bi:bi});
+          headers.push(item.id+'_'+(bi+1)+'_board'); colMap.push({h:item.id+'_'+(bi+1)+'_board',item:item,sub:'brd_board',bi:bi});
+          headers.push(item.id+'_'+(bi+1)+'_fw');    colMap.push({h:item.id+'_'+(bi+1)+'_fw',   item:item,sub:'brd_fw',   bi:bi});
+        }
+        break;}
       case 'camera-multi':
         // 최대 카메라 수 탐색
         var maxCams=0;
@@ -980,6 +1381,13 @@ function exportVisionCSV(){
       switch(cm.sub){
         case 'spec': row.push(v&&typeof v==='object'?v.spec:''); break;
         case 'qty': row.push(v&&typeof v==='object'?v.qty:''); break;
+        case 'tcam_model': row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].model:''); break;
+        case 'tcam_sn':   row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].sn:'');    break;
+        case 'tillum_model': row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].model:''); break;
+        case 'tillum_sn':    row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].sn:'');    break;
+        case 'brd_model': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].model:''); break;
+        case 'brd_board': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].board:''); break;
+        case 'brd_fw':    row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].fw:'');    break;
         case 'cam_model': row.push(Array.isArray(v)&&v[cm.ci]?v[cm.ci].model:''); break;
         case 'cam_count': row.push(Array.isArray(v)&&v[cm.ci]?v[cm.ci].count:''); break;
         case 'cam_sn': row.push(Array.isArray(v)&&v[cm.ci]&&v[cm.ci].sns?v[cm.ci].sns[cm.si]||'':''); break;
@@ -1049,6 +1457,41 @@ function _parseAndImportVisionCSV(text){
       switch(item.type){
         case 'spec-qty':
           equip.data[item.id]={spec:rmap[item.id+'_spec']||'',qty:rmap[item.id+'_qty']||''}; break;
+        case 'type-camera':{
+          var tcImpTypeItem=_findItemById('vi_type');
+          var tcImpTypes=(tcImpTypeItem?tcImpTypeItem.options||[]):[];
+          var tcRes={};
+          tcImpTypes.forEach(function(t){
+            var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+            var entries=[]; var ci=0;
+            while(rmap[item.id+'_'+tk+'_'+(ci+1)+'_model']!==undefined){
+              entries.push({model:rmap[item.id+'_'+tk+'_'+(ci+1)+'_model']||'',sn:rmap[item.id+'_'+tk+'_'+(ci+1)+'_sn']||''});
+              ci++;
+            }
+            if(entries.length)tcRes[t]=entries;
+          });
+          if(Object.keys(tcRes).length)equip.data[item.id]=tcRes; break;}
+        case 'type-illum':{
+          var tiImpTypeItem=_findItemById('vi_type');
+          var tiImpTypes=(tiImpTypeItem?tiImpTypeItem.options||[]):[];
+          var tiRes={};
+          tiImpTypes.forEach(function(t){
+            var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+            var entries=[]; var ci=0;
+            while(rmap[item.id+'_'+tk+'_'+(ci+1)+'_model']!==undefined){
+              entries.push({model:rmap[item.id+'_'+tk+'_'+(ci+1)+'_model']||'',sn:rmap[item.id+'_'+tk+'_'+(ci+1)+'_sn']||''});
+              ci++;
+            }
+            if(entries.length)tiRes[t]=entries;
+          });
+          if(Object.keys(tiRes).length)equip.data[item.id]=tiRes; break;}
+        case 'board-multi':{
+          var bdRows=[]; var bi=0;
+          while(rmap[item.id+'_'+(bi+1)+'_model']!==undefined){
+            bdRows.push({model:rmap[item.id+'_'+(bi+1)+'_model']||'',board:rmap[item.id+'_'+(bi+1)+'_board']||'',fw:rmap[item.id+'_'+(bi+1)+'_fw']||''});
+            bi++;
+          }
+          if(bdRows.length)equip.data[item.id]=bdRows; break;}
         case 'camera-multi':{
           var cams=[]; var ci=0;
           while(rmap['cam'+(ci+1)+'_model']!==undefined||rmap['cam'+(ci+1)+'_count']!==undefined){
