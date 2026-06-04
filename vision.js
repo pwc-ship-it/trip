@@ -1294,7 +1294,7 @@ function exportVisionCSV(){
         colMap.push({h:item.id+'_spec',item:item,sub:'spec'}); colMap.push({h:item.id+'_qty',item:item,sub:'qty'}); break;
       case 'type-camera':{
         var tcTypeItem=_findItemById('vi_type');
-        var tcTypes=(tcTypeItem?tcTypeItem.options||[]):[];
+        var tcTypes=tcTypeItem?(tcTypeItem.options||[]):[];
         tcTypes.forEach(function(t){
           var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
           var maxN=0;
@@ -1307,7 +1307,7 @@ function exportVisionCSV(){
         break;}
       case 'type-illum':{
         var tiTypeItem=_findItemById('vi_type');
-        var tiTypes=(tiTypeItem?tiTypeItem.options||[]):[];
+        var tiTypes=tiTypeItem?(tiTypeItem.options||[]):[];
         tiTypes.forEach(function(t){
           var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
           var maxN=0;
@@ -1535,7 +1535,7 @@ function _parseAndImportVisionCSV(text){
           equip.data[item.id]={spec:rmap[item.id+'_spec']||'',qty:rmap[item.id+'_qty']||''}; break;
         case 'type-camera':{
           var tcImpTypeItem=_findItemById('vi_type');
-          var tcImpTypes=(tcImpTypeItem?tcImpTypeItem.options||[]):[];
+          var tcImpTypes=tcImpTypeItem?(tcImpTypeItem.options||[]):[];
           var tcRes={};
           tcImpTypes.forEach(function(t){
             var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
@@ -1549,7 +1549,7 @@ function _parseAndImportVisionCSV(text){
           if(Object.keys(tcRes).length)equip.data[item.id]=tcRes; break;}
         case 'type-illum':{
           var tiImpTypeItem=_findItemById('vi_type');
-          var tiImpTypes=(tiImpTypeItem?tiImpTypeItem.options||[]):[];
+          var tiImpTypes=tiImpTypeItem?(tiImpTypeItem.options||[]):[];
           var tiRes={};
           tiImpTypes.forEach(function(t){
             var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
