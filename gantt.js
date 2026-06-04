@@ -244,7 +244,7 @@ function renderGantt(){
   document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-GANTT_TODAY_OFFSET);
 }
 
-function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();}
+function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();if(_activeTab==='vision')renderVisionTab();}
 function setGanttZoom(z){_ganttZoom=z;renderAll();_updateZoomBtns();}
 function _updateZoomBtns(){
   ['week','biweek','month'].forEach(function(z){

@@ -1,28 +1,82 @@
 /* ══════════════════════════════════════════
    이력관리 (Vision 설비 이력) — vision.js
+   v2: 그리드 뷰 + 다중 카메라 + CSV + 복사
 ══════════════════════════════════════════ */
 
 /* ── 전역 상태 ── */
-var _visionEditMode = false;
+var _visionView = 'grid';        // 'grid' | 'detail'
 var _visionSelId = null;
-var _visionSearch = '';
+var _visionFilterType = 'all';
+var _visionEditMode = false;
+var _viCollapsed = {};           // {siteId: true/false}
 
-/* Vision Type 색상 맵 */
+/* Vision Type 색상 */
 var VI_TYPE_COLOR = {
-  'Notching':    '#1a55bb',
-  'Delamination':'#1a7a3a',
-  'Foil':        '#7a5500',
-  'NGMarking':   '#7a1a99',
-  'DNC_Notching':'#0a6a7a',
-  'DNC_Cutting': '#7a3a10'
+  'Notching':    '#1a55bb','Delamination':'#1a7a3a','Foil':'#7a5500',
+  'NGMarking':   '#7a1a99','DNC_Notching':'#0a6a7a','DNC_Cutting':'#7a3a10'
 };
-function _viTypeColor(t){ return VI_TYPE_COLOR[t] || '#3a3a5a'; }
+function _viTypeColor(t){ return VI_TYPE_COLOR[t]||'#3a3a5a'; }
 
-/* ── 유틸 ── */
-function _viId(){ return 've' + Date.now() + Math.floor(Math.random()*1000); }
-function _viItemsOf(cat){
-  // 그룹 없는 카테고리: cat.items / 그룹 있는 카테고리: cat.groups
-  return cat.items || [];
+/* ── 공통 유틸 ── */
+function _viId(){ return 've'+Date.now()+Math.floor(Math.random()*1000); }
+function _viToday(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function _viEquipLabel(e){
+  var line=(e.data&&e.data['vi_line'])||'';
+  var unit=(e.data&&e.data['vi_unit'])||'';
+  if(line&&unit) return line+'-'+unit;
+  return unit||line||e.id;
+}
+function _viTypeLabel(e){
+  var t=(e.data&&e.data['vi_type']);
+  if(!t) return '';
+  if(Array.isArray(t)) return t.join(', ');
+  return t;
+}
+function _viTypeBadges(typeVal){
+  var types=Array.isArray(typeVal)?typeVal:(typeVal?[typeVal]:[]);
+  return types.map(function(t){
+    return '<span class="vi-type-badge" style="background:'+_viTypeColor(t)+'">'+_esc(t)+'</span>';
+  }).join(' ');
+}
+
+/* ══════════════════════════════════════════
+   템플릿 순회 헬퍼
+══════════════════════════════════════════ */
+function _viAllItems(){
+  var list=[];
+  (S.visionTemplate.categories||[]).forEach(function(cat){
+    if(cat.groups) cat.groups.forEach(function(g){ (g.items||[]).forEach(function(i){ list.push(i); }); });
+    else (cat.items||[]).forEach(function(i){ list.push(i); });
+  });
+  return list;
+}
+function _getViDynCols(){
+  var fixed=['vi_site','vi_line','vi_unit','vi_type'];
+  return _viAllItems().filter(function(i){ return i.showInGrid && fixed.indexOf(i.id)<0; });
+}
+function _findCat(catId){ return (S.visionTemplate.categories||[]).find(function(c){return c.id===catId;})||null; }
+function _findGrp(catId,grpId){ var cat=_findCat(catId); if(!cat||!cat.groups)return null; return cat.groups.find(function(g){return g.id===grpId;})||null; }
+function _findItem(catId,grpId,itemId){ var list=_getItemsList(catId,grpId); if(!list)return null; return list.find(function(i){return i.id===itemId;})||null; }
+function _findItemById(itemId){
+  var found=null;
+  (S.visionTemplate.categories||[]).forEach(function(cat){
+    if(found)return;
+    if(cat.items){ var i=cat.items.find(function(x){return x.id===itemId;}); if(i)found=i; }
+    if(cat.groups) cat.groups.forEach(function(g){ if(found)return; var i=(g.items||[]).find(function(x){return x.id===itemId;}); if(i)found=i; });
+  });
+  return found;
+}
+function _getItemsList(catId,grpId){
+  var cat=_findCat(catId); if(!cat)return null;
+  if(grpId){ var grp=_findGrp(catId,grpId); if(!grp)return null; if(!grp.items)grp.items=[]; return grp.items; }
+  if(!cat.items)cat.items=[]; return cat.items;
 }
 
 /* ══════════════════════════════════════════
@@ -33,917 +87,1013 @@ function renderVisionTab(){
   renderVisionMain();
 }
 
-/* ── 사이드바 ── */
+/* ══════════════════════════════════════════
+   사이드바 (필터 + 설비 목록)
+══════════════════════════════════════════ */
 function renderVisionSidebar(){
-  var sb = document.getElementById('visionSidebar');
-  if(!sb) return;
+  var sb=document.getElementById('visionSidebar');
+  if(!sb)return;
 
-  var search = _visionSearch.trim().toLowerCase();
-  var equips = S.visionEquips.filter(function(e){
-    if(!search) return true;
-    var name = _viEquipName(e);
-    var type = (e.data && e.data['vi_type']) || '';
-    var site = (e.data && e.data['vi_site']) || e.siteId || '';
-    return (name+type+site).toLowerCase().indexOf(search) >= 0;
+  /* Type 필터 버튼 */
+  var allTypes=[];
+  (S.visionEquips||[]).forEach(function(e){
+    var t=e.data&&e.data['vi_type'];
+    var types=Array.isArray(t)?t:(t?[t]:[]);
+    types.forEach(function(ty){ if(ty&&allTypes.indexOf(ty)<0) allTypes.push(ty); });
+  });
+  var typeBar='<div class="vi-type-filter">'+
+    '<button class="vi-type-btn'+(_visionFilterType==='all'?' on':'')+'" onclick="setVisionFilterType(\'all\')">전체</button>'+
+    allTypes.map(function(t){
+      return '<button class="vi-type-btn'+(_visionFilterType===t?' on':'')+'" onclick="setVisionFilterType(\''+_esc(t)+'\')">'+_esc(t)+'</button>';
+    }).join('')+
+  '</div>';
+
+  /* 필터 적용 */
+  var equips=(S.visionEquips||[]).filter(function(e){
+    if(_visionFilterType==='all')return true;
+    var t=e.data&&e.data['vi_type'];
+    var types=Array.isArray(t)?t:(t?[t]:[]);
+    return types.indexOf(_visionFilterType)>=0;
   });
 
-  // 사이트별 그룹핑
-  var bysite = {};
+  /* 사이트별 그룹 */
+  var bysite={};
   equips.forEach(function(e){
-    var sid = e.siteId || '기타';
-    if(!bysite[sid]) bysite[sid] = [];
+    var sid=e.siteId||'기타'; if(!bysite[sid])bysite[sid]=[]; bysite[sid].push(e);
+  });
+  var siteOrder=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
+  Object.keys(bysite).forEach(function(k){ if(siteOrder.indexOf(k)<0)siteOrder.push(k); });
+
+  var listHtml='';
+  siteOrder.forEach(function(sid){
+    var site=S.sites.find(function(s){return s.id===sid;});
+    var sname=site?site.name:sid;
+    var scolor=site?site.color:'#555';
+    var cnt=bysite[sid].length;
+    var isOpen=_viCollapsed[sid]!==true;
+    listHtml+='<div class="vi-sb-site-sec">'+
+      '<div class="vi-sb-site-toggle" onclick="_viToggleSite(\''+sid+'\')" style="border-left:3px solid '+scolor+'">'+
+        '<span class="vi-sb-site-arr'+(isOpen?' open':'')+'">▶</span>'+
+        '<span class="vi-sb-site-name">'+_esc(sname)+'</span>'+
+        '<span class="vi-sb-site-cnt">'+cnt+'</span>'+
+      '</div>'+
+      (isOpen?'<div class="vi-sb-equip-list">'+
+        bysite[sid].map(function(e){
+          var sel=e.id===_visionSelId?' sel':'';
+          return '<div class="vi-sb-eq-item'+sel+'" onclick="openVisionDetail(\''+e.id+'\')">'+
+            '<span class="vi-sb-eq-name">'+_esc(_viEquipLabel(e))+'</span>'+
+          '</div>';
+        }).join('')+
+      '</div>':'')+'</div>';
+  });
+
+  if(!equips.length){
+    listHtml='<div style="padding:20px 10px;text-align:center;color:#444;font-size:11px">'+
+      (_visionFilterType!=='all'?'필터 결과 없음':'등록된 설비가 없습니다')+'</div>';
+  }
+
+  sb.innerHTML=typeBar+
+    '<div class="vi-sb-body" style="flex:1;overflow-y:auto">'+listHtml+'</div>'+
+    '<div class="vi-sb-foot">'+
+      '<button class="btn pri" onclick="openAddVisionEquip()" style="width:100%;font-size:11px">+ 설비 추가</button>'+
+    '</div>';
+}
+
+function _viToggleSite(sid){ _viCollapsed[sid]=!_viCollapsed[sid]; renderVisionSidebar(); }
+function setVisionFilterType(t){ _visionFilterType=t; renderVisionTab(); }
+
+/* ══════════════════════════════════════════
+   메인 영역 분기
+══════════════════════════════════════════ */
+function renderVisionMain(){
+  var main=document.getElementById('visionMain');
+  if(!main)return;
+  main.style.overflow='hidden'; main.style.display='flex'; main.style.flexDirection='column';
+  if(_visionView==='detail') _renderDetailView(main);
+  else _renderGridView(main);
+}
+
+/* ══════════════════════════════════════════
+   그리드 뷰
+══════════════════════════════════════════ */
+function _renderGridView(main){
+  var dynCols=_getViDynCols();
+
+  /* 필터된 설비 */
+  var equips=(S.visionEquips||[]).filter(function(e){
+    if(_visionFilterType==='all')return true;
+    var t=e.data&&e.data['vi_type']; var types=Array.isArray(t)?t:(t?[t]:[]);
+    return types.indexOf(_visionFilterType)>=0;
+  });
+
+  /* 사이트별 그룹 */
+  var bysite={}; var siteOrder=[];
+  equips.forEach(function(e){
+    var sid=e.siteId||'기타';
+    if(!bysite[sid]){bysite[sid]=[]; siteOrder.push(sid);}
     bysite[sid].push(e);
   });
+  var orderedSites=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
+  siteOrder.forEach(function(k){if(orderedSites.indexOf(k)<0)orderedSites.push(k);});
 
-  var siteKeys = Object.keys(bysite);
-  // S.sites 순서 맞추기
-  var orderedSites = S.sites.map(function(s){ return s.id; }).filter(function(id){ return bysite[id]; });
-  siteKeys.forEach(function(k){ if(orderedSites.indexOf(k)<0) orderedSites.push(k); });
+  /* 헤더 */
+  var fixedLeft=0;
+  var colSite=100, colLine=90, colUnit=160;
+  var hdrHtml='<tr>'+
+    '<th class="vi-th fix-col" style="left:0;min-width:'+colSite+'px">사이트</th>'+
+    '<th class="vi-th fix-col" style="left:'+colSite+'px;min-width:'+colLine+'px">라인</th>'+
+    '<th class="vi-th fix-col" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">호기 / Type</th>'+
+    dynCols.map(function(c){
+      return '<th class="vi-th" style="min-width:120px">'+_esc(c.name)+'</th>';
+    }).join('')+
+  '</tr>';
 
-  var listHtml = '';
-  orderedSites.forEach(function(sid){
-    var site = S.sites.find(function(s){ return s.id===sid; });
-    var sname = site ? site.name : sid;
-    var scolor = site ? site.color : '#555';
-    listHtml += '<div class="vi-sb-site-hdr" style="color:'+scolor+';border-left:3px solid '+scolor+';padding-left:8px">'+_esc(sname)+'</div>';
-    bysite[sid].forEach(function(e){
-      var sel = (e.id===_visionSelId) ? ' sel' : '';
-      var type = (e.data && e.data['vi_type']) || '';
-      var typeBadge = type ? '<span class="vi-type-badge" style="background:'+_viTypeColor(type)+'">'+_esc(type)+'</span>' : '';
-      var sub = [(e.data&&e.data['vi_line'])||(e.data&&e.data['vi_site'])||'', (e.data&&e.data['vi_unit'])||''].filter(Boolean).join(' / ');
-      listHtml += '<div class="vi-eq-card'+sel+'" onclick="selectVisionEquip(\''+e.id+'\')">'+
-        '<div class="vi-eq-name">'+typeBadge+_esc(_viEquipName(e))+'</div>'+
-        (sub?'<div class="vi-eq-sub">'+_esc(sub)+'</div>':'')+
-        '</div>';
+  /* 행 */
+  var bodyHtml='';
+  if(!equips.length){
+    var span=3+dynCols.length;
+    bodyHtml='<tr><td colspan="'+span+'" class="vi-grid-empty">등록된 설비가 없습니다<br><span style="font-size:11px;color:#333">좌측 "+ 설비 추가"로 시작하세요</span></td></tr>';
+  } else {
+    orderedSites.forEach(function(sid){
+      var site=S.sites.find(function(s){return s.id===sid;});
+      var sname=site?site.name:sid; var scolor=site?site.color:'#555';
+      var span=3+dynCols.length;
+      bodyHtml+='<tr class="vi-site-grp-row"><td colspan="'+span+'" style="color:'+scolor+';border-left:3px solid '+scolor+'">'+_esc(sname)+' ('+bysite[sid].length+')</td></tr>';
+      bysite[sid].forEach(function(e){
+        var line=_esc((e.data&&e.data['vi_line'])||'');
+        var unit=_esc((e.data&&e.data['vi_unit'])||'');
+        var typeVal=e.data&&e.data['vi_type'];
+        var typeBadges=_viTypeBadges(typeVal);
+        bodyHtml+='<tr class="vi-grid-row" onclick="openVisionDetail(\''+e.id+'\')">'+
+          '<td class="vi-td fix-col" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>'+
+          '<td class="vi-td fix-col" style="left:'+colSite+'px;min-width:'+colLine+'px">'+line+'</td>'+
+          '<td class="vi-td fix-col" style="left:'+(colSite+colLine)+'px;min-width:'+colUnit+'px">'+
+            (typeBadges?typeBadges+' ':'')+unit+
+          '</td>'+
+          dynCols.map(function(c){
+            return '<td class="vi-td">'+_esc(_viGridCellValue(e,c))+'</td>';
+          }).join('')+
+        '</tr>';
+      });
     });
-  });
-
-  if(!equips.length && !search){
-    listHtml = '<div style="padding:20px 10px;text-align:center;color:#444;font-size:11px">등록된 설비가 없습니다</div>';
-  } else if(!equips.length && search){
-    listHtml = '<div style="padding:20px 10px;text-align:center;color:#444;font-size:11px">검색 결과 없음</div>';
   }
 
-  sb.innerHTML =
-    '<div class="vi-sb-head">'+
-      '<span style="font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.05em">설비 목록</span>'+
-      '<button class="btn pri" onclick="openAddVisionEquip()" style="padding:2px 7px;font-size:10px">+ 추가</button>'+
+  main.innerHTML=
+    '<div class="vi-grid-wrap">'+
+      '<table class="vi-grid"><thead>'+hdrHtml+'</thead><tbody>'+bodyHtml+'</tbody></table>'+
+    '</div>';
+}
+
+function _viGridCellValue(equip, item){
+  var val=(equip.data||{})[item.id];
+  if(val===undefined||val===null||val==='')return '';
+  switch(item.type){
+    case 'multiselect': return Array.isArray(val)?val.join(', '):(val||'');
+    case 'camera-multi':
+      if(!Array.isArray(val)||!val.length)return '';
+      var totalCams=val.reduce(function(s,c){return s+(parseInt(c.count)||0);},0);
+      return val.length+'종 / '+totalCams+'대';
+    case 'spec-qty':
+      if(typeof val==='object') return [val.spec,val.qty?'×'+val.qty:''].filter(Boolean).join(' ');
+      return String(val);
+    case 'ssd-multi':
+      if(!Array.isArray(val)||!val.length)return '';
+      return val.filter(function(r){return r.capacity;}).map(function(r){
+        return r.capacity+(r.qty?'×'+r.qty:'');
+      }).join(', ');
+    case 'lancard-multi':
+      if(!Array.isArray(val)||!val.length)return '';
+      return val.filter(function(r){return r.speed;}).map(function(r){
+        return r.speed+(r.ports?'×'+r.ports:'');
+      }).join(', ');
+    default: return String(val);
+  }
+}
+
+/* ══════════════════════════════════════════
+   상세 뷰
+══════════════════════════════════════════ */
+function openVisionDetail(id){
+  _visionSelId=id; _visionView='detail';
+  renderVisionSidebar(); renderVisionMain();
+}
+function backToVisionGrid(){
+  _visionView='grid';
+  renderVisionMain();
+}
+
+function _renderDetailView(main){
+  var equip=S.visionEquips.find(function(e){return e.id===_visionSelId;});
+  if(!equip){ _visionView='grid'; _renderGridView(main); return; }
+  main.innerHTML=
+    '<div class="vi-detail-toolbar" style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid #2a2a34;background:#18181e">'+
+      '<button class="btn" onclick="backToVisionGrid()">← 목록으로</button>'+
+      '<span style="font-size:12px;font-weight:600;color:#c0c0e0;flex:1">'+_esc(_viEquipLabel(equip))+'</span>'+
+      '<button class="btn pri" onclick="saveVisionEquipData()">저장</button>'+
+      '<button class="btn" onclick="copyVisionEquip(\''+equip.id+'\')" title="복사">복사</button>'+
+      '<button class="btn red" onclick="delVisionEquip(\''+equip.id+'\')">삭제</button>'+
     '</div>'+
-    '<div style="padding:4px 8px 2px">'+
-      '<input class="vi-sb-search" type="text" placeholder="검색 (이름/Type/사이트)" value="'+_esc(search)+'" oninput="_viSearchChange(this.value)">'+
-    '</div>'+
-    '<div class="vi-sb-body">'+listHtml+'</div>';
-}
-
-function _viSearchChange(v){
-  _visionSearch = v;
-  renderVisionSidebar();
-}
-
-function _viEquipName(e){
-  var unit = (e.data && e.data['vi_unit']) || '';
-  var sn   = (e.data && e.data['vi_sn'])   || '';
-  if(unit) return unit + (sn ? ' ('+sn+')' : '');
-  return sn || e.id;
-}
-
-/* ── 메인 영역 ── */
-function renderVisionMain(){
-  var main = document.getElementById('visionMain');
-  if(!main) return;
-  main.style.overflow = 'hidden';
-  main.style.display = 'flex';
-  main.style.flexDirection = 'column';
-  if(!_visionSelId){
-    main.innerHTML = '<div class="vi-empty"><span>설비를 선택하거나 새로 추가하세요</span><span class="vi-empty-sub">좌측 목록에서 설비를 선택하면 상세 정보가 표시됩니다</span></div>';
-    return;
-  }
-  var equip = S.visionEquips.find(function(e){ return e.id===_visionSelId; });
-  if(!equip){
-    _visionSelId = null;
-    main.innerHTML = '<div class="vi-empty"><span>설비를 선택하세요</span></div>';
-    return;
-  }
-  main.innerHTML =
-    '<div class="vi-main-inner'+ (_visionEditMode ? ' vi-tpl-on' : '') +'" id="visionFormWrap">'+
+    '<div class="vi-main-inner'+(_visionEditMode?' vi-tpl-on':'')+'" id="visionFormWrap" style="flex:1;overflow-y:auto;padding:16px 20px">'+
       _renderVisionEquipForm(equip)+
     '</div>'+
-    '<div class="vi-footer">'+
-      '<button class="btn pri" onclick="saveVisionEquipData()">저장</button>'+
-      '<button class="btn red" onclick="delVisionEquip(\''+equip.id+'\')">삭제</button>'+
-      '<span style="flex:1"></span>'+
+    '<div class="vi-footer" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid #2a2a34;background:#18181e">'+
       '<span style="font-size:10px;color:#444" id="viSaveTs">'+
-        (equip.updatedAt ? '최종 저장: '+equip.updatedAt : '')+
+        (equip.updatedAt?'최종 저장: '+equip.updatedAt:'')+
       '</span>'+
     '</div>';
 }
 
-/* ── 설비 상세 폼 렌더링 ── */
+/* ── 상세 폼 렌더 ── */
 function _renderVisionEquipForm(equip){
-  var data = equip.data || {};
-  var type = data['vi_type'] || '';
-  var typeBadge = type ? '<span class="vi-type-badge" style="background:'+_viTypeColor(type)+'">'+_esc(type)+'</span>' : '';
-  var site = S.sites.find(function(s){ return s.id===equip.siteId; });
-  var siteName = site ? site.name : (equip.siteId || '');
-
-  var html = '<div class="vi-equip-hdr">'+
-    '<div class="vi-equip-title">'+typeBadge+_esc(_viEquipName(equip))+'</div>'+
-    '<span class="vi-equip-meta">'+_esc(siteName)+'</span>'+
+  var data=equip.data||{};
+  var typeVal=data['vi_type'];
+  var html='<div class="vi-equip-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #2a2a34">'+
+    '<div style="flex:1;font-size:13px;font-weight:600;color:#e0e0ec">'+_viTypeBadges(typeVal)+' '+_esc(_viEquipLabel(equip))+'</div>'+
     '</div>';
-
-  S.visionTemplate.categories.forEach(function(cat, ci){
-    html += _renderViCategory(cat, data, ci);
+  (S.visionTemplate.categories||[]).forEach(function(cat,ci){
+    html+=_renderViCategory(cat,data,ci);
   });
-
-  if(_visionEditMode){
-    html += '<button class="vi-tpl-add-btn" onclick="openAddVisionCategory()">+ 카테고리 추가</button>';
-  }
+  if(_visionEditMode) html+='<button class="vi-tpl-add-btn" onclick="openAddVisionCategory()">+ 카테고리 추가</button>';
   return html;
 }
 
-function _renderViCategory(cat, data, ci){
-  var hasGroups = !!(cat.groups && cat.groups.length > 0);
-  var bodyHtml = '';
-
+function _renderViCategory(cat,data,ci){
+  var hasGroups=!!(cat.groups&&cat.groups.length>0);
+  var bodyHtml='';
   if(hasGroups){
-    cat.groups.forEach(function(grp, gi){
-      bodyHtml += _renderViGroup(cat, grp, data, ci, gi);
-    });
-    if(_visionEditMode){
-      bodyHtml += '<button class="vi-tpl-add-btn" onclick="openAddVisionGroup(\''+cat.id+'\')">+ 그룹 추가</button>';
-    }
+    cat.groups.forEach(function(grp,gi){ bodyHtml+=_renderViGroup(cat,grp,data,ci,gi); });
+    if(_visionEditMode) bodyHtml+='<button class="vi-tpl-add-btn" onclick="openAddVisionGroup(\''+cat.id+'\')">+ 그룹 추가</button>';
   } else {
-    var items = cat.items || [];
-    items.forEach(function(item, ii){
-      bodyHtml += _renderViItemRow(cat.id, null, item, data, ci, -1, ii);
-    });
-    if(_visionEditMode){
-      bodyHtml += '<button class="vi-tpl-add-btn" onclick="openAddVisionItem(\''+cat.id+'\',\'\')">+ 항목 추가</button>';
-    }
+    (cat.items||[]).forEach(function(item,ii){ bodyHtml+=_renderViItemRow(cat.id,null,item,data,ci,-1,ii); });
+    if(_visionEditMode) bodyHtml+='<button class="vi-tpl-add-btn" onclick="openAddVisionItem(\''+cat.id+'\',\'\')">+ 항목 추가</button>';
   }
-
-  var ctrlHtml = '<div class="vi-cat-ctrl">'+
-    '<button class="vi-ctrl-btn" onclick="moveViCategory('+ci+',-1)" title="위로">▲</button>'+
-    '<button class="vi-ctrl-btn" onclick="moveViCategory('+ci+',1)" title="아래로">▼</button>'+
-    '<button class="vi-ctrl-btn" onclick="openRenameViCategory(\''+cat.id+'\')" title="이름 변경">✏</button>'+
-    '<button class="vi-ctrl-btn del" onclick="delViCategory(\''+cat.id+'\')" title="삭제">✕</button>'+
-    '</div>';
-
+  var ctrlHtml='<div class="vi-cat-ctrl">'+
+    '<button class="vi-ctrl-btn" onclick="moveViCategory('+ci+',-1)">▲</button>'+
+    '<button class="vi-ctrl-btn" onclick="moveViCategory('+ci+',1)">▼</button>'+
+    '<button class="vi-ctrl-btn" onclick="openRenameViCategory(\''+cat.id+'\')">✏</button>'+
+    '<button class="vi-ctrl-btn del" onclick="delViCategory(\''+cat.id+'\')">✕</button></div>';
   return '<div class="vi-cat" id="vicat_'+cat.id+'">'+
     '<div class="vi-cat-hdr" onclick="_toggleViCat(\''+cat.id+'\')">'+
       '<span class="vi-cat-arrow open" id="vicat_arr_'+cat.id+'">▶</span>'+
-      '<span class="vi-cat-name">'+_esc(cat.name)+'</span>'+
-      ctrlHtml+
+      '<span class="vi-cat-name">'+_esc(cat.name)+'</span>'+ctrlHtml+
     '</div>'+
-    '<div class="vi-cat-body" id="vicat_body_'+cat.id+'">'+bodyHtml+'</div>'+
-    '</div>';
+    '<div class="vi-cat-body" id="vicat_body_'+cat.id+'">'+bodyHtml+'</div></div>';
 }
 
-function _renderViGroup(cat, grp, data, ci, gi){
-  var items = grp.items || [];
-  var itemsHtml = items.map(function(item, ii){
-    return _renderViItemRow(cat.id, grp.id, item, data, ci, gi, ii);
-  }).join('');
-
-  if(_visionEditMode){
-    itemsHtml += '<button class="vi-tpl-add-btn" onclick="openAddVisionItem(\''+cat.id+'\',\''+grp.id+'\')">+ 항목 추가</button>';
-  }
-
-  var ctrlHtml = '<div class="vi-grp-ctrl">'+
-    '<button class="vi-ctrl-btn" onclick="moveViGroup(\''+cat.id+'\','+gi+',-1)" title="위로">▲</button>'+
-    '<button class="vi-ctrl-btn" onclick="moveViGroup(\''+cat.id+'\','+gi+',1)" title="아래로">▼</button>'+
-    '<button class="vi-ctrl-btn" onclick="openRenameViGroup(\''+cat.id+'\',\''+grp.id+'\')" title="이름 변경">✏</button>'+
-    '<button class="vi-ctrl-btn del" onclick="delViGroup(\''+cat.id+'\',\''+grp.id+'\')" title="삭제">✕</button>'+
-    '</div>';
-
+function _renderViGroup(cat,grp,data,ci,gi){
+  var items=grp.items||[];
+  var itemsHtml=items.map(function(item,ii){ return _renderViItemRow(cat.id,grp.id,item,data,ci,gi,ii); }).join('');
+  if(_visionEditMode) itemsHtml+='<button class="vi-tpl-add-btn" onclick="openAddVisionItem(\''+cat.id+'\',\''+grp.id+'\')">+ 항목 추가</button>';
+  var ctrlHtml='<div class="vi-grp-ctrl">'+
+    '<button class="vi-ctrl-btn" onclick="moveViGroup(\''+cat.id+'\','+gi+',-1)">▲</button>'+
+    '<button class="vi-ctrl-btn" onclick="moveViGroup(\''+cat.id+'\','+gi+',1)">▼</button>'+
+    '<button class="vi-ctrl-btn" onclick="openRenameViGroup(\''+cat.id+'\',\''+grp.id+'\')">✏</button>'+
+    '<button class="vi-ctrl-btn del" onclick="delViGroup(\''+cat.id+'\',\''+grp.id+'\')">✕</button></div>';
   return '<div class="vi-grp" id="vigrp_'+grp.id+'">'+
     '<div class="vi-grp-hdr" onclick="_toggleViGrp(\''+grp.id+'\')">'+
       '<span class="vi-grp-arrow open" id="vigrp_arr_'+grp.id+'">▶</span>'+
-      '<span class="vi-grp-name">'+_esc(grp.name)+'</span>'+
-      ctrlHtml+
+      '<span class="vi-grp-name">'+_esc(grp.name)+'</span>'+ctrlHtml+
     '</div>'+
-    '<div class="vi-grp-body" id="vigrp_body_'+grp.id+'">'+itemsHtml+'</div>'+
-    '</div>';
+    '<div class="vi-grp-body" id="vigrp_body_'+grp.id+'">'+itemsHtml+'</div></div>';
 }
 
-function _renderViItemRow(catId, grpId, item, data, ci, gi, ii){
-  var val = data[item.id] !== undefined ? data[item.id] : '';
-  var grpArg = grpId ? '\''+grpId+'\'' : '\'\'';
-
-  var ctrlHtml = '<div class="vi-item-ctrl">'+
-    '<button class="vi-ctrl-btn" onclick="moveViItem(\''+catId+'\','+grpArg+',\''+item.id+'\',-1)" title="위로">▲</button>'+
-    '<button class="vi-ctrl-btn" onclick="moveViItem(\''+catId+'\','+grpArg+',\''+item.id+'\',1)" title="아래로">▼</button>'+
-    '<button class="vi-ctrl-btn" onclick="openEditViItem(\''+catId+'\','+grpArg+',\''+item.id+'\')" title="편집">✏</button>'+
-    '<button class="vi-ctrl-btn del" onclick="delViItem(\''+catId+'\','+grpArg+',\''+item.id+'\')" title="삭제">✕</button>'+
-    '</div>';
-
+function _renderViItemRow(catId,grpId,item,data,ci,gi,ii){
+  var val=data[item.id]!==undefined?data[item.id]:'';
+  var grpArg=grpId?'\''+grpId+'\'':'\'\'';
+  var ctrlHtml='<div class="vi-item-ctrl">'+
+    '<button class="vi-ctrl-btn" onclick="moveViItem(\''+catId+'\','+grpArg+',\''+item.id+'\',-1)">▲</button>'+
+    '<button class="vi-ctrl-btn" onclick="moveViItem(\''+catId+'\','+grpArg+',\''+item.id+'\',1)">▼</button>'+
+    '<button class="vi-ctrl-btn" onclick="openEditViItem(\''+catId+'\','+grpArg+',\''+item.id+'\')">✏</button>'+
+    '<button class="vi-ctrl-btn del" onclick="delViItem(\''+catId+'\','+grpArg+',\''+item.id+'\')">✕</button></div>';
   return '<div class="vi-item-row">'+
     '<div class="vi-item-label">'+_esc(item.name)+'</div>'+
-    '<div class="vi-item-input">'+_renderViInput(item, val)+'</div>'+
-    ctrlHtml+
-    '</div>';
+    '<div class="vi-item-input">'+_renderViInput(item,val)+'</div>'+
+    ctrlHtml+'</div>';
 }
 
-/* ── 입력 타입별 렌더링 ── */
-function _renderViInput(item, val){
-  var id = 'viinp_'+item.id;
+/* ── 입력 타입 렌더 ── */
+function _renderViInput(item,val){
+  var id='viinp_'+item.id;
   switch(item.type){
-    case 'select':  return _renderViSelect(item, val, id);
-    case 'camera-sn': return _renderViCameraSn(item, val, id);
-    case 'spec-qty':  return _renderViSpecQty(item, val, id);
-    case 'ssd-multi': return _renderViSsdMulti(item, val, id);
-    case 'lancard-multi': return _renderViLancardMulti(item, val, id);
-    default: // text
-      return '<input type="text" id="'+id+'" value="'+_esc(String(val||''))+'" placeholder="입력...">';
+    case 'multiselect': return _renderViMultisel(item,val,id);
+    case 'camera-multi': return _renderViCameraMulti(item,val,id);
+    case 'spec-qty': return _renderViSpecQty(item,val,id);
+    case 'ssd-multi': return _renderViSsdMulti(item,val,id);
+    case 'lancard-multi': return _renderViLancardMulti(item,val,id);
+    default: return '<input type="text" id="'+id+'" value="'+_esc(String(val||''))+'" placeholder="입력...">';
   }
 }
 
-function _renderViSelect(item, val, id){
-  var opts = (item.options || []).map(function(o){
-    return '<option value="'+_esc(o)+'"'+(val===o?' selected':'')+'>'+_esc(o)+'</option>';
+function _renderViMultisel(item,val,id){
+  var selected=Array.isArray(val)?val:(val?[val]:[]);
+  var opts=(item.options||[]).map(function(o){
+    var chk=selected.indexOf(o)>=0?' checked':'';
+    var delBtn=_visionEditMode?'<button class="vi-sel-opt-del" onclick="delSelectOption(\''+item.id+'\',\''+_esc(o)+'\')" title="옵션 삭제">×</button>':'';
+    return '<label style="display:inline-flex;align-items:center;gap:3px;white-space:nowrap">'+
+      '<input type="checkbox" class="vi-ms-chk" value="'+_esc(o)+'"'+chk+'>'+_esc(o)+delBtn+'</label>';
   }).join('');
-  var html = '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+
-    '<select id="'+id+'" style="flex:1;min-width:120px">'+
-      '<option value="">-- 선택 --</option>'+opts+
-    '</select>';
-  if(_visionEditMode){
-    html += '<button class="vi-ctrl-btn" onclick="openAddSelectOption(\''+item.id+'\')" title="옵션 추가" style="border:1px dashed #3a3a5a;padding:3px 6px">+ 옵션</button>';
-  }
-  html += '</div>';
-  // 현재 select 옵션 태그 표시 (편집 모드)
-  if(_visionEditMode && item.options && item.options.length){
-    html += '<div class="vi-sel-opts" style="margin-top:4px">'+
-      item.options.map(function(o){
-        return '<span class="vi-sel-opt-tag">'+_esc(o)+
-          '<button class="vi-sel-opt-del" onclick="delSelectOption(\''+item.id+'\',\''+_esc(o)+'\')" title="옵션 삭제">×</button>'+
-          '</span>';
-      }).join('')+
-    '</div>';
-  }
+  var addBtn=_visionEditMode?'<button class="vi-ctrl-btn" onclick="openAddSelectOption(\''+item.id+'\')" style="border:1px dashed #3a3a5a;padding:3px 6px;font-size:10px">+ 옵션</button>':'';
+  return '<div class="vi-multisel" id="'+id+'">'+opts+(addBtn?'<span style="display:inline-flex;align-items:center">'+addBtn+'</span>':'')+'</div>';
+}
+
+function _renderViCameraMulti(item,val,id){
+  var cameras=Array.isArray(val)&&val.length?val:[{model:'',count:0,sns:[]}];
+  var html='<div class="vi-cam-multi" id="'+id+'">';
+  cameras.forEach(function(cam,idx){
+    html+=_renderViCamEntry(id,cam,idx,cameras.length);
+  });
+  html+='<button class="vi-cam-add-btn" onclick="_viCamEntryAdd(\''+id+'\')">+ 카메라 추가</button>';
+  html+='</div>';
   return html;
 }
 
-function _renderViCameraSn(item, val, id){
-  // val = {count:N, sns:[...]} or ''
-  var obj = (val && typeof val==='object') ? val : {count:0, sns:[]};
-  var count = obj.count || 0;
-  var sns = obj.sns || [];
-
-  var snRows = '';
+function _renderViCamEntry(wrapperId,cam,idx,total){
+  var count=parseInt(cam.count)||0;
+  var sns=cam.sns||[];
+  var snRows='';
   for(var i=0;i<count;i++){
-    snRows += '<div class="vi-cam-sn-item">'+
-      '<label>CAM '+(i+1)+'</label>'+
-      '<input type="text" class="vi-cam-sn-inp" data-idx="'+i+'" value="'+_esc(sns[i]||'')+'" placeholder="S/N">'+
-      '</div>';
+    snRows+='<div class="vi-cam-sn-row"><label>SN '+(i+1)+'</label>'+
+      '<input type="text" class="vi-cam-sn-inp" data-idx="'+i+'" value="'+_esc(sns[i]||'')+'"></div>';
   }
-
-  return '<div id="'+id+'_wrap">'+
-    '<div class="vi-cam-qty-row">'+
-      '<label>수량</label>'+
-      '<input type="number" id="'+id+'_count" min="0" max="99" value="'+count+'" oninput="_viCamCountChange(\''+item.id+'\',this.value)" style="width:60px">'+
-      '<span style="font-size:10px;color:#555">대</span>'+
+  return '<div class="vi-cam-entry" id="'+wrapperId+'_cam'+idx+'">'+
+    '<div class="vi-cam-entry-hdr">카메라 '+(idx+1)+
+      '<button class="vi-cam-entry-del" onclick="_viCamEntryDel(\''+wrapperId+'\','+idx+')" title="삭제">✕</button>'+
     '</div>'+
-    '<div class="vi-cam-sn-list" id="'+id+'_sns">'+snRows+'</div>'+
-    '</div>';
+    '<div class="vi-cam-entry-body">'+
+      '<div class="vi-cam-entry-row"><label>모델명</label><input type="text" class="vi-cam-model-inp" value="'+_esc(cam.model||'')+'"></div>'+
+      '<div class="vi-cam-entry-row"><label>수량</label>'+
+        '<input type="number" class="vi-cam-qty-inp qty-inp" min="0" max="99" value="'+count+'" oninput="_viCamQtyChange(\''+wrapperId+'\','+idx+',this.value)">'+
+        '<span style="font-size:10px;color:#555">대</span>'+
+      '</div>'+
+      '<div class="vi-cam-sn-rows" id="'+wrapperId+'_cam'+idx+'_sns">'+snRows+'</div>'+
+    '</div></div>';
 }
 
-function _renderViSpecQty(item, val, id){
-  var obj = (val && typeof val==='object') ? val : {spec:'', qty:''};
+function _viCamQtyChange(wrapperId,idx,val){
+  var count=Math.max(0,Math.min(99,parseInt(val)||0));
+  var snWrap=document.getElementById(wrapperId+'_cam'+idx+'_sns');
+  if(!snWrap)return;
+  var existing=snWrap.querySelectorAll('.vi-cam-sn-row');
+  var cur=existing.length;
+  while(cur>count){ snWrap.removeChild(snWrap.lastChild); cur--; }
+  while(cur<count){
+    var div=document.createElement('div'); div.className='vi-cam-sn-row';
+    div.innerHTML='<label>SN '+(cur+1)+'</label><input type="text" class="vi-cam-sn-inp" data-idx="'+cur+'" value="">';
+    snWrap.appendChild(div); cur++;
+  }
+}
+
+function _viCamEntryAdd(wrapperId){
+  var wrap=document.getElementById(wrapperId);
+  if(!wrap)return;
+  var entries=wrap.querySelectorAll('.vi-cam-entry');
+  var idx=entries.length;
+  var addBtn=wrap.querySelector('.vi-cam-add-btn');
+  var div=document.createElement('div');
+  div.innerHTML=_renderViCamEntry(wrapperId,{model:'',count:0,sns:[]},idx,idx+1);
+  wrap.insertBefore(div.firstChild,addBtn);
+  _viRenumberCamEntries(wrapperId);
+}
+
+function _viCamEntryDel(wrapperId,idx){
+  var entry=document.getElementById(wrapperId+'_cam'+idx);
+  if(entry) entry.parentNode.removeChild(entry);
+  _viRenumberCamEntries(wrapperId);
+}
+
+function _viRenumberCamEntries(wrapperId){
+  var wrap=document.getElementById(wrapperId);
+  if(!wrap)return;
+  var entries=wrap.querySelectorAll('.vi-cam-entry');
+  entries.forEach(function(el,i){
+    var hdr=el.querySelector('.vi-cam-entry-hdr');
+    if(hdr){ var del=hdr.querySelector('.vi-cam-entry-del'); hdr.textContent='카메라 '+(i+1); if(del)hdr.appendChild(del); }
+    el.id=wrapperId+'_cam'+i;
+    var delBtn=el.querySelector('.vi-cam-entry-del');
+    if(delBtn) delBtn.setAttribute('onclick','_viCamEntryDel(\''+wrapperId+'\','+i+')');
+    var qtyInp=el.querySelector('.vi-cam-qty-inp');
+    if(qtyInp) qtyInp.setAttribute('oninput','_viCamQtyChange(\''+wrapperId+'\','+i+',this.value)');
+    var snsWrap=el.querySelector('[id$="_sns"]');
+    if(snsWrap) snsWrap.id=wrapperId+'_cam'+i+'_sns';
+  });
+}
+
+function _renderViSpecQty(item,val,id){
+  var obj=(val&&typeof val==='object')?val:{spec:'',qty:''};
   return '<div class="vi-spec-qty">'+
-    '<input type="text" id="'+id+'_spec" class="spec-inp" value="'+_esc(obj.spec||'')+'" placeholder="사양">'+
+    '<input type="text" id="'+id+'_spec" class="spec-inp" value="'+_esc(obj.spec||'')+'" placeholder="사양 입력">'+
     '<input type="number" id="'+id+'_qty" class="qty-inp" value="'+_esc(String(obj.qty||''))+'" min="0" placeholder="수량">'+
-    '<span class="qty-lbl">EA</span>'+
-    '</div>';
+    '<span class="qty-lbl">EA</span></div>';
 }
 
-function _renderViSsdMulti(item, val, id){
-  var rows = (Array.isArray(val) && val.length) ? val : [{capacity:'',qty:'',drive:''}];
-  var thead = '<tr><th>용량</th><th style="width:55px">수량(EA)</th><th>드라이브</th><th style="width:24px"></th></tr>';
-  var tbody = rows.map(function(r,i){
+function _renderViSsdMulti(item,val,id){
+  var rows=(Array.isArray(val)&&val.length)?val:[{capacity:'',qty:'',drive:''}];
+  var thead='<tr><th>용량</th><th style="width:55px">수량</th><th>드라이브</th><th style="width:24px"></th></tr>';
+  var tbody=rows.map(function(r,i){
     return '<tr>'+
       '<td><input type="text" value="'+_esc(r.capacity||'')+'" placeholder="예: 1TB"></td>'+
-      '<td><input type="number" value="'+_esc(String(r.qty||''))+'" min="0" placeholder="수량"></td>'+
-      '<td><input type="text" value="'+_esc(r.drive||'')+'" placeholder="예: C:, D:"></td>'+
-      '<td><button class="vi-multi-del-btn" onclick="_viSsdDelRow(\''+id+'\','+i+')">✕</button></td>'+
-      '</tr>';
+      '<td><input type="number" value="'+_esc(String(r.qty||''))+'" min="0"></td>'+
+      '<td><input type="text" value="'+_esc(r.drive||'')+'" placeholder="C:, D:"></td>'+
+      '<td><button class="vi-multi-del-btn" onclick="_viSsdDelRow(\''+id+'\','+i+')">✕</button></td></tr>';
   }).join('');
   return '<table class="vi-multi-table" id="'+id+'_tbl"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'+
     '<button class="vi-add-row-btn" onclick="_viSsdAddRow(\''+id+'\')">+ 행 추가</button>';
 }
 
-function _renderViLancardMulti(item, val, id){
-  var rows = (Array.isArray(val) && val.length) ? val : [{speed:'',ports:'',purpose:''}];
-  var thead = '<tr><th>속도</th><th style="width:55px">PORT 수</th><th>사용 목적</th><th style="width:24px"></th></tr>';
-  var tbody = rows.map(function(r,i){
+function _renderViLancardMulti(item,val,id){
+  var rows=(Array.isArray(val)&&val.length)?val:[{speed:'',ports:'',purpose:''}];
+  var thead='<tr><th>속도</th><th style="width:55px">PORT 수</th><th>사용 목적</th><th style="width:24px"></th></tr>';
+  var tbody=rows.map(function(r,i){
     return '<tr>'+
-      '<td><input type="text" value="'+_esc(r.speed||'')+'" placeholder="예: 1Gbps"></td>'+
-      '<td><input type="number" value="'+_esc(String(r.ports||''))+'" min="0" placeholder="수"></td>'+
-      '<td><input type="text" value="'+_esc(r.purpose||'')+'" placeholder="예: 카메라"></td>'+
-      '<td><button class="vi-multi-del-btn" onclick="_viLanDelRow(\''+id+'\','+i+')">✕</button></td>'+
-      '</tr>';
+      '<td><input type="text" value="'+_esc(r.speed||'')+'" placeholder="1Gbps"></td>'+
+      '<td><input type="number" value="'+_esc(String(r.ports||''))+'" min="0"></td>'+
+      '<td><input type="text" value="'+_esc(r.purpose||'')+'" placeholder="카메라"></td>'+
+      '<td><button class="vi-multi-del-btn" onclick="_viLanDelRow(\''+id+'\','+i+')">✕</button></td></tr>';
   }).join('');
   return '<table class="vi-multi-table" id="'+id+'_tbl"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'+
     '<button class="vi-add-row-btn" onclick="_viLanAddRow(\''+id+'\')">+ 행 추가</button>';
 }
 
-/* ── 동적 행 추가/삭제 헬퍼 ── */
-function _viCamCountChange(itemId, val){
-  var count = parseInt(val) || 0;
-  if(count < 0) count = 0;
-  if(count > 50) count = 50;
-  var id = 'viinp_'+itemId;
-  var snList = document.getElementById(id+'_sns');
-  if(!snList) return;
-  var existing = snList.querySelectorAll('.vi-cam-sn-item');
-  var cur = existing.length;
-  // 줄이기
-  while(cur > count){ snList.removeChild(snList.lastChild); cur--; }
-  // 늘리기
-  while(cur < count){
-    var div = document.createElement('div');
-    div.className = 'vi-cam-sn-item';
-    div.innerHTML = '<label>CAM '+(cur+1)+'</label><input type="text" class="vi-cam-sn-inp" data-idx="'+cur+'" value="" placeholder="S/N">';
-    snList.appendChild(div);
-    cur++;
-  }
-}
-
+/* ── 다중행 동적 추가/삭제 ── */
 function _viSsdAddRow(id){
-  var tbody = document.querySelector('#'+id+'_tbl tbody');
-  if(!tbody) return;
-  var idx = tbody.rows.length;
-  var tr = document.createElement('tr');
-  tr.innerHTML = '<td><input type="text" value="" placeholder="예: 1TB"></td>'+
-    '<td><input type="number" value="" min="0" placeholder="수량"></td>'+
-    '<td><input type="text" value="" placeholder="예: C:, D:"></td>'+
+  var tbody=document.querySelector('#'+id+'_tbl tbody'); if(!tbody)return;
+  var idx=tbody.rows.length;
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="text" value="" placeholder="예: 1TB"></td>'+
+    '<td><input type="number" value="" min="0"></td>'+
+    '<td><input type="text" value="" placeholder="C:, D:"></td>'+
     '<td><button class="vi-multi-del-btn" onclick="_viSsdDelRow(\''+id+'\','+idx+')">✕</button></td>';
-  tbody.appendChild(tr);
-  _viReindexDelBtns(id+'_tbl', '_viSsdDelRow', id);
+  tbody.appendChild(tr); _viReindexDelBtns(id+'_tbl','_viSsdDelRow',id);
 }
-function _viSsdDelRow(id, idx){
-  var tbody = document.querySelector('#'+id+'_tbl tbody');
-  if(!tbody || tbody.rows.length <= 1) return;
-  tbody.deleteRow(idx);
-  _viReindexDelBtns(id+'_tbl', '_viSsdDelRow', id);
+function _viSsdDelRow(id,idx){
+  var tbody=document.querySelector('#'+id+'_tbl tbody'); if(!tbody||tbody.rows.length<=1)return;
+  tbody.deleteRow(idx); _viReindexDelBtns(id+'_tbl','_viSsdDelRow',id);
 }
 function _viLanAddRow(id){
-  var tbody = document.querySelector('#'+id+'_tbl tbody');
-  if(!tbody) return;
-  var idx = tbody.rows.length;
-  var tr = document.createElement('tr');
-  tr.innerHTML = '<td><input type="text" value="" placeholder="예: 1Gbps"></td>'+
-    '<td><input type="number" value="" min="0" placeholder="수"></td>'+
-    '<td><input type="text" value="" placeholder="예: 카메라"></td>'+
+  var tbody=document.querySelector('#'+id+'_tbl tbody'); if(!tbody)return;
+  var idx=tbody.rows.length;
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="text" value="" placeholder="1Gbps"></td>'+
+    '<td><input type="number" value="" min="0"></td>'+
+    '<td><input type="text" value="" placeholder="카메라"></td>'+
     '<td><button class="vi-multi-del-btn" onclick="_viLanDelRow(\''+id+'\','+idx+')">✕</button></td>';
-  tbody.appendChild(tr);
-  _viReindexDelBtns(id+'_tbl', '_viLanDelRow', id);
+  tbody.appendChild(tr); _viReindexDelBtns(id+'_tbl','_viLanDelRow',id);
 }
-function _viLanDelRow(id, idx){
-  var tbody = document.querySelector('#'+id+'_tbl tbody');
-  if(!tbody || tbody.rows.length <= 1) return;
-  tbody.deleteRow(idx);
-  _viReindexDelBtns(id+'_tbl', '_viLanDelRow', id);
+function _viLanDelRow(id,idx){
+  var tbody=document.querySelector('#'+id+'_tbl tbody'); if(!tbody||tbody.rows.length<=1)return;
+  tbody.deleteRow(idx); _viReindexDelBtns(id+'_tbl','_viLanDelRow',id);
 }
-function _viReindexDelBtns(tblId, fnName, id){
-  var tbody = document.querySelector('#'+tblId+' tbody');
-  if(!tbody) return;
-  Array.prototype.forEach.call(tbody.rows, function(tr, i){
-    var btn = tr.querySelector('.vi-multi-del-btn');
-    if(btn) btn.setAttribute('onclick', fnName+'(\''+id+'\','+i+')');
+function _viReindexDelBtns(tblId,fnName,id){
+  var tbody=document.querySelector('#'+tblId+' tbody'); if(!tbody)return;
+  Array.prototype.forEach.call(tbody.rows,function(tr,i){
+    var btn=tr.querySelector('.vi-multi-del-btn');
+    if(btn)btn.setAttribute('onclick',fnName+'(\''+id+'\','+i+')');
   });
 }
 
 /* ── 접기/펼치기 ── */
 function _toggleViCat(catId){
-  var body = document.getElementById('vicat_body_'+catId);
-  var arr  = document.getElementById('vicat_arr_'+catId);
-  if(!body) return;
-  var collapsed = body.classList.toggle('collapsed');
-  if(arr){ if(collapsed) arr.classList.remove('open'); else arr.classList.add('open'); }
+  var body=document.getElementById('vicat_body_'+catId);
+  var arr=document.getElementById('vicat_arr_'+catId);
+  if(!body)return;
+  var c=body.classList.toggle('collapsed');
+  if(arr){if(c)arr.classList.remove('open');else arr.classList.add('open');}
 }
 function _toggleViGrp(grpId){
-  var body = document.getElementById('vigrp_body_'+grpId);
-  var arr  = document.getElementById('vigrp_arr_'+grpId);
-  if(!body) return;
-  var collapsed = body.classList.toggle('collapsed');
-  if(arr){ if(collapsed) arr.classList.remove('open'); else arr.classList.add('open'); }
+  var body=document.getElementById('vigrp_body_'+grpId);
+  var arr=document.getElementById('vigrp_arr_'+grpId);
+  if(!body)return;
+  var c=body.classList.toggle('collapsed');
+  if(arr){if(c)arr.classList.remove('open');else arr.classList.add('open');}
 }
 
 /* ══════════════════════════════════════════
-   설비 CRUD
+   데이터 수집 및 저장
 ══════════════════════════════════════════ */
-function selectVisionEquip(id){
-  _visionSelId = id;
-  renderVisionSidebar();
-  renderVisionMain();
-}
-
-function openAddVisionEquip(){
-  var siteOpts = S.sites.map(function(s){
-    return '<option value="'+s.id+'">'+_esc(s.name)+'</option>';
-  }).join('');
-  mw('<div class="mtit">📋 설비 추가</div>'+
-    '<div class="fg"><label class="fl">사이트</label>'+
-      '<select id="vi_new_site"><option value="">-- 선택 --</option>'+siteOpts+'</select></div>'+
-    '<div class="fg"><label class="fl">호기명</label>'+
-      '<input type="text" id="vi_new_unit" placeholder="예: Anode"></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doAddVisionEquip()">추가</button>'+
-    '</div>');
-}
-function _doAddVisionEquip(){
-  var siteId = document.getElementById('vi_new_site').value;
-  var unit   = document.getElementById('vi_new_unit').value.trim();
-  if(!siteId){ alert('사이트를 선택해주세요.'); return; }
-  var site = S.sites.find(function(s){ return s.id===siteId; });
-  var equip = {
-    id: _viId(),
-    siteId: siteId,
-    createdAt: _viToday(),
-    updatedAt: _viToday(),
-    data: {
-      'vi_site': site ? site.name : siteId,
-      'vi_unit': unit
-    }
-  };
-  S.visionEquips.push(equip);
-  _visionSelId = equip.id;
-  saveData();
-  cm();
-  renderVisionTab();
-}
-
-/* ── 데이터 수집 및 저장 ── */
 function saveVisionEquipData(){
-  var equip = S.visionEquips.find(function(e){ return e.id===_visionSelId; });
-  if(!equip) return;
-  var data = _collectVisionFormData();
-  equip.data = data;
-  equip.updatedAt = _viToday();
-  // siteId를 vi_site 선택값 기준 사이트 ID로 동기화
-  var siteName = data['vi_site'] || '';
-  var matchSite = S.sites.find(function(s){ return s.name===siteName||s.id===siteName; });
-  if(matchSite) equip.siteId = matchSite.id;
+  var equip=S.visionEquips.find(function(e){return e.id===_visionSelId;});
+  if(!equip)return;
+  equip.data=_collectVisionFormData();
+  equip.updatedAt=_viToday();
+  var sn=equip.data['vi_site']||'';
+  var matchSite=S.sites.find(function(s){return s.name===sn||s.id===sn;});
+  if(matchSite)equip.siteId=matchSite.id;
   saveData();
-  var ts = document.getElementById('viSaveTs');
-  if(ts) ts.textContent = '최종 저장: '+equip.updatedAt;
-  renderVisionSidebar(); // 카드명 반영
+  var ts=document.getElementById('viSaveTs');
+  if(ts)ts.textContent='최종 저장: '+equip.updatedAt;
+  renderVisionSidebar();
 }
 
 function _collectVisionFormData(){
-  var data = {};
-  S.visionTemplate.categories.forEach(function(cat){
-    var itemsList = cat.items || [];
-    if(cat.groups){ cat.groups.forEach(function(g){ itemsList = itemsList.concat(g.items||[]); }); }
-    itemsList.forEach(function(item){
-      data[item.id] = _collectViField(item);
-    });
+  var data={};
+  (S.visionTemplate.categories||[]).forEach(function(cat){
+    var items=[];
+    if(cat.groups) cat.groups.forEach(function(g){items=items.concat(g.items||[]);});
+    else items=cat.items||[];
+    items.forEach(function(item){ data[item.id]=_collectViField(item); });
   });
   return data;
 }
 
 function _collectViField(item){
-  var id = 'viinp_'+item.id;
+  var id='viinp_'+item.id;
   switch(item.type){
-    case 'select':{
-      var sel = document.getElementById(id);
-      return sel ? sel.value : '';
+    case 'multiselect':{
+      var wrap=document.getElementById(id); if(!wrap)return [];
+      var chks=wrap.querySelectorAll('.vi-ms-chk:checked');
+      return Array.prototype.map.call(chks,function(c){return c.value;});
     }
-    case 'camera-sn':{
-      var countEl = document.getElementById(id+'_count');
-      var count = countEl ? (parseInt(countEl.value)||0) : 0;
-      var sns = [];
-      var snInps = document.querySelectorAll('#'+id+'_sns .vi-cam-sn-inp');
-      for(var i=0;i<snInps.length;i++) sns.push(snInps[i].value);
-      return {count:count, sns:sns};
+    case 'camera-multi':{
+      var wrap=document.getElementById(id); if(!wrap)return [];
+      var entries=wrap.querySelectorAll('.vi-cam-entry');
+      return Array.prototype.map.call(entries,function(el){
+        var modelEl=el.querySelector('.vi-cam-model-inp');
+        var qtyEl=el.querySelector('.vi-cam-qty-inp');
+        var snInps=el.querySelectorAll('.vi-cam-sn-inp');
+        return {
+          model:modelEl?modelEl.value:'',
+          count:parseInt(qtyEl?qtyEl.value:0)||0,
+          sns:Array.prototype.map.call(snInps,function(i){return i.value;})
+        };
+      });
     }
     case 'spec-qty':{
-      var specEl = document.getElementById(id+'_spec');
-      var qtyEl  = document.getElementById(id+'_qty');
-      return {spec: specEl?specEl.value:'', qty: qtyEl?qtyEl.value:''};
+      var s=document.getElementById(id+'_spec'), q=document.getElementById(id+'_qty');
+      return {spec:s?s.value:'', qty:q?q.value:''};
     }
     case 'ssd-multi': return _collectMultiTable(id+'_tbl',['capacity','qty','drive']);
     case 'lancard-multi': return _collectMultiTable(id+'_tbl',['speed','ports','purpose']);
-    default:{
-      var el = document.getElementById(id);
-      return el ? el.value : '';
-    }
+    default:{ var el=document.getElementById(id); return el?el.value:''; }
   }
 }
 
-function _collectMultiTable(tblId, fields){
-  var rows = [];
-  var tbody = document.querySelector('#'+tblId+' tbody');
-  if(!tbody) return rows;
-  Array.prototype.forEach.call(tbody.rows, function(tr){
-    var inputs = tr.querySelectorAll('input');
-    var obj = {};
-    fields.forEach(function(f,i){ obj[f] = inputs[i] ? inputs[i].value : ''; });
+function _collectMultiTable(tblId,fields){
+  var rows=[]; var tbody=document.querySelector('#'+tblId+' tbody'); if(!tbody)return rows;
+  Array.prototype.forEach.call(tbody.rows,function(tr){
+    var inputs=tr.querySelectorAll('input'); var obj={};
+    fields.forEach(function(f,i){obj[f]=inputs[i]?inputs[i].value:'';});
     rows.push(obj);
   });
   return rows;
 }
 
+/* ══════════════════════════════════════════
+   설비 CRUD
+══════════════════════════════════════════ */
+function openAddVisionEquip(){
+  var siteOpts=S.sites.map(function(s){return '<option value="'+s.id+'">'+_esc(s.name)+'</option>';}).join('');
+  mw('<div class="mtit">📋 설비 추가</div>'+
+    '<div class="fg"><label class="fl">사이트</label><select id="vi_new_site"><option value="">-- 선택 --</option>'+siteOpts+'</select></div>'+
+    '<div class="fg"><label class="fl">호기명</label><input type="text" id="vi_new_unit" placeholder="예: Anode"></div>'+
+    '<div class="fg"><label class="fl">라인</label><input type="text" id="vi_new_line" placeholder="예: 1라인"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doAddVisionEquip()">추가</button></div>');
+}
+function _doAddVisionEquip(){
+  var siteId=document.getElementById('vi_new_site').value;
+  var unit=document.getElementById('vi_new_unit').value.trim();
+  var line=document.getElementById('vi_new_line').value.trim();
+  if(!siteId){alert('사이트를 선택해주세요.');return;}
+  var site=S.sites.find(function(s){return s.id===siteId;});
+  var equip={id:_viId(),siteId:siteId,createdAt:_viToday(),updatedAt:_viToday(),
+    data:{'vi_site':site?site.name:siteId,'vi_unit':unit,'vi_line':line}};
+  S.visionEquips.push(equip);
+  _visionSelId=equip.id; _visionView='detail';
+  saveData(); cm(); renderVisionTab();
+}
+
 function delVisionEquip(id){
-  var equip = S.visionEquips.find(function(e){ return e.id===id; });
-  var name = equip ? _viEquipName(equip) : id;
-  if(!confirm('['+name+'] 설비를 삭제하시겠습니까?')) return;
-  S.visionEquips = S.visionEquips.filter(function(e){ return e.id!==id; });
-  _visionSelId = null;
-  saveData();
-  renderVisionTab();
+  var equip=S.visionEquips.find(function(e){return e.id===id;});
+  var name=equip?_viEquipLabel(equip):id;
+  if(!confirm('['+name+'] 설비를 삭제하시겠습니까?'))return;
+  S.visionEquips=S.visionEquips.filter(function(e){return e.id!==id;});
+  _visionSelId=null; _visionView='grid';
+  saveData(); renderVisionTab();
+}
+
+function copyVisionEquip(srcId){
+  var src=S.visionEquips.find(function(e){return e.id===srcId;});
+  if(!src)return;
+  var newEquip={id:_viId(),siteId:src.siteId,createdAt:_viToday(),updatedAt:_viToday(),
+    data:deepCopy(src.data)};
+  if(newEquip.data['vi_unit']) newEquip.data['vi_unit']+=' (복사)';
+  S.visionEquips.push(newEquip);
+  _visionSelId=newEquip.id; _visionView='detail';
+  saveData(); renderVisionTab();
 }
 
 /* ══════════════════════════════════════════
-   설비진행율에서 가져오기
+   설비진행율 가져오기
 ══════════════════════════════════════════ */
 function openVisionImport(){
-  if(!S.equipUnits || !S.equipUnits.length){
-    alert('설비 진행율에 등록된 호기가 없습니다.');
-    return;
-  }
-  var listHtml = S.equipUnits.map(function(u){
-    var site = S.sites.find(function(s){ return s.id===u.siteId; });
-    var siteName = site ? site.name : (u.siteId||'');
-    var label = [u.lineName, u.unitName].filter(Boolean).join(' / ');
+  if(!S.equipUnits||!S.equipUnits.length){alert('설비 진행율에 등록된 호기가 없습니다.');return;}
+  var listHtml=S.equipUnits.map(function(u){
+    var site=S.sites.find(function(s){return s.id===u.siteId;});
+    var siteName=site?site.name:(u.siteId||'');
+    var label=[u.lineName,u.unitName].filter(Boolean).join('-');
     return '<label class="vi-import-item">'+
       '<input type="checkbox" class="vi-import-chk" value="'+u.id+'">'+
       '<span class="vi-import-label">'+_esc(label)+'</span>'+
-      '<span class="vi-import-sub">'+_esc(siteName)+'</span>'+
-      '</label>';
+      '<span class="vi-import-sub">'+_esc(siteName)+'</span></label>';
   }).join('');
-
   mw('<div class="mtit">설비진행율 → 이력관리 가져오기</div>'+
-    '<div style="font-size:11px;color:#888;margin-bottom:6px">선택한 호기의 기본정보(사이트/라인/호기)를 복사하여 새 설비 레코드를 생성합니다.</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:6px">선택한 호기의 기본정보를 복사하여 새 설비 레코드를 생성합니다.</div>'+
     '<div class="vi-import-list">'+listHtml+'</div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doVisionImport()">가져오기</button>'+
-    '</div>');
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doVisionImport()">가져오기</button></div>');
 }
 function _doVisionImport(){
-  var chks = document.querySelectorAll('.vi-import-chk:checked');
-  if(!chks.length){ alert('가져올 호기를 선택해주세요.'); return; }
-  var added = 0;
-  Array.prototype.forEach.call(chks, function(chk){
-    var unit = S.equipUnits.find(function(u){ return u.id===chk.value; });
-    if(!unit) return;
-    var site = S.sites.find(function(s){ return s.id===unit.siteId; });
-    var equip = {
-      id: _viId(),
-      siteId: unit.siteId || '',
-      createdAt: _viToday(),
-      updatedAt: _viToday(),
-      data: {
-        'vi_site': site ? site.name : (unit.siteId||''),
-        'vi_line': unit.lineName || '',
-        'vi_unit': unit.unitName || ''
-      }
-    };
-    S.visionEquips.push(equip);
-    added++;
+  var chks=document.querySelectorAll('.vi-import-chk:checked');
+  if(!chks.length){alert('가져올 호기를 선택해주세요.');return;}
+  var added=0;
+  Array.prototype.forEach.call(chks,function(chk){
+    var unit=S.equipUnits.find(function(u){return u.id===chk.value;}); if(!unit)return;
+    var site=S.sites.find(function(s){return s.id===unit.siteId;});
+    var equip={id:_viId(),siteId:unit.siteId||'',createdAt:_viToday(),updatedAt:_viToday(),
+      data:{'vi_site':site?site.name:(unit.siteId||''),'vi_line':unit.lineName||'','vi_unit':unit.unitName||''}};
+    S.visionEquips.push(equip); added++;
   });
-  saveData();
-  cm();
-  renderVisionTab();
-  if(added) alert(added+'개 설비를 가져왔습니다.');
+  saveData(); cm(); renderVisionTab();
+  if(added)alert(added+'개 설비를 가져왔습니다.');
+}
+
+/* ══════════════════════════════════════════
+   열 설정
+══════════════════════════════════════════ */
+function openViColumnSettings(){
+  var fixedIds=['vi_site','vi_line','vi_unit','vi_type'];
+  var catHtml='';
+  (S.visionTemplate.categories||[]).forEach(function(cat){
+    var items=[];
+    if(cat.groups) cat.groups.forEach(function(g){items=items.concat((g.items||[]).map(function(i){return{item:i,grp:g.name};}));});
+    else (cat.items||[]).forEach(function(i){items.push({item:i,grp:null});});
+    var eligible=items.filter(function(x){return fixedIds.indexOf(x.item.id)<0;});
+    if(!eligible.length)return;
+    catHtml+='<div class="vi-col-cat-hdr">'+_esc(cat.name)+'</div>';
+    eligible.forEach(function(x){
+      var lbl=(x.grp?x.grp+' > ':'')+x.item.name;
+      catHtml+='<label class="vi-col-item">'+
+        '<input type="checkbox" class="vi-col-chk" data-id="'+x.item.id+'"'+(x.item.showInGrid?' checked':'')+'>'+
+        '<label>'+_esc(lbl)+'</label></label>';
+    });
+  });
+  mw('<div class="mtit">열 설정 (그리드에 표시할 항목)</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:8px">고정 열(사이트/라인/호기/Type)은 항상 표시됩니다.</div>'+
+    '<div class="vi-col-settings-list">'+catHtml+'</div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doViColumnSettings()">적용</button></div>');
+}
+function _doViColumnSettings(){
+  var chks=document.querySelectorAll('.vi-col-chk');
+  Array.prototype.forEach.call(chks,function(chk){
+    var item=_findItemById(chk.dataset.id); if(item)item.showInGrid=chk.checked;
+  });
+  saveData(); cm(); renderVisionMain();
 }
 
 /* ══════════════════════════════════════════
    템플릿 편집 모드
 ══════════════════════════════════════════ */
 function toggleVisionTemplateEdit(){
-  _visionEditMode = !_visionEditMode;
-  var btn = document.getElementById('btnVisionTplEdit');
-  if(btn){
-    btn.textContent = _visionEditMode ? '편집 완료' : '템플릿 편집';
-    btn.className = _visionEditMode ? 'btn warn' : 'btn';
-  }
-  renderVisionMain();
+  _visionEditMode=!_visionEditMode;
+  var btn=document.getElementById('btnVisionTplEdit');
+  if(btn){btn.textContent=_visionEditMode?'편집 완료':'템플릿 편집'; btn.className=_visionEditMode?'btn warn':'btn';}
+  if(_visionView==='detail') renderVisionMain();
 }
 
-/* ── 카테고리 ── */
 function openAddVisionCategory(){
   mw('<div class="mtit">카테고리 추가</div>'+
-    '<div class="fg"><label class="fl">카테고리명</label>'+
-      '<input type="text" id="vi_new_cat_name" placeholder="예: 소프트웨어"></div>'+
-    '<div class="fg"><label class="fl">구조</label>'+
-      '<select id="vi_new_cat_type">'+
-        '<option value="items">항목만 (그룹 없음)</option>'+
-        '<option value="groups">그룹 포함</option>'+
-      '</select></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doAddViCategory()">추가</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">카테고리명</label><input type="text" id="vi_new_cat_name" placeholder="예: 소프트웨어"></div>'+
+    '<div class="fg"><label class="fl">구조</label><select id="vi_new_cat_type"><option value="items">항목만 (그룹 없음)</option><option value="groups">그룹 포함</option></select></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doAddViCategory()">추가</button></div>');
 }
 function _doAddViCategory(){
-  var name = document.getElementById('vi_new_cat_name').value.trim();
-  var type = document.getElementById('vi_new_cat_type').value;
-  if(!name){ alert('카테고리명을 입력해주세요.'); return; }
-  var maxOrder = S.visionTemplate.categories.reduce(function(m,c){ return Math.max(m,c.order||0); }, -1);
-  var cat = {id:'vc_'+Date.now(), name:name, order:maxOrder+1};
-  if(type==='groups') cat.groups = [];
-  else cat.items = [];
-  S.visionTemplate.categories.push(cat);
-  saveData(); cm(); renderVisionMain();
+  var name=document.getElementById('vi_new_cat_name').value.trim();
+  var type=document.getElementById('vi_new_cat_type').value;
+  if(!name){alert('카테고리명을 입력해주세요.');return;}
+  var cats=S.visionTemplate.categories||[];
+  var maxOrder=cats.reduce(function(m,c){return Math.max(m,c.order||0);},-1);
+  var cat={id:'vc_'+Date.now(),name:name,order:maxOrder+1};
+  if(type==='groups')cat.groups=[];else cat.items=[];
+  cats.push(cat); saveData(); cm(); renderVisionMain();
 }
-
 function openRenameViCategory(catId){
-  var cat = _findCat(catId);
-  if(!cat) return;
+  var cat=_findCat(catId); if(!cat)return;
   mw('<div class="mtit">카테고리 이름 변경</div>'+
-    '<div class="fg"><label class="fl">카테고리명</label>'+
-      '<input type="text" id="vi_ren_cat" value="'+_esc(cat.name)+'"></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doRenameViCat(\''+catId+'\')">저장</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">카테고리명</label><input type="text" id="vi_ren_cat" value="'+_esc(cat.name)+'"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doRenameViCat(\''+catId+'\')">저장</button></div>');
 }
 function _doRenameViCat(catId){
-  var name = document.getElementById('vi_ren_cat').value.trim();
-  if(!name) return;
-  var cat = _findCat(catId);
-  if(cat) cat.name = name;
-  saveData(); cm(); renderVisionMain();
+  var name=document.getElementById('vi_ren_cat').value.trim(); if(!name)return;
+  var cat=_findCat(catId); if(cat)cat.name=name; saveData(); cm(); renderVisionMain();
 }
-
 function delViCategory(catId){
-  var cat = _findCat(catId);
-  if(!cat) return;
-  var itemCount = _countCatItems(cat);
-  var msg = '['+cat.name+'] 카테고리를 삭제하시겠습니까?';
-  if(itemCount) msg += '\n이 카테고리에는 항목이 '+itemCount+'개 있습니다.\n기존 설비의 해당 데이터는 보존됩니다.';
-  if(!confirm(msg)) return;
-  S.visionTemplate.categories = S.visionTemplate.categories.filter(function(c){ return c.id!==catId; });
+  var cat=_findCat(catId); if(!cat)return;
+  var cnt=cat.groups?cat.groups.reduce(function(s,g){return s+(g.items?g.items.length:0);},0):(cat.items?cat.items.length:0);
+  var msg='['+cat.name+'] 카테고리를 삭제하시겠습니까?';
+  if(cnt)msg+='\n항목 '+cnt+'개 포함. 기존 설비 데이터는 보존됩니다.';
+  if(!confirm(msg))return;
+  S.visionTemplate.categories=S.visionTemplate.categories.filter(function(c){return c.id!==catId;});
   saveData(); renderVisionMain();
 }
-function _countCatItems(cat){
-  if(cat.items) return cat.items.length;
-  if(cat.groups) return cat.groups.reduce(function(s,g){ return s+(g.items?g.items.length:0); },0);
-  return 0;
+function moveViCategory(ci,dir){
+  var cats=S.visionTemplate.categories; var ni=ci+dir;
+  if(ni<0||ni>=cats.length)return;
+  var tmp=cats[ci];cats[ci]=cats[ni];cats[ni]=tmp; saveData(); renderVisionMain();
 }
 
-function moveViCategory(ci, dir){
-  var cats = S.visionTemplate.categories;
-  var ni = ci+dir;
-  if(ni<0||ni>=cats.length) return;
-  var tmp=cats[ci]; cats[ci]=cats[ni]; cats[ni]=tmp;
-  saveData(); renderVisionMain();
-}
-
-/* ── 그룹 ── */
 function openAddVisionGroup(catId){
   mw('<div class="mtit">그룹 추가</div>'+
-    '<div class="fg"><label class="fl">그룹명</label>'+
-      '<input type="text" id="vi_new_grp_name" placeholder="예: LIGHTING"></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doAddViGroup(\''+catId+'\')">추가</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">그룹명</label><input type="text" id="vi_new_grp_name" placeholder="예: LIGHTING"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doAddViGroup(\''+catId+'\')">추가</button></div>');
 }
 function _doAddViGroup(catId){
-  var name = document.getElementById('vi_new_grp_name').value.trim();
-  if(!name){ alert('그룹명을 입력해주세요.'); return; }
-  var cat = _findCat(catId);
-  if(!cat) return;
-  if(!cat.groups) cat.groups = [];
-  var maxOrder = cat.groups.reduce(function(m,g){ return Math.max(m,g.order||0); },-1);
-  cat.groups.push({id:'vg_'+Date.now(), name:name, order:maxOrder+1, items:[]});
-  saveData(); cm(); renderVisionMain();
+  var name=document.getElementById('vi_new_grp_name').value.trim(); if(!name){alert('그룹명을 입력해주세요.');return;}
+  var cat=_findCat(catId); if(!cat)return; if(!cat.groups)cat.groups=[];
+  var maxOrder=cat.groups.reduce(function(m,g){return Math.max(m,g.order||0);},-1);
+  cat.groups.push({id:'vg_'+Date.now(),name:name,order:maxOrder+1,items:[]}); saveData(); cm(); renderVisionMain();
 }
-
-function openRenameViGroup(catId, grpId){
-  var grp = _findGrp(catId, grpId);
-  if(!grp) return;
+function openRenameViGroup(catId,grpId){
+  var grp=_findGrp(catId,grpId); if(!grp)return;
   mw('<div class="mtit">그룹 이름 변경</div>'+
-    '<div class="fg"><label class="fl">그룹명</label>'+
-      '<input type="text" id="vi_ren_grp" value="'+_esc(grp.name)+'"></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doRenameViGrp(\''+catId+'\',\''+grpId+'\')">저장</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">그룹명</label><input type="text" id="vi_ren_grp" value="'+_esc(grp.name)+'"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doRenameViGrp(\''+catId+'\',\''+grpId+'\')">저장</button></div>');
 }
-function _doRenameViGrp(catId, grpId){
-  var name = document.getElementById('vi_ren_grp').value.trim();
-  if(!name) return;
-  var grp = _findGrp(catId, grpId);
-  if(grp) grp.name = name;
-  saveData(); cm(); renderVisionMain();
+function _doRenameViGrp(catId,grpId){
+  var name=document.getElementById('vi_ren_grp').value.trim(); if(!name)return;
+  var grp=_findGrp(catId,grpId); if(grp)grp.name=name; saveData(); cm(); renderVisionMain();
 }
-
-function delViGroup(catId, grpId){
-  var cat = _findCat(catId);
-  var grp = _findGrp(catId, grpId);
-  if(!cat||!grp) return;
-  var itemCount = grp.items ? grp.items.length : 0;
-  var msg = '['+grp.name+'] 그룹을 삭제하시겠습니까?';
-  if(itemCount) msg += '\n이 그룹에는 항목이 '+itemCount+'개 있습니다.\n기존 설비의 해당 데이터는 보존됩니다.';
-  if(!confirm(msg)) return;
-  cat.groups = cat.groups.filter(function(g){ return g.id!==grpId; });
-  saveData(); renderVisionMain();
+function delViGroup(catId,grpId){
+  var cat=_findCat(catId); var grp=_findGrp(catId,grpId); if(!cat||!grp)return;
+  var cnt=grp.items?grp.items.length:0;
+  var msg='['+grp.name+'] 그룹을 삭제하시겠습니까?';
+  if(cnt)msg+='\n항목 '+cnt+'개 포함. 기존 설비 데이터는 보존됩니다.';
+  if(!confirm(msg))return;
+  cat.groups=cat.groups.filter(function(g){return g.id!==grpId;}); saveData(); renderVisionMain();
+}
+function moveViGroup(catId,gi,dir){
+  var cat=_findCat(catId); if(!cat||!cat.groups)return;
+  var grps=cat.groups; var ni=gi+dir; if(ni<0||ni>=grps.length)return;
+  var tmp=grps[gi];grps[gi]=grps[ni];grps[ni]=tmp; saveData(); renderVisionMain();
 }
 
-function moveViGroup(catId, gi, dir){
-  var cat = _findCat(catId);
-  if(!cat||!cat.groups) return;
-  var grps = cat.groups;
-  var ni = gi+dir;
-  if(ni<0||ni>=grps.length) return;
-  var tmp=grps[gi]; grps[gi]=grps[ni]; grps[ni]=tmp;
-  saveData(); renderVisionMain();
-}
-
-/* ── 항목 ── */
-var _VI_TYPES = [
-  {val:'text',       lbl:'텍스트'},
-  {val:'select',     lbl:'선택 (드롭다운)'},
-  {val:'camera-sn',  lbl:'카메라 S/N (수량+S/N 목록)'},
-  {val:'spec-qty',   lbl:'사양+수량'},
-  {val:'ssd-multi',  lbl:'SSD (용량/수량/드라이브)'},
+var _VI_TYPES=[
+  {val:'text',lbl:'텍스트'},{val:'multiselect',lbl:'복수 선택 (체크박스)'},
+  {val:'camera-multi',lbl:'카메라 (다중 모델+S/N)'},
+  {val:'spec-qty',lbl:'사양+수량'},{val:'ssd-multi',lbl:'SSD/HDD (용량/수량/드라이브)'},
   {val:'lancard-multi',lbl:'랜카드 (속도/PORT/목적)'}
 ];
 
-function openAddVisionItem(catId, grpId){
-  var typeOpts = _VI_TYPES.map(function(t){
-    return '<option value="'+t.val+'">'+t.lbl+'</option>';
-  }).join('');
+function openAddVisionItem(catId,grpId){
+  var typeOpts=_VI_TYPES.map(function(t){return '<option value="'+t.val+'">'+t.lbl+'</option>';}).join('');
   mw('<div class="mtit">항목 추가</div>'+
-    '<div class="fg"><label class="fl">항목명</label>'+
-      '<input type="text" id="vi_new_item_name" placeholder="예: 버전"></div>'+
-    '<div class="fg"><label class="fl">입력 타입</label>'+
-      '<select id="vi_new_item_type">'+typeOpts+'</select></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doAddViItem(\''+catId+'\',\''+grpId+'\')">추가</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">항목명</label><input type="text" id="vi_new_item_name" placeholder="예: 버전"></div>'+
+    '<div class="fg"><label class="fl">입력 타입</label><select id="vi_new_item_type">'+typeOpts+'</select></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doAddViItem(\''+catId+'\',\''+grpId+'\')">추가</button></div>');
 }
-function _doAddViItem(catId, grpId){
-  var name = document.getElementById('vi_new_item_name').value.trim();
-  var type = document.getElementById('vi_new_item_type').value;
-  if(!name){ alert('항목명을 입력해주세요.'); return; }
-  var itemsList = _getItemsList(catId, grpId||'');
-  if(!itemsList) return;
-  var maxOrder = itemsList.reduce(function(m,i){ return Math.max(m,i.order||0); },-1);
-  var newItem = {id:'vi_'+Date.now(), name:name, type:type, order:maxOrder+1};
-  if(type==='select') newItem.options = [];
-  itemsList.push(newItem);
-  saveData(); cm(); renderVisionMain();
+function _doAddViItem(catId,grpId){
+  var name=document.getElementById('vi_new_item_name').value.trim();
+  var type=document.getElementById('vi_new_item_type').value;
+  if(!name){alert('항목명을 입력해주세요.');return;}
+  var list=_getItemsList(catId,grpId||''); if(!list)return;
+  var maxOrder=list.reduce(function(m,i){return Math.max(m,i.order||0);},-1);
+  var newItem={id:'vi_'+Date.now(),name:name,type:type,order:maxOrder+1,showInGrid:false};
+  if(type==='multiselect'||type==='select')newItem.options=[];
+  list.push(newItem); saveData(); cm(); renderVisionMain();
 }
-
-function openEditViItem(catId, grpId, itemId){
-  var item = _findItem(catId, grpId, itemId);
-  if(!item) return;
-  var typeOpts = _VI_TYPES.map(function(t){
-    return '<option value="'+t.val+'"'+(item.type===t.val?' selected':'')+'>'+t.lbl+'</option>';
-  }).join('');
+function openEditViItem(catId,grpId,itemId){
+  var item=_findItem(catId,grpId,itemId); if(!item)return;
+  var typeOpts=_VI_TYPES.map(function(t){return '<option value="'+t.val+'"'+(item.type===t.val?' selected':'')+'>'+t.lbl+'</option>';}).join('');
   mw('<div class="mtit">항목 편집</div>'+
-    '<div class="fg"><label class="fl">항목명</label>'+
-      '<input type="text" id="vi_edit_item_name" value="'+_esc(item.name)+'"></div>'+
-    '<div class="fg"><label class="fl">입력 타입</label>'+
-      '<select id="vi_edit_item_type">'+typeOpts+'</select></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doEditViItem(\''+catId+'\',\''+grpId+'\',\''+itemId+'\')">저장</button>'+
-    '</div>');
+    '<div class="fg"><label class="fl">항목명</label><input type="text" id="vi_edit_item_name" value="'+_esc(item.name)+'"></div>'+
+    '<div class="fg"><label class="fl">입력 타입</label><select id="vi_edit_item_type">'+typeOpts+'</select></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doEditViItem(\''+catId+'\',\''+grpId+'\',\''+itemId+'\')">저장</button></div>');
 }
-function _doEditViItem(catId, grpId, itemId){
-  var name = document.getElementById('vi_edit_item_name').value.trim();
-  var type = document.getElementById('vi_edit_item_type').value;
-  if(!name){ alert('항목명을 입력해주세요.'); return; }
-  var item = _findItem(catId, grpId, itemId);
-  if(!item) return;
-  item.name = name;
-  if(item.type!==type){
-    item.type = type;
-    if(type==='select' && !item.options) item.options=[];
-  }
+function _doEditViItem(catId,grpId,itemId){
+  var name=document.getElementById('vi_edit_item_name').value.trim();
+  var type=document.getElementById('vi_edit_item_type').value;
+  if(!name){alert('항목명을 입력해주세요.');return;}
+  var item=_findItem(catId,grpId,itemId); if(!item)return;
+  item.name=name;
+  if(item.type!==type){item.type=type; if((type==='multiselect'||type==='select')&&!item.options)item.options=[];}
   saveData(); cm(); renderVisionMain();
 }
-
-function delViItem(catId, grpId, itemId){
-  var item = _findItem(catId, grpId, itemId);
-  if(!item) return;
-  // 기존 데이터가 있는 설비 수 확인
-  var affected = S.visionEquips.filter(function(e){
-    return e.data && e.data[itemId] !== undefined && e.data[itemId] !== '' && e.data[itemId] !== null;
-  }).length;
-  var msg = '['+item.name+'] 항목을 삭제하시겠습니까?';
-  if(affected) msg += '\n데이터가 입력된 설비 '+affected+'개가 있습니다.\n기존 데이터는 보존됩니다(화면에서만 숨겨짐).';
-  if(!confirm(msg)) return;
-  var list = _getItemsList(catId, grpId);
-  if(!list) return;
-  var idx = list.findIndex ? list.findIndex(function(i){ return i.id===itemId; })
-    : (function(){ for(var x=0;x<list.length;x++) if(list[x].id===itemId) return x; return -1; })();
-  if(idx>=0) list.splice(idx,1);
-  saveData(); renderVisionMain();
+function delViItem(catId,grpId,itemId){
+  var item=_findItem(catId,grpId,itemId); if(!item)return;
+  var affected=(S.visionEquips||[]).filter(function(e){return e.data&&e.data[itemId]!==undefined&&e.data[itemId]!==''&&e.data[itemId]!==null;}).length;
+  var msg='['+item.name+'] 항목을 삭제하시겠습니까?';
+  if(affected)msg+='\n데이터 입력 설비 '+affected+'개. 기존 데이터는 보존됩니다.';
+  if(!confirm(msg))return;
+  var list=_getItemsList(catId,grpId); if(!list)return;
+  var idx=-1; for(var i=0;i<list.length;i++)if(list[i].id===itemId){idx=i;break;}
+  if(idx>=0)list.splice(idx,1); saveData(); renderVisionMain();
+}
+function moveViItem(catId,grpId,itemId,dir){
+  var list=_getItemsList(catId,grpId); if(!list)return;
+  var idx=-1; for(var i=0;i<list.length;i++)if(list[i].id===itemId){idx=i;break;}
+  if(idx<0)return; var ni=idx+dir; if(ni<0||ni>=list.length)return;
+  var tmp=list[idx];list[idx]=list[ni];list[ni]=tmp; saveData(); renderVisionMain();
 }
 
-function moveViItem(catId, grpId, itemId, dir){
-  var list = _getItemsList(catId, grpId);
-  if(!list) return;
-  var idx = -1;
-  for(var i=0;i<list.length;i++) if(list[i].id===itemId){ idx=i; break; }
-  if(idx<0) return;
-  var ni = idx+dir;
-  if(ni<0||ni>=list.length) return;
-  var tmp=list[idx]; list[idx]=list[ni]; list[ni]=tmp;
-  saveData(); renderVisionMain();
-}
-
-/* ── select 옵션 관리 ── */
 function openAddSelectOption(itemId){
-  mw('<div class="mtit">드롭다운 옵션 추가</div>'+
-    '<div class="fg"><label class="fl">옵션명</label>'+
-      '<input type="text" id="vi_new_opt" placeholder="예: Winding"></div>'+
-    '<div class="mfoot">'+
-      '<button class="btn sm" onclick="cm()">취소</button>'+
-      '<button class="btn sm pri" onclick="_doAddSelectOption(\''+itemId+'\')">추가</button>'+
-    '</div>');
+  mw('<div class="mtit">옵션 추가</div>'+
+    '<div class="fg"><label class="fl">옵션명</label><input type="text" id="vi_new_opt" placeholder="예: Winding"></div>'+
+    '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doAddSelectOption(\''+itemId+'\')">추가</button></div>');
 }
 function _doAddSelectOption(itemId){
-  var val = document.getElementById('vi_new_opt').value.trim();
-  if(!val){ alert('옵션명을 입력해주세요.'); return; }
-  var item = _findItemById(itemId);
-  if(!item) return;
-  if(!item.options) item.options=[];
-  if(item.options.indexOf(val)>=0){ alert('이미 존재하는 옵션입니다.'); return; }
-  item.options.push(val);
-  saveData(); cm(); renderVisionMain();
+  var val=document.getElementById('vi_new_opt').value.trim(); if(!val){alert('옵션명을 입력해주세요.');return;}
+  var item=_findItemById(itemId); if(!item)return;
+  if(!item.options)item.options=[];
+  if(item.options.indexOf(val)>=0){alert('이미 존재하는 옵션입니다.');return;}
+  item.options.push(val); saveData(); cm(); renderVisionMain();
 }
-function delSelectOption(itemId, optVal){
-  var item = _findItemById(itemId);
-  if(!item||!item.options) return;
-  item.options = item.options.filter(function(o){ return o!==optVal; });
-  saveData(); renderVisionMain();
+function delSelectOption(itemId,optVal){
+  var item=_findItemById(itemId); if(!item||!item.options)return;
+  item.options=item.options.filter(function(o){return o!==optVal;}); saveData(); renderVisionMain();
 }
 
 /* ══════════════════════════════════════════
-   CSV 스텁
+   CSV 내보내기 / 가져오기
 ══════════════════════════════════════════ */
 function exportVisionCSV(){
-  alert('CSV 내보내기 기능은 추후 업데이트 예정입니다.\n현재 데이터는 localStorage 및 Google Sheets에 저장되어 있습니다.');
-}
-function openVisionCsvImport(){
-  alert('CSV 가져오기 기능은 추후 업데이트 예정입니다.\n현재는 수동 입력 또는 "진행율 가져오기" 기능을 사용해주세요.');
-}
+  if(!S.visionEquips||!S.visionEquips.length){alert('내보낼 설비 데이터가 없습니다.');return;}
+  var allItems=_viAllItems();
+  var headers=['site','line','unit','type']; // 고정 4열
+  var colMap=[]; // {header, item}
 
-/* ══════════════════════════════════════════
-   유틸 헬퍼
-══════════════════════════════════════════ */
-function _esc(s){
-  return String(s||'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-}
-function _viToday(){
-  var d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-
-function _findCat(catId){
-  return S.visionTemplate.categories.find(function(c){ return c.id===catId; }) || null;
-}
-function _findGrp(catId, grpId){
-  var cat = _findCat(catId);
-  if(!cat||!cat.groups) return null;
-  return cat.groups.find(function(g){ return g.id===grpId; }) || null;
-}
-function _findItem(catId, grpId, itemId){
-  var list = _getItemsList(catId, grpId);
-  if(!list) return null;
-  return list.find(function(i){ return i.id===itemId; }) || null;
-}
-function _findItemById(itemId){
-  // 전체 카테고리/그룹을 순회하며 item 찾기
-  var found = null;
-  S.visionTemplate.categories.forEach(function(cat){
-    if(found) return;
-    if(cat.items){
-      var i = cat.items.find(function(x){ return x.id===itemId; });
-      if(i) found=i;
+  // 단순 타입 컬럼
+  allItems.forEach(function(item){
+    var fixedIds=['vi_site','vi_line','vi_unit','vi_type'];
+    if(fixedIds.indexOf(item.id)>=0)return;
+    switch(item.type){
+      case 'spec-qty':
+        headers.push(item.id+'_spec'); headers.push(item.id+'_qty');
+        colMap.push({h:item.id+'_spec',item:item,sub:'spec'}); colMap.push({h:item.id+'_qty',item:item,sub:'qty'}); break;
+      case 'camera-multi':
+        // 최대 카메라 수 탐색
+        var maxCams=0;
+        S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id]; if(Array.isArray(v))maxCams=Math.max(maxCams,v.length);});
+        maxCams=Math.max(maxCams,1);
+        var maxSns=0;
+        S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id]; if(Array.isArray(v))v.forEach(function(c){maxSns=Math.max(maxSns,parseInt(c.count)||0);});});
+        maxSns=Math.max(maxSns,1);
+        for(var ci=0;ci<maxCams;ci++){
+          headers.push('cam'+(ci+1)+'_model'); colMap.push({h:'cam'+(ci+1)+'_model',item:item,sub:'cam_model',ci:ci});
+          headers.push('cam'+(ci+1)+'_count'); colMap.push({h:'cam'+(ci+1)+'_count',item:item,sub:'cam_count',ci:ci});
+          for(var si=0;si<maxSns;si++){
+            headers.push('cam'+(ci+1)+'_sn'+(si+1)); colMap.push({h:'cam'+(ci+1)+'_sn'+(si+1),item:item,sub:'cam_sn',ci:ci,si:si});
+          }
+        }
+        break;
+      case 'ssd-multi':
+        var maxRows=0;
+        S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id]; if(Array.isArray(v))maxRows=Math.max(maxRows,v.length);});
+        maxRows=Math.max(maxRows,1);
+        for(var ri=0;ri<maxRows;ri++){
+          var p=item.id+'_'+(ri+1);
+          headers.push(p+'_cap'); headers.push(p+'_qty'); headers.push(p+'_drive');
+          colMap.push({h:p+'_cap',item:item,sub:'ssd_cap',ri:ri}); colMap.push({h:p+'_qty',item:item,sub:'ssd_qty',ri:ri}); colMap.push({h:p+'_drive',item:item,sub:'ssd_drive',ri:ri});
+        }
+        break;
+      case 'lancard-multi':
+        var maxRows2=0;
+        S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id]; if(Array.isArray(v))maxRows2=Math.max(maxRows2,v.length);});
+        maxRows2=Math.max(maxRows2,1);
+        for(var ri2=0;ri2<maxRows2;ri2++){
+          var p2=item.id+'_'+(ri2+1);
+          headers.push(p2+'_speed'); headers.push(p2+'_ports'); headers.push(p2+'_purpose');
+          colMap.push({h:p2+'_speed',item:item,sub:'lan_speed',ri:ri2}); colMap.push({h:p2+'_ports',item:item,sub:'lan_ports',ri:ri2}); colMap.push({h:p2+'_purpose',item:item,sub:'lan_purpose',ri:ri2});
+        }
+        break;
+      default:
+        headers.push(item.id); colMap.push({h:item.id,item:item,sub:'direct'});
     }
-    if(cat.groups) cat.groups.forEach(function(grp){
-      if(found) return;
-      var i = (grp.items||[]).find(function(x){ return x.id===itemId; });
-      if(i) found=i;
-    });
   });
-  return found;
+
+  // 행 생성
+  var rows=[headers];
+  S.visionEquips.forEach(function(e){
+    var d=e.data||{};
+    var row=[
+      d['vi_site']||'', d['vi_line']||'', d['vi_unit']||'',
+      Array.isArray(d['vi_type'])?d['vi_type'].join(';'):(d['vi_type']||'')
+    ];
+    colMap.forEach(function(cm){
+      var v=d[cm.item.id];
+      switch(cm.sub){
+        case 'spec': row.push(v&&typeof v==='object'?v.spec:''); break;
+        case 'qty': row.push(v&&typeof v==='object'?v.qty:''); break;
+        case 'cam_model': row.push(Array.isArray(v)&&v[cm.ci]?v[cm.ci].model:''); break;
+        case 'cam_count': row.push(Array.isArray(v)&&v[cm.ci]?v[cm.ci].count:''); break;
+        case 'cam_sn': row.push(Array.isArray(v)&&v[cm.ci]&&v[cm.ci].sns?v[cm.ci].sns[cm.si]||'':''); break;
+        case 'ssd_cap': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].capacity:''); break;
+        case 'ssd_qty': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].qty:''); break;
+        case 'ssd_drive': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].drive:''); break;
+        case 'lan_speed': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].speed:''); break;
+        case 'lan_ports': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].ports:''); break;
+        case 'lan_purpose': row.push(Array.isArray(v)&&v[cm.ri]?v[cm.ri].purpose:''); break;
+        default:
+          if(Array.isArray(v))row.push(v.join(';'));
+          else row.push(v!==undefined&&v!==null?String(v):'');
+      }
+    });
+    rows.push(row);
+  });
+
+  var csv=rows.map(function(r){return r.map(function(c){var s=String(c||''); return (s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',');}).join('\r\n');
+  var bom='﻿';
+  var blob=new Blob([bom+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='vision_equip_'+_viToday()+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
-function _getItemsList(catId, grpId){
-  var cat = _findCat(catId);
-  if(!cat) return null;
-  if(grpId){
-    var grp = _findGrp(catId, grpId);
-    if(!grp) return null;
-    if(!grp.items) grp.items=[];
-    return grp.items;
+
+function openVisionCsvImport(){
+  var fi=document.getElementById('viCsvFileInput'); if(fi)fi.click();
+}
+
+function handleVisionCsvFile(input){
+  var file=input.files&&input.files[0]; if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    // BOM 제거
+    if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+    _parseAndImportVisionCSV(text);
+  };
+  reader.readAsText(file,'utf-8');
+  input.value='';
+}
+
+function _parseAndImportVisionCSV(text){
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(lines.length<2){alert('데이터가 없습니다.');return;}
+  var headers=_csvParseLine(lines[0]);
+  var allItems=_viAllItems();
+  var imported=0, updated=0;
+  for(var li=1;li<lines.length;li++){
+    var row=_csvParseLine(lines[li]);
+    if(!row.length||!row[0])continue;
+    var rmap={};
+    headers.forEach(function(h,i){rmap[h]=row[i]||'';});
+    var siteName=rmap['site']||''; var line=rmap['line']||''; var unit=rmap['unit']||'';
+    var site=S.sites.find(function(s){return s.name===siteName||s.id===siteName;});
+    // 기존 설비 매칭 (사이트+라인+호기)
+    var existing=S.visionEquips.find(function(e){
+      return e.siteId===(site?site.id:siteName)&&(e.data&&e.data['vi_unit']===unit)&&(e.data&&e.data['vi_line']===line);
+    });
+    var equip=existing||{id:_viId(),siteId:site?site.id:siteName,createdAt:_viToday(),updatedAt:_viToday(),data:{}};
+    equip.data['vi_site']=siteName; equip.data['vi_line']=line; equip.data['vi_unit']=unit;
+    var typeStr=rmap['type']||'';
+    equip.data['vi_type']=typeStr?typeStr.split(';').map(function(s){return s.trim();}).filter(Boolean):[];
+    // 나머지 항목
+    allItems.forEach(function(item){
+      var fixedIds=['vi_site','vi_line','vi_unit','vi_type']; if(fixedIds.indexOf(item.id)>=0)return;
+      switch(item.type){
+        case 'spec-qty':
+          equip.data[item.id]={spec:rmap[item.id+'_spec']||'',qty:rmap[item.id+'_qty']||''}; break;
+        case 'camera-multi':{
+          var cams=[]; var ci=0;
+          while(rmap['cam'+(ci+1)+'_model']!==undefined||rmap['cam'+(ci+1)+'_count']!==undefined){
+            var model=rmap['cam'+(ci+1)+'_model']||'';
+            var count=parseInt(rmap['cam'+(ci+1)+'_count'])||0;
+            var sns=[]; for(var si=0;si<count;si++){sns.push(rmap['cam'+(ci+1)+'_sn'+(si+1)]||'');}
+            cams.push({model:model,count:count,sns:sns}); ci++;
+          }
+          if(cams.length)equip.data[item.id]=cams; break;}
+        case 'ssd-multi':{
+          var rows=[]; var ri=0;
+          while(rmap[item.id+'_'+(ri+1)+'_cap']!==undefined){
+            rows.push({capacity:rmap[item.id+'_'+(ri+1)+'_cap']||'',qty:rmap[item.id+'_'+(ri+1)+'_qty']||'',drive:rmap[item.id+'_'+(ri+1)+'_drive']||''});
+            ri++;
+          }
+          if(rows.length)equip.data[item.id]=rows; break;}
+        case 'lancard-multi':{
+          var rows2=[]; var ri2=0;
+          while(rmap[item.id+'_'+(ri2+1)+'_speed']!==undefined){
+            rows2.push({speed:rmap[item.id+'_'+(ri2+1)+'_speed']||'',ports:rmap[item.id+'_'+(ri2+1)+'_ports']||'',purpose:rmap[item.id+'_'+(ri2+1)+'_purpose']||''});
+            ri2++;
+          }
+          if(rows2.length)equip.data[item.id]=rows2; break;}
+        case 'multiselect':{
+          var v=rmap[item.id]||'';
+          equip.data[item.id]=v?v.split(';').map(function(s){return s.trim();}).filter(Boolean):[];break;}
+        default:
+          if(rmap[item.id]!==undefined)equip.data[item.id]=rmap[item.id];
+      }
+    });
+    equip.updatedAt=_viToday();
+    if(existing)updated++;
+    else{S.visionEquips.push(equip);imported++;}
   }
-  if(!cat.items) cat.items=[];
-  return cat.items;
+  saveData(); renderVisionTab();
+  alert('가져오기 완료: 신규 '+imported+'개, 업데이트 '+updated+'개');
+}
+
+function _csvParseLine(line){
+  var result=[]; var cur=''; var inQ=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){result.push(cur);cur='';}
+    else cur+=c;
+  }
+  result.push(cur); return result;
 }

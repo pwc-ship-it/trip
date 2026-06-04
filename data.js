@@ -88,14 +88,14 @@ var DEF = {
       {
         "id": "vc_basic", "name": "기본정보", "order": 0,
         "items": [
-          {"id":"vi_site",    "name":"사이트",   "type":"text",   "order":0},
-          {"id":"vi_line",    "name":"라인",     "type":"text",   "order":1},
-          {"id":"vi_unit",    "name":"호기",     "type":"text",   "order":2},
-          {"id":"vi_type",    "name":"Type",     "type":"select", "order":3,
+          {"id":"vi_site",    "name":"사이트",   "type":"text",        "order":0, "showInGrid":false},
+          {"id":"vi_line",    "name":"라인",     "type":"text",        "order":1, "showInGrid":false},
+          {"id":"vi_unit",    "name":"호기",     "type":"text",        "order":2, "showInGrid":false},
+          {"id":"vi_type",    "name":"Type",     "type":"multiselect", "order":3, "showInGrid":false,
            "options":["Notching","Delamination","Foil","NGMarking","DNC_Notching","DNC_Cutting"]},
-          {"id":"vi_sn",      "name":"S/N",      "type":"text",   "order":4},
-          {"id":"vi_os",      "name":"OS",       "type":"text",   "order":5},
-          {"id":"vi_license", "name":"라이센스", "type":"text",   "order":6}
+          {"id":"vi_sn",      "name":"S/N",      "type":"text",        "order":4, "showInGrid":true},
+          {"id":"vi_os",      "name":"OS",       "type":"text",        "order":5, "showInGrid":true},
+          {"id":"vi_license", "name":"라이센스", "type":"text",        "order":6, "showInGrid":false}
         ]
       },
       {
@@ -104,32 +104,39 @@ var DEF = {
           {
             "id":"vg_camera","name":"CAMERA","order":0,
             "items":[
-              {"id":"vi_cam_model","name":"Camera 모델명","type":"text",      "order":0},
-              {"id":"vi_cam_sn",  "name":"Camera S/N",   "type":"camera-sn", "order":1}
+              {"id":"vi_cameras","name":"Camera","type":"camera-multi","order":0,"showInGrid":true}
             ]
           },
           {
-            "id":"vg_fg","name":"FRAME GRABBER","order":1,
+            "id":"vg_light","name":"LIGHTING","order":1,
             "items":[
-              {"id":"vi_fg_model","name":"FRAME GRABBER 모델명","type":"text","order":0},
-              {"id":"vi_fg_board","name":"BOARD 버전",           "type":"text","order":1},
-              {"id":"vi_fg_fw",  "name":"FIRMWARE",              "type":"text","order":2}
+              {"id":"vi_light_model","name":"조명 모델명","type":"text",     "order":0,"showInGrid":false},
+              {"id":"vi_light_qty",  "name":"수량",       "type":"spec-qty", "order":1,"showInGrid":false},
+              {"id":"vi_light_sn",   "name":"S/N",        "type":"text",     "order":2,"showInGrid":false}
             ]
           },
           {
-            "id":"vg_sync","name":"SYNC BOARD","order":2,
+            "id":"vg_fg","name":"FRAME GRABBER","order":2,
             "items":[
-              {"id":"vi_sync_ver",  "name":"Sync 버전",  "type":"text","order":0},
-              {"id":"vi_sync_board","name":"BOARD 버전", "type":"text","order":1},
-              {"id":"vi_sync_fw",   "name":"FIRMWARE",   "type":"text","order":2}
+              {"id":"vi_fg_model","name":"FRAME GRABBER 모델명","type":"text","order":0,"showInGrid":false},
+              {"id":"vi_fg_board","name":"BOARD 버전",           "type":"text","order":1,"showInGrid":false},
+              {"id":"vi_fg_fw",  "name":"FIRMWARE",              "type":"text","order":2,"showInGrid":false}
             ]
           },
           {
-            "id":"vg_trig","name":"TRIGGER BOARD","order":3,
+            "id":"vg_sync","name":"SYNC BOARD","order":3,
             "items":[
-              {"id":"vi_trig_model","name":"TRIGGER BOARD 모델명","type":"text","order":0},
-              {"id":"vi_trig_board","name":"BOARD 버전",           "type":"text","order":1},
-              {"id":"vi_trig_fw",  "name":"FIRMWARE",              "type":"text","order":2}
+              {"id":"vi_sync_ver",  "name":"Sync 버전",  "type":"text","order":0,"showInGrid":false},
+              {"id":"vi_sync_board","name":"BOARD 버전", "type":"text","order":1,"showInGrid":false},
+              {"id":"vi_sync_fw",   "name":"FIRMWARE",   "type":"text","order":2,"showInGrid":false}
+            ]
+          },
+          {
+            "id":"vg_trig","name":"TRIGGER BOARD","order":4,
+            "items":[
+              {"id":"vi_trig_model","name":"TRIGGER BOARD 모델명","type":"text","order":0,"showInGrid":false},
+              {"id":"vi_trig_board","name":"BOARD 버전",           "type":"text","order":1,"showInGrid":false},
+              {"id":"vi_trig_fw",  "name":"FIRMWARE",              "type":"text","order":2,"showInGrid":false}
             ]
           }
         ]
@@ -137,11 +144,12 @@ var DEF = {
       {
         "id": "vc_pc", "name": "PC", "order": 2,
         "items": [
-          {"id":"vi_cpu",      "name":"CPU",       "type":"spec-qty",     "order":0},
-          {"id":"vi_mainboard","name":"MAIN BOARD","type":"spec-qty",     "order":1},
-          {"id":"vi_ram",      "name":"RAM",       "type":"spec-qty",     "order":2},
-          {"id":"vi_ssd",      "name":"SSD",       "type":"ssd-multi",    "order":3},
-          {"id":"vi_lancard",  "name":"LANCARD",   "type":"lancard-multi","order":4}
+          {"id":"vi_cpu",      "name":"CPU",       "type":"spec-qty",     "order":0,"showInGrid":false},
+          {"id":"vi_mainboard","name":"MAIN BOARD","type":"spec-qty",     "order":1,"showInGrid":false},
+          {"id":"vi_ram",      "name":"RAM",       "type":"spec-qty",     "order":2,"showInGrid":false},
+          {"id":"vi_ssd",      "name":"SSD",       "type":"ssd-multi",    "order":3,"showInGrid":false},
+          {"id":"vi_hdd",      "name":"HDD",       "type":"ssd-multi",    "order":4,"showInGrid":false},
+          {"id":"vi_lancard",  "name":"LANCARD",   "type":"lancard-multi","order":5,"showInGrid":false}
         ]
       }
     ]

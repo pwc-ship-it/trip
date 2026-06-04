@@ -50,8 +50,10 @@
           <button class="btn" id="btnVisionTplEdit" onclick="toggleVisionTemplateEdit()">템플릿 편집</button>
           <button class="btn" onclick="openVisionImport()">진행율 가져오기</button>
           <span style="display:inline-block;width:1px;height:16px;background:#3a3a44;flex-shrink:0"></span>
+          <button class="btn" onclick="openViColumnSettings()">열 설정</button>
           <button class="btn" onclick="exportVisionCSV()">CSV 내보내기</button>
           <button class="btn" onclick="openVisionCsvImport()">CSV 가져오기</button>
+          <input type="file" id="viCsvFileInput" accept=".csv" style="display:none" onchange="handleVisionCsvFile(this)">
         </div>
         <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
           <button class="btn" onclick="collapseAllEquip()">접기 전체</button>
