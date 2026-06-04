@@ -543,6 +543,8 @@ document.addEventListener('DOMContentLoaded', function(){
    탭 전환
 ════════════════════════════════════════════ */
 var _activeTab='gantt';
+var _viSyncTimer=null; // 이력관리 자동 동기화 타이머
+
 function switchTab(tab){
   _activeTab=tab;
   document.getElementById('view_gantt').style.display=tab==='gantt'?'flex':'none';
@@ -558,5 +560,58 @@ function switchTab(tab){
   document.getElementById('visionTools').style.display=tab==='vision'?'flex':'none';
   if(tab==='person') renderPersonTab();
   if(tab==='equip') renderEquipTab();
-  if(tab==='vision') renderVisionTab();
+  if(tab==='vision'){
+    renderVisionTab();
+    // 탭 진입 시 Sheets에서 최신 이력관리 데이터 자동 Pull
+    refreshVisionFromSheets(true);
+    // 2분마다 자동 갱신
+    if(_viSyncTimer) clearInterval(_viSyncTimer);
+    _viSyncTimer=setInterval(function(){refreshVisionFromSheets(true);},2*60*1000);
+  } else {
+    // Vision 탭 벗어나면 타이머 중지
+    if(_viSyncTimer){clearInterval(_viSyncTimer);_viSyncTimer=null;}
+  }
+}
+
+/* 이력관리 전용 Sheets Pull (isDirty 무관, visionEquips/visionTemplate만 갱신) */
+function refreshVisionFromSheets(silent){
+  var url=getSheetsUrl();
+  if(!url||location.protocol==='file:'){
+    if(!silent) alert('Sheets 연결이 설정되지 않았습니다.\n⚙ Sheets 설정에서 URL을 확인해주세요.');
+    return;
+  }
+  fetch(url+'?action=load')
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(data){
+      if(data.error)throw new Error(data.error);
+      var updated=false;
+      if(data.visionEquips&&data.visionEquips.length){
+        var sheetsIds={};
+        data.visionEquips.forEach(function(e){sheetsIds[e.id]=true;});
+        var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id];});
+        var _prevVE=S.visionEquips||[];
+        S.visionEquips=data.visionEquips.map(function(ve){
+          if(ve.data&&typeof ve.data!=='object') ve.data={};
+          if(!ve.data||!Object.keys(ve.data).length){
+            var lv=_prevVE.find(function(x){return x.id===ve.id;});
+            if(lv&&lv.data&&Object.keys(lv.data).length) ve.data=lv.data;
+          }
+          return ve;
+        }).concat(localOnly);
+        updated=true;
+      }
+      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length){
+        S.visionTemplate=data.visionTemplate;
+        _migrateVisionTemplate();
+        updated=true;
+      }
+      if(updated){
+        saveData();
+        if(_activeTab==='vision'&&typeof renderVisionTab==='function') renderVisionTab();
+      }
+      if(!silent) alert('이력관리 설비 '+S.visionEquips.length+'개를 Sheets에서 불러왔습니다.');
+    })
+    .catch(function(err){
+      if(!silent) alert('Sheets 불러오기 실패: '+err.message);
+    });
 }
