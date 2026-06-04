@@ -609,7 +609,14 @@ function refreshVisionFromSheets(silent){
         saveData();
         if(_activeTab==='vision'&&typeof renderVisionTab==='function') renderVisionTab();
       }
-      if(!silent) alert('이력관리 설비 '+S.visionEquips.length+'개를 Sheets에서 불러왔습니다.');
+      if(!silent){
+        var sheetsCount=(data.visionEquips&&data.visionEquips.length)||0;
+        if(sheetsCount===0){
+          alert('Sheets에 이력관리 설비 데이터가 없습니다.\n\nApps Script가 배포되지 않았을 수 있습니다.\n(Backup 폴더 → Apps Script 업데이트_Vision이력관리.txt 참조)');
+        } else {
+          alert('Sheets에서 '+sheetsCount+'개 설비를 가져왔습니다. (현재 총 '+S.visionEquips.length+'개)');
+        }
+      }
     })
     .catch(function(err){
       if(!silent) alert('Sheets 불러오기 실패: '+err.message);
