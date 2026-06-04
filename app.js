@@ -16,6 +16,50 @@ function normDate(s){
   if(isNaN(d.getTime()))return s;
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+/* ══════════════════════════════════════════
+   Vision 템플릿 마이그레이션 (loadData + loadFromSheets 공용)
+   - loadFromSheets가 Sheets의 구형 템플릿으로 덮어쓴 뒤 saveCache하는 구조 때문에
+     마이그레이션을 두 곳 모두에서 실행해야 영구 반영됨
+══════════════════════════════════════════ */
+function _migrateVisionTemplate(){
+  // Migration 1: 구형 템플릿(vi_cameras=camera-multi) → 신형 전체 교체
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var visCat=cats.find(function(c){return c.id==='vc_vision';});
+    if(!visCat||!visCat.groups)return;
+    var camGrp=visCat.groups.find(function(g){return g.id==='vg_camera';});
+    if(!camGrp||!camGrp.items)return;
+    var camItem=camGrp.items.find(function(i){return i.id==='vi_cameras';});
+    if(!camItem||camItem.type!=='camera-multi')return;
+    var oldOpts=null;
+    var oldBasic=cats.find(function(c){return c.id==='vc_basic';});
+    if(oldBasic&&oldBasic.items){var ot=oldBasic.items.find(function(i){return i.id==='vi_type';});if(ot)oldOpts=ot.options;}
+    S.visionTemplate=deepCopy(DEF.visionTemplate);
+    if(oldOpts){var nb=S.visionTemplate.categories.find(function(c){return c.id==='vc_basic';});if(nb&&nb.items){var nt=nb.items.find(function(i){return i.id==='vi_type';});if(nt)nt.options=oldOpts;}}
+  })();
+  // Migration 2: vc_board 누락 시 추가 + Vision 내 Board 그룹 잔재 정리
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    if(cats.find(function(c){return c.id==='vc_board';}))return;
+    var defBoard=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_board';});
+    if(!defBoard)return;
+    var pcIdx=-1;for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_pc'){pcIdx=i;break;}}
+    if(pcIdx>=0) cats.splice(pcIdx,0,deepCopy(defBoard)); else cats.push(deepCopy(defBoard));
+    var visCat=cats.find(function(c){return c.id==='vc_vision';});
+    if(visCat&&visCat.groups){
+      visCat.groups=visCat.groups.filter(function(g){return g.id!=='vg_fg'&&g.id!=='vg_sync'&&g.id!=='vg_trig';});
+    }
+  })();
+  // Migration 3: vi_ram specPlaceholder 누락 시 추가
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var pcCat=cats.find(function(c){return c.id==='vc_pc';});
+    if(!pcCat||!pcCat.items)return;
+    var ram=pcCat.items.find(function(i){return i.id==='vi_ram';});
+    if(ram&&!ram.specPlaceholder) ram.specPlaceholder='예: DDR5-4800 16GB';
+  })();
+}
+
 function loadData(){
   // localStorage 캐시 있으면 우선 사용, 없으면 DEF
   try{
@@ -43,48 +87,7 @@ function loadData(){
         S.equipProjects=d.equipProjects||[];
         S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
         S.visionEquips=d.visionEquips||[];
-        // 구형 템플릿(vi_cameras=camera-multi) 감지 시 신형으로 자동 마이그레이션
-        (function(){
-          var cats=S.visionTemplate.categories||[];
-          var visCat=cats.find(function(c){return c.id==='vc_vision';});
-          if(!visCat||!visCat.groups)return;
-          var camGrp=visCat.groups.find(function(g){return g.id==='vg_camera';});
-          if(!camGrp||!camGrp.items)return;
-          var camItem=camGrp.items.find(function(i){return i.id==='vi_cameras';});
-          if(!camItem||camItem.type!=='camera-multi')return;
-          // 구형 감지 → 신형으로 교체 (Type 옵션만 보존)
-          var oldOpts=null;
-          var oldBasic=cats.find(function(c){return c.id==='vc_basic';});
-          if(oldBasic&&oldBasic.items){var ot=oldBasic.items.find(function(i){return i.id==='vi_type';});if(ot)oldOpts=ot.options;}
-          S.visionTemplate=deepCopy(DEF.visionTemplate);
-          if(oldOpts){
-            var nb=S.visionTemplate.categories.find(function(c){return c.id==='vc_basic';});
-            if(nb&&nb.items){var nt=nb.items.find(function(i){return i.id==='vi_type';});if(nt)nt.options=oldOpts;}
-          }
-        })();
-        // vc_board 카테고리 누락 시 추가 + Vision 내 Board 그룹 잔재 정리
-        (function(){
-          var cats=S.visionTemplate.categories||[];
-          if(cats.find(function(c){return c.id==='vc_board';}))return;
-          var defBoard=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_board';});
-          if(!defBoard)return;
-          var pcIdx=-1; for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_pc'){pcIdx=i;break;}}
-          if(pcIdx>=0) cats.splice(pcIdx,0,deepCopy(defBoard)); else cats.push(deepCopy(defBoard));
-          var visCat=cats.find(function(c){return c.id==='vc_vision';});
-          if(visCat&&visCat.groups){
-            visCat.groups=visCat.groups.filter(function(g){
-              return g.id!=='vg_fg'&&g.id!=='vg_sync'&&g.id!=='vg_trig';
-            });
-          }
-        })();
-        // vi_ram specPlaceholder 누락 시 추가
-        (function(){
-          var cats=S.visionTemplate.categories||[];
-          var pcCat=cats.find(function(c){return c.id==='vc_pc';});
-          if(!pcCat||!pcCat.items)return;
-          var ram=pcCat.items.find(function(i){return i.id==='vi_ram';});
-          if(ram&&!ram.specPlaceholder) ram.specPlaceholder='예: DDR5-4800 16GB';
-        })();
+        _migrateVisionTemplate();
         return;
       }
     }
@@ -393,9 +396,11 @@ function loadFromSheets(callback){
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
       if(data.equipProjects)S.equipProjects=data.equipProjects;
 
-      // ── visionTemplate: 카테고리 있을 때만 교체 ──
-      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length)
+      // ── visionTemplate: 카테고리 있을 때만 교체 → 마이그레이션도 함께 적용 ──
+      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length){
         S.visionTemplate=data.visionTemplate;
+        _migrateVisionTemplate();
+      }
 
       // ── visionEquips: data 안전 병합 ──
       if(data.visionEquips&&data.visionEquips.length){
