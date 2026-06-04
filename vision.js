@@ -275,8 +275,22 @@ function _viGridCellValue(equip, item){
     }
     case 'type-pc':{
       if(!val||typeof val!=='object'||Array.isArray(val))return '';
-      var total4=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total4+=val[k].length;});
-      return total4?total4+'대':'';
+      var total4=0; var ramParts=[];
+      Object.keys(val).forEach(function(k){
+        if(!Array.isArray(val[k]))return;
+        total4+=val[k].length;
+        val[k].forEach(function(pc){
+          if(pc.name) return; // skip name-only check
+          if(pc.ram&&pc.ram.length){
+            pc.ram.forEach(function(r){
+              if(r.capacity&&r.qty) ramParts.push(r.capacity.replace(/^.*?([\d]+GB).*/i,'$1')+'×'+r.qty);
+            });
+          }
+        });
+      });
+      var s=total4?total4+'대':'';
+      if(ramParts.length) s+=' / RAM: '+ramParts.join(', ');
+      return s;
     }
     case 'board-multi':
       if(!Array.isArray(val)||!val.length)return '';
@@ -632,14 +646,16 @@ function _renderViPcEntry(baseId,ti,pi,e){
   e=e||{};
   var cpu=e.cpu||{spec:'',qty:''};
   var mb=e.mainboard||{spec:'',qty:''};
-  var ram=e.ram||{spec:'',qty:''};
   var eid=baseId+'_t'+ti+'_pc'+pi;
   return '<div class="vi-type-pc-entry" id="'+_esc(eid)+'">'+
-    '<div class="vi-type-pc-entry-hdr">PC '+(pi+1)+'</div>'+
+    '<div class="vi-type-pc-entry-hdr">'+
+      '<span class="vi-pc-entry-num">PC '+(pi+1)+'</span>'+
+      '<input type="text" class="vi-pc-name-inp" value="'+_esc(e.name||'')+'" placeholder="이름 (예: Host, Vision)">'+
+    '</div>'+
     '<div class="vi-type-pc-entry-body">'+
       _viPcSpecRow('CPU','vi-pc-cpu-spec','vi-pc-cpu-qty',cpu.spec,cpu.qty,'')+
       _viPcSpecRow('MAIN BOARD','vi-pc-mb-spec','vi-pc-mb-qty',mb.spec,mb.qty,'')+
-      _viPcSpecRow('RAM','vi-pc-ram-spec','vi-pc-ram-qty',ram.spec,ram.qty,'예: DDR5-4800 16GB')+
+      _viPcSubSec(eid,'ram','RAM',Array.isArray(e.ram)?e.ram:[])+
       _viPcSubSec(eid,'ssd','SSD',e.ssd||[])+
       _viPcSubSec(eid,'hdd','HDD',e.hdd||[])+
       _viPcSubSec(eid,'lancard','LANCARD',e.lancard||[])+
@@ -675,6 +691,9 @@ function _viPcSubRowFields(sub,r){
   r=r||{};
   var del='<button class="vi-pc-sub-del" onclick="_viPcSubDel(this)">✕</button>';
   switch(sub){
+    case 'ram':
+      return '<input type="text" placeholder="예: DDR5-4800 16GB" style="flex:2" value="'+_esc(r.capacity||'')+'">'+
+        '<input type="number" class="qty-inp" min="0" placeholder="수량(EA)" value="'+_esc(String(r.qty||''))+'">'+del;
     case 'ssd': case 'hdd':
       return '<input type="text" placeholder="예: 1TB" value="'+_esc(r.capacity||'')+'">'+
         '<input type="number" class="qty-inp" min="0" placeholder="수량" value="'+_esc(String(r.qty||''))+'">'+
@@ -727,9 +746,10 @@ function _collectViPcEntry(el){
     });
   }
   return {
+    name:g('vi-pc-name-inp'),
     cpu:{spec:g('vi-pc-cpu-spec'),qty:g('vi-pc-cpu-qty')},
     mainboard:{spec:g('vi-pc-mb-spec'),qty:g('vi-pc-mb-qty')},
-    ram:{spec:g('vi-pc-ram-spec'),qty:g('vi-pc-ram-qty')},
+    ram:subRows('ram',['capacity','qty']),
     ssd:subRows('ssd',['capacity','qty','drive']),
     hdd:subRows('hdd',['capacity','qty','drive']),
     lancard:subRows('lancard',['speed','ports','purpose']),

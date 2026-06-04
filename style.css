@@ -657,12 +657,18 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-type-pc-count-row{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg-sub);border-bottom:1px solid var(--bd-main);font-size:11px;color:var(--tx-dim)}
 .vi-type-pc-entries{display:flex;flex-direction:column;gap:8px;padding:8px}
 .vi-type-pc-entry{border:1px solid var(--bd-main);border-radius:4px;overflow:hidden}
-.vi-type-pc-entry-hdr{padding:4px 10px;background:var(--bg-deep);font-size:11px;font-weight:600;color:var(--tx-sub)}
 .vi-type-pc-entry-body{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
 .vi-pc-spec-row{display:flex;align-items:center;gap:6px;font-size:11px}
-.vi-pc-spec-row .vi-pc-f-lbl{width:90px;flex-shrink:0;color:var(--tx-dim);font-size:11px}
-.vi-pc-spec-row .spec-inp{flex:1;min-width:0;width:auto!important}
-.vi-pc-spec-row .qty-inp{width:42px;flex:none;text-align:center}
+.vi-pc-spec-row .vi-pc-f-lbl{width:80px;flex-shrink:0;color:var(--tx-dim);font-size:11px}
+.vi-pc-spec-row .spec-inp{flex:1;min-width:0;width:auto!important;padding:5px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-spec-row .spec-inp:focus{border-color:#1a6bbf}
+.vi-pc-spec-row .qty-inp{width:42px;flex:none;text-align:center;padding:5px 4px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-spec-row .qty-inp:focus{border-color:#1a6bbf}
+.vi-type-pc-entry-hdr{padding:4px 10px;background:var(--bg-deep);font-size:11px;font-weight:600;color:var(--tx-sub);display:flex;align-items:center;gap:8px}
+.vi-pc-entry-num{flex-shrink:0;font-size:11px;color:var(--tx-dim)}
+.vi-pc-name-inp{flex:1;min-width:0;padding:3px 7px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-name-inp:focus{background:var(--bg-inp);border-color:#1a6bbf}
+.vi-pc-name-inp::placeholder{color:var(--tx-dim);font-weight:400}
 .vi-pc-sub-sec{border-top:1px solid var(--bd-deep);padding-top:5px;margin-top:3px}
 .vi-pc-sub-sec-lbl{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--tx-dim);margin-bottom:3px}
 .vi-pc-sub-add{font-size:10px;padding:2px 7px;background:none;border:1px dashed #3a3a60;border-radius:3px;color:#5a5aaa;cursor:pointer}
