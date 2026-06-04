@@ -126,21 +126,7 @@ var DEF = {
         "id": "vc_board", "name": "Board", "order": 2,
         "groups": [
           {
-            "id":"vg_fg","name":"FRAME GRABBER","order":0,
-            "items":[
-              {"id":"vi_board_fg","name":"Frame Grabber","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["모델명","BOARD 버전","FIRMWARE"]}
-            ]
-          },
-          {
-            "id":"vg_sync","name":"SYNC BOARD","order":1,
-            "items":[
-              {"id":"vi_board_sync","name":"Sync Board","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["버전","BOARD 버전","FIRMWARE"]}
-            ]
-          },
-          {
-            "id":"vg_trig","name":"TRIGGER BOARD","order":2,
+            "id":"vg_trig","name":"TRIGGER BOARD","order":0,
             "items":[
               {"id":"vi_board_trig","name":"Trigger Board","type":"board-multi","order":0,"showInGrid":false,
                "labels":["모델명","BOARD 버전","FIRMWARE"]}
@@ -151,12 +137,7 @@ var DEF = {
       {
         "id": "vc_pc", "name": "PC", "order": 3,
         "items": [
-          {"id":"vi_cpu",      "name":"CPU",       "type":"spec-qty",     "order":0,"showInGrid":false},
-          {"id":"vi_mainboard","name":"MAIN BOARD","type":"spec-qty",     "order":1,"showInGrid":false},
-          {"id":"vi_ram",      "name":"RAM",       "type":"spec-qty",     "order":2,"showInGrid":false,"specPlaceholder":"예: DDR5-4800 16GB"},
-          {"id":"vi_ssd",      "name":"SSD",       "type":"ssd-multi",    "order":3,"showInGrid":false},
-          {"id":"vi_hdd",      "name":"HDD",       "type":"ssd-multi",    "order":4,"showInGrid":false},
-          {"id":"vi_lancard",  "name":"LANCARD",   "type":"lancard-multi","order":5,"showInGrid":false}
+          {"id":"vi_pc","name":"PC","type":"type-pc","order":0,"showInGrid":false}
         ]
       }
     ]

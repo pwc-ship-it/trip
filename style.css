@@ -650,6 +650,30 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-prog-del-btn:hover{color:#e84040}
 .vi-prog-add-btn{margin:4px 8px 6px;font-size:10px;padding:4px 10px;color:#5a5aaa;background:none;border:1px dashed #3a3a60;border-radius:4px;cursor:pointer}
 .vi-prog-add-btn:hover{background:#1a1a30;color:#9090cc}
+/* ── type-pc ── */
+.vi-type-pc{display:flex;flex-direction:column;gap:8px}
+.vi-type-pc-sec{border:1px solid var(--bd-main);border-radius:5px;overflow:hidden}
+.vi-type-pc-sec-hdr{padding:5px 10px;font-size:11px;font-weight:700;background:var(--bg-deep);letter-spacing:.03em}
+.vi-type-pc-count-row{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg-sub);border-bottom:1px solid var(--bd-main);font-size:11px;color:var(--tx-dim)}
+.vi-type-pc-entries{display:flex;flex-direction:column;gap:8px;padding:8px}
+.vi-type-pc-entry{border:1px solid var(--bd-main);border-radius:4px;overflow:hidden}
+.vi-type-pc-entry-hdr{padding:4px 10px;background:var(--bg-deep);font-size:11px;font-weight:600;color:var(--tx-sub)}
+.vi-type-pc-entry-body{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.vi-pc-spec-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.vi-pc-spec-row .vi-pc-f-lbl{width:90px;flex-shrink:0;color:var(--tx-dim);font-size:11px}
+.vi-pc-spec-row .spec-inp{flex:1;min-width:0;width:auto!important}
+.vi-pc-spec-row .qty-inp{width:42px;flex:none;text-align:center}
+.vi-pc-sub-sec{border-top:1px solid var(--bd-deep);padding-top:5px;margin-top:3px}
+.vi-pc-sub-sec-lbl{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--tx-dim);margin-bottom:3px}
+.vi-pc-sub-add{font-size:10px;padding:2px 7px;background:none;border:1px dashed #3a3a60;border-radius:3px;color:#5a5aaa;cursor:pointer}
+.vi-pc-sub-add:hover{background:#1a1a30;color:#9090cc}
+.vi-pc-sub-rows{display:flex;flex-direction:column;gap:2px}
+.vi-pc-sub-row{display:flex;gap:4px;align-items:center;padding:1px 0}
+.vi-pc-sub-row input{flex:1;min-width:0;padding:3px 6px;font-size:11px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:3px;color:var(--tx-main);outline:none;font-family:inherit;width:auto!important}
+.vi-pc-sub-row input.qty-inp{flex:none;width:40px!important;text-align:center}
+.vi-pc-sub-row input:focus{border-color:#1a6bbf}
+.vi-pc-sub-del{background:none;border:none;cursor:pointer;color:#5a2020;font-size:13px;line-height:1;padding:0 3px;flex-shrink:0}
+.vi-pc-sub-del:hover{color:#e84040}
 /* ── 특이사항 textarea ── */
 .vi-notes-area{width:100%;padding:6px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit;resize:vertical;min-height:70px;line-height:1.5;box-sizing:border-box}
 .vi-notes-area:focus{border-color:#1a6bbf}

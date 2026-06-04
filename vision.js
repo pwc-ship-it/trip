@@ -273,6 +273,11 @@ function _viGridCellValue(equip, item){
       var total3=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total3+=val[k].length;});
       return total3?total3+'개':'';
     }
+    case 'type-pc':{
+      if(!val||typeof val!=='object'||Array.isArray(val))return '';
+      var total4=0;Object.keys(val).forEach(function(k){if(Array.isArray(val[k]))total4+=val[k].length;});
+      return total4?total4+'대':'';
+    }
     case 'board-multi':
       if(!Array.isArray(val)||!val.length)return '';
       return val.length+'개';
@@ -409,6 +414,7 @@ function _renderViInput(item,val){
     case 'type-camera': return _renderViTypeCamera(item,val,id);
     case 'type-illum': return _renderViTypeIllum(item,val,id);
     case 'type-program': return _renderViTypeProgram(item,val,id);
+    case 'type-pc': return _renderViTypePc(item,val,id);
     case 'board-multi': return _renderViBoardMulti(item,val,id);
     case 'camera-multi': return _renderViCameraMulti(item,val,id);
     case 'spec-qty': return _renderViSpecQty(item,val,id);
@@ -548,6 +554,16 @@ function _viTypeManagerChange(){
       progWrap.parentNode.replaceChild(tmp3.firstChild,progWrap);
     }
   }
+  var pcItem=_findItemById('vi_pc');
+  if(pcItem){
+    var pcWrap=document.getElementById('viinp_vi_pc');
+    if(pcWrap){
+      var pcData=_collectViTypePcFromDom(pcWrap);
+      var tmp4=document.createElement('div');
+      tmp4.innerHTML=_renderViTypePc(pcItem,pcData,'viinp_vi_pc');
+      pcWrap.parentNode.replaceChild(tmp4.firstChild,pcWrap);
+    }
+  }
 }
 
 function _collectViTypeCamFromDom(wrap){
@@ -576,6 +592,159 @@ function _collectViTypeIllumFromDom(wrap){
       var s=el.querySelector('.vi-type-illum-sn');
       return {model:m?m.value:'',sn:s?s.value:''};
     });
+  });
+  return result;
+}
+
+/* ══════════════════════════════════════════
+   type-pc 렌더 (Vision Type별 PC 수량 관리)
+══════════════════════════════════════════ */
+function _renderViTypePc(item,val,id){
+  var obj=(val&&typeof val==='object'&&!Array.isArray(val))?val:{};
+  if(!_viCurrentTypes||!_viCurrentTypes.length){
+    return '<div class="vi-type-empty" id="'+id+'">기본정보에서 Vision Type을 선택하면 PC 항목이 표시됩니다.</div>';
+  }
+  var html='<div class="vi-type-pc" id="'+id+'">';
+  _viCurrentTypes.forEach(function(t,ti){
+    var entries=Array.isArray(obj[t])?obj[t]:[];
+    var count=entries.length;
+    var color=_viTypeColor(t);
+    var sectionId=id+'_t'+ti;
+    html+='<div class="vi-type-pc-sec" data-type="'+_esc(t)+'" data-idx="'+ti+'">'+
+      '<div class="vi-type-pc-sec-hdr" style="border-left:3px solid '+color+';color:'+color+'">'+_esc(t)+'</div>'+
+      '<div class="vi-type-pc-count-row">'+
+        '<label>PC 수량</label>'+
+        '<input type="number" class="vi-type-pc-count qty-inp" min="0" max="10" value="'+count+'" '+
+          'oninput="_viTypePcCountChange(\''+id+'\','+ti+',this.value)">'+
+        '<span class="qty-lbl">대</span>'+
+      '</div>'+
+      '<div class="vi-type-pc-entries" id="'+sectionId+'_entries">';
+    for(var i=0;i<count;i++){
+      html+=_renderViPcEntry(id,ti,i,entries[i]||{});
+    }
+    html+='</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function _renderViPcEntry(baseId,ti,pi,e){
+  e=e||{};
+  var cpu=e.cpu||{spec:'',qty:''};
+  var mb=e.mainboard||{spec:'',qty:''};
+  var ram=e.ram||{spec:'',qty:''};
+  var eid=baseId+'_t'+ti+'_pc'+pi;
+  return '<div class="vi-type-pc-entry" id="'+_esc(eid)+'">'+
+    '<div class="vi-type-pc-entry-hdr">PC '+(pi+1)+'</div>'+
+    '<div class="vi-type-pc-entry-body">'+
+      _viPcSpecRow('CPU','vi-pc-cpu-spec','vi-pc-cpu-qty',cpu.spec,cpu.qty,'')+
+      _viPcSpecRow('MAIN BOARD','vi-pc-mb-spec','vi-pc-mb-qty',mb.spec,mb.qty,'')+
+      _viPcSpecRow('RAM','vi-pc-ram-spec','vi-pc-ram-qty',ram.spec,ram.qty,'예: DDR5-4800 16GB')+
+      _viPcSubSec(eid,'ssd','SSD',e.ssd||[])+
+      _viPcSubSec(eid,'hdd','HDD',e.hdd||[])+
+      _viPcSubSec(eid,'lancard','LANCARD',e.lancard||[])+
+      _viPcSubSec(eid,'fg','FRAME GRABBER',e.fg||[])+
+      _viPcSubSec(eid,'sync','SYNC BOARD',e.sync||[])+
+    '</div></div>';
+}
+
+function _viPcSpecRow(lbl,specCls,qtyCls,specVal,qtyVal,ph){
+  return '<div class="vi-pc-spec-row">'+
+    '<span class="vi-pc-f-lbl">'+_esc(lbl)+'</span>'+
+    '<input type="text" class="'+specCls+' spec-inp" value="'+_esc(specVal||'')+'"'+(ph?' placeholder="'+_esc(ph)+'"':'')+'>'+
+    '<input type="number" class="'+qtyCls+' qty-inp" value="'+_esc(String(qtyVal||''))+'" min="0">'+
+    '<span class="qty-lbl">EA</span>'+
+  '</div>';
+}
+
+function _viPcSubSec(eid,sub,label,rows){
+  var tEsc=eid.replace(/'/g,"\\'");
+  var rowsHtml=rows.map(function(r){
+    return '<div class="vi-pc-sub-row">'+_viPcSubRowFields(sub,r)+'</div>';
+  }).join('');
+  return '<div class="vi-pc-sub-sec">'+
+    '<div class="vi-pc-sub-sec-lbl">'+
+      '<span>'+_esc(label)+'</span>'+
+      '<button class="vi-pc-sub-add" onclick="_viPcSubAdd(\''+_esc(eid)+'_'+sub+'\',\''+sub+'\')">+ 추가</button>'+
+    '</div>'+
+    '<div class="vi-pc-sub-rows" data-sub="'+sub+'" id="'+_esc(eid)+'_'+sub+'">'+rowsHtml+'</div>'+
+  '</div>';
+}
+
+function _viPcSubRowFields(sub,r){
+  r=r||{};
+  var del='<button class="vi-pc-sub-del" onclick="_viPcSubDel(this)">✕</button>';
+  switch(sub){
+    case 'ssd': case 'hdd':
+      return '<input type="text" placeholder="예: 1TB" value="'+_esc(r.capacity||'')+'">'+
+        '<input type="number" class="qty-inp" min="0" placeholder="수량" value="'+_esc(String(r.qty||''))+'">'+
+        '<input type="text" placeholder="C:" value="'+_esc(r.drive||'')+'">'+del;
+    case 'lancard':
+      return '<input type="text" placeholder="1Gbps" value="'+_esc(r.speed||'')+'">'+
+        '<input type="number" class="qty-inp" min="0" placeholder="PORT" value="'+_esc(String(r.ports||''))+'">'+
+        '<input type="text" placeholder="목적" value="'+_esc(r.purpose||'')+'">'+del;
+    case 'fg':
+      return '<input type="text" placeholder="모델명" value="'+_esc(r.model||'')+'">'+
+        '<input type="text" placeholder="BOARD 버전" value="'+_esc(r.board||'')+'">'+
+        '<input type="text" placeholder="FIRMWARE" value="'+_esc(r.fw||'')+'">'+del;
+    case 'sync':
+      return '<input type="text" placeholder="버전" value="'+_esc(r.model||'')+'">'+
+        '<input type="text" placeholder="BOARD 버전" value="'+_esc(r.board||'')+'">'+
+        '<input type="text" placeholder="FIRMWARE" value="'+_esc(r.fw||'')+'">'+del;
+    default: return del;
+  }
+}
+
+function _viTypePcCountChange(id,ti,val){
+  var count=Math.max(0,Math.min(10,parseInt(val)||0));
+  var container=document.getElementById(id+'_t'+ti+'_entries'); if(!container)return;
+  var current=container.querySelectorAll('.vi-type-pc-entry').length;
+  while(current>count){container.removeChild(container.lastChild);current--;}
+  while(current<count){
+    var tmp=document.createElement('div');
+    tmp.innerHTML=_renderViPcEntry(id,ti,current,{});
+    container.appendChild(tmp.firstChild); current++;
+  }
+}
+
+function _viPcSubAdd(containerId,subType){
+  var container=document.getElementById(containerId); if(!container)return;
+  var div=document.createElement('div'); div.className='vi-pc-sub-row';
+  div.innerHTML=_viPcSubRowFields(subType,{}); // empty row
+  container.appendChild(div);
+}
+
+function _viPcSubDel(btn){ var row=btn.parentNode; row.parentNode.removeChild(row); }
+
+function _collectViPcEntry(el){
+  function g(cls){var e=el.querySelector('.'+cls);return e?e.value:'';}
+  function subRows(dataSub,fields){
+    var c=el.querySelector('.vi-pc-sub-rows[data-sub="'+dataSub+'"]'); if(!c)return [];
+    return Array.prototype.map.call(c.querySelectorAll('.vi-pc-sub-row'),function(r){
+      var inps=r.querySelectorAll('input'); var obj={};
+      fields.forEach(function(f,i){obj[f]=inps[i]?inps[i].value:'';});
+      return obj;
+    });
+  }
+  return {
+    cpu:{spec:g('vi-pc-cpu-spec'),qty:g('vi-pc-cpu-qty')},
+    mainboard:{spec:g('vi-pc-mb-spec'),qty:g('vi-pc-mb-qty')},
+    ram:{spec:g('vi-pc-ram-spec'),qty:g('vi-pc-ram-qty')},
+    ssd:subRows('ssd',['capacity','qty','drive']),
+    hdd:subRows('hdd',['capacity','qty','drive']),
+    lancard:subRows('lancard',['speed','ports','purpose']),
+    fg:subRows('fg',['model','board','fw']),
+    sync:subRows('sync',['model','board','fw'])
+  };
+}
+
+function _collectViTypePcFromDom(wrap){
+  var result={};
+  var secs=wrap.querySelectorAll('.vi-type-pc-sec');
+  Array.prototype.forEach.call(secs,function(sec){
+    var t=sec.getAttribute('data-type'); if(!t)return;
+    var entries=sec.querySelectorAll('.vi-type-pc-entry');
+    result[t]=Array.prototype.map.call(entries,_collectViPcEntry);
   });
   return result;
 }
@@ -1084,6 +1253,10 @@ function _collectViField(item){
       var wrap=document.getElementById(id); if(!wrap)return {};
       return _collectViTypeProgFromDom(wrap);
     }
+    case 'type-pc':{
+      var wrap=document.getElementById(id); if(!wrap)return {};
+      return _collectViTypePcFromDom(wrap);
+    }
     case 'textarea':{ var el=document.getElementById(id); return el?el.value:''; }
     case 'ssd-multi': return _collectMultiTable(id+'_tbl',['capacity','qty','drive']);
     case 'lancard-multi': return _collectMultiTable(id+'_tbl',['speed','ports','purpose']);
@@ -1303,6 +1476,7 @@ var _VI_TYPES=[
   {val:'type-camera',lbl:'카메라 (Type별 그룹)'},
   {val:'type-illum',lbl:'조명 (Type별 그룹)'},
   {val:'type-program',lbl:'프로그램 (Type별 그룹)'},
+  {val:'type-pc',lbl:'PC (Type별 그룹)'},
   {val:'textarea',lbl:'텍스트 (여러 줄)'},
   {val:'board-multi',lbl:'Board (수량→상세 입력)'},
   {val:'camera-multi',lbl:'카메라 (다중 모델+S/N)'},
@@ -1434,6 +1608,24 @@ function exportVisionCSV(){
           }
         });
         break;}
+      case 'type-pc':{
+        var tpcTypeItem=_findItemById('vi_type');
+        var tpcTypes=tpcTypeItem?(tpcTypeItem.options||[]):[];
+        var pcSubs=['cpu','mainboard','ram'];
+        var pcSubTbls={ssd:['cap','qty','drive'],hdd:['cap','qty','drive'],lancard:['spd','ports','purpose'],fg:['f1','f2','f3'],sync:['f1','f2','f3']};
+        tpcTypes.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          var maxPc=0;
+          S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(v&&v[t]&&Array.isArray(v[t]))maxPc=Math.max(maxPc,v[t].length);});
+          for(var pi2=0;pi2<maxPc;pi2++){
+            var pfx=item.id+'_'+tk+'_'+(pi2+1);
+            pcSubs.forEach(function(sf){
+              headers.push(pfx+'_'+sf+'_spec'); colMap.push({h:pfx+'_'+sf+'_spec',item:item,sub:'tpc_spec',t:t,pi:pi2,sf:sf});
+              headers.push(pfx+'_'+sf+'_qty');  colMap.push({h:pfx+'_'+sf+'_qty', item:item,sub:'tpc_qty', t:t,pi:pi2,sf:sf});
+            });
+          }
+        });
+        break;}
       case 'board-multi':{
         var maxBd=0;
         S.visionEquips.forEach(function(e){var v=e.data&&e.data[item.id];if(Array.isArray(v))maxBd=Math.max(maxBd,v.length);});
@@ -1503,6 +1695,8 @@ function exportVisionCSV(){
         case 'tillum_sn':    row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].sn:'');    break;
         case 'tprog_name':   row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].name:'');   break;
         case 'tprog_ver':    row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.ci]?v[cm.t][cm.ci].version:'');break;
+        case 'tpc_spec': row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.pi]&&v[cm.t][cm.pi][cm.sf]?v[cm.t][cm.pi][cm.sf].spec:'');break;
+        case 'tpc_qty':  row.push(v&&typeof v==='object'&&!Array.isArray(v)&&Array.isArray(v[cm.t])&&v[cm.t][cm.pi]&&v[cm.t][cm.pi][cm.sf]?v[cm.t][cm.pi][cm.sf].qty:''); break;
         case 'brd_model': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].model:''); break;
         case 'brd_board': row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].board:''); break;
         case 'brd_fw':    row.push(Array.isArray(v)&&v[cm.bi]?v[cm.bi].fw:'');    break;
@@ -1596,6 +1790,14 @@ function _doDownloadVisionCsvTemplate(){
         types.forEach(function(t){
           var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
           for(var ci=0;ci<4;ci++){headers.push(item.id+'_'+tk+'_'+(ci+1)+'_name');headers.push(item.id+'_'+tk+'_'+(ci+1)+'_ver');}
+        });break;
+      case 'type-pc':
+        types.forEach(function(t){
+          var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          for(var pi4=0;pi4<2;pi4++){
+            var pfx=item.id+'_'+tk+'_'+(pi4+1);
+            ['cpu','mainboard','ram'].forEach(function(sf){headers.push(pfx+'_'+sf+'_spec');headers.push(pfx+'_'+sf+'_qty');});
+          }
         });break;
       case 'camera-multi':break;
       case 'textarea':headers.push(item.id);break;
@@ -1699,6 +1901,26 @@ function _parseAndImportVisionCSV(text){
             if(entries.length)tpRes[t]=entries;
           });
           if(Object.keys(tpRes).length)equip.data[item.id]=tpRes; break;}
+        case 'type-pc':{
+          var tpcImpTypeItem=_findItemById('vi_type');
+          var tpcImpTypes=tpcImpTypeItem?(tpcImpTypeItem.options||[]):[];
+          var tpcRes={};
+          tpcImpTypes.forEach(function(t){
+            var tk=t.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+            var pcs=[]; var pi3=0;
+            while(rmap[item.id+'_'+tk+'_'+(pi3+1)+'_cpu_spec']!==undefined){
+              var pfx=item.id+'_'+tk+'_'+(pi3+1);
+              pcs.push({
+                cpu:{spec:rmap[pfx+'_cpu_spec']||'',qty:rmap[pfx+'_cpu_qty']||''},
+                mainboard:{spec:rmap[pfx+'_mainboard_spec']||'',qty:rmap[pfx+'_mainboard_qty']||''},
+                ram:{spec:rmap[pfx+'_ram_spec']||'',qty:rmap[pfx+'_ram_qty']||''},
+                ssd:[],hdd:[],lancard:[],fg:[],sync:[]
+              });
+              pi3++;
+            }
+            if(pcs.length)tpcRes[t]=pcs;
+          });
+          if(Object.keys(tpcRes).length)equip.data[item.id]=tpcRes; break;}
         case 'board-multi':{
           var bdRows=[]; var bi=0;
           while(rmap[item.id+'_'+(bi+1)+'_model']!==undefined){
