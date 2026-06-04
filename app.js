@@ -60,6 +60,79 @@ function saveCache(data){
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
   }catch(e){}
 }
+
+/* ── 데이터 보호: Sheets 로드 전 로컬 스냅샷 백업 ── */
+var BACKUP_KEY='trip_data_backup';
+function _saveLocalBackup(){
+  try{
+    var snap={ts:Date.now(),
+      equipItems:S.equipItems, equipUnits:S.equipUnits,
+      equipProjects:S.equipProjects, equipSiteOrder:S.equipSiteOrder,
+      visionTemplate:S.visionTemplate, visionEquips:S.visionEquips,
+      schedules:S.schedules, events:S.events, workTasks:S.workTasks,
+      sites:S.sites, groups:S.groups, projects:S.projects};
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(snap));
+  }catch(e){}
+}
+
+/* 안전한 cells 객체 여부 확인 */
+function _isValidCells(cells){
+  return cells&&typeof cells==='object'&&!Array.isArray(cells)&&Object.keys(cells).length>0;
+}
+
+/* 수동 전체 데이터 백업 다운로드 */
+function downloadDataBackup(){
+  try{
+    var data={ts:new Date().toISOString(),
+      groups:S.groups,sites:S.sites,projects:S.projects,
+      schedules:S.schedules,events:S.events,workTasks:S.workTasks,
+      equipItems:S.equipItems,equipUnits:S.equipUnits,
+      equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
+      visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
+    var json=JSON.stringify(data,null,2);
+    var blob=new Blob([json],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    var d=new Date();
+    a.href=url;
+    a.download='BU3_backup_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    alert('백업 파일이 다운로드되었습니다.');
+  }catch(e){alert('백업 실패: '+e.message);}
+}
+
+/* 백업 파일로 데이터 복원 */
+function restoreFromBackupFile(){
+  var input=document.createElement('input');
+  input.type='file';input.accept='.json';
+  input.onchange=function(ev){
+    var file=ev.target.files[0]; if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var d=JSON.parse(e.target.result);
+        if(!d.sites||!d.equipItems){alert('올바른 백업 파일이 아닙니다.');return;}
+        if(!confirm('현재 데이터를 백업 파일로 복원하시겠습니까?\n저장 시각: '+(d.ts||'알 수 없음')))return;
+        if(d.groups)S.groups=d.groups;
+        if(d.sites&&d.sites.length)S.sites=d.sites;
+        if(d.projects)S.projects=d.projects;
+        if(d.schedules)S.schedules=d.schedules;
+        if(d.events)S.events=d.events;
+        if(d.workTasks)S.workTasks=d.workTasks;
+        if(d.equipItems&&d.equipItems.length)S.equipItems=d.equipItems;
+        if(d.equipUnits&&d.equipUnits.length)S.equipUnits=d.equipUnits;
+        if(d.equipSiteOrder)S.equipSiteOrder=d.equipSiteOrder;
+        if(d.equipProjects)S.equipProjects=d.equipProjects;
+        if(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)S.visionTemplate=d.visionTemplate;
+        if(d.visionEquips)S.visionEquips=d.visionEquips;
+        saveData(); renderAll();
+        alert('복원 완료되었습니다.');
+      }catch(err){alert('복원 실패: '+err.message);}
+    };
+    reader.readAsText(file,'utf-8');
+  };
+  document.body.appendChild(input);input.click();document.body.removeChild(input);
+}
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
   var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
@@ -202,6 +275,11 @@ function loadFromSheets(callback){
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
       if(data.error)throw new Error(data.error);
+
+      // ── Sheets 로드 전 로컬 스냅샷 보존 ──
+      _saveLocalBackup();
+
+      // ── groups / sites / projects ──
       if(data.groups&&data.groups.length)S.groups=data.groups;
       if(data.sites&&data.sites.length){
         var oldSites=S.sites;
@@ -215,6 +293,8 @@ function loadFromSheets(callback){
         });
       }
       if(data.projects&&data.projects.length)S.projects=data.projects;
+
+      // ── schedules ──
       if(data.schedules&&data.schedules.length){
         S.schedules=data.schedules.map(function(sc){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
@@ -226,25 +306,58 @@ function loadFromSheets(callback){
       }
       if(data.events)S.events=data.events;
       if(data.workTasks)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
+
+      // ── equipItems: Sheets에 항목이 있을 때만 교체 ──
       if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
-      if(data.equipUnits){
-        // 안전 병합: Sheets cells 우선, 없으면 로컬 cells 보존 (string 오염 차단)
+      // (Sheets가 빈 배열이면 로컬 유지 — 항목 정의는 절대 사라지면 안 됨)
+
+      // ── equipUnits: cells 안전 병합 (핵심 보호) ──
+      if(data.equipUnits&&data.equipUnits.length){
         var _prevUnits=S.equipUnits||[];
         S.equipUnits=data.equipUnits.map(function(su){
-          var hasCells=su.cells&&typeof su.cells==='object'&&!Array.isArray(su.cells)&&Object.keys(su.cells).length>0;
+          // string 오염 차단
+          if(su.cells&&typeof su.cells!=='object') su.cells={};
+          var hasCells=_isValidCells(su.cells);
           if(!hasCells){
+            // Sheets에 cells 없으면 로컬 cells 보존
             var local=_prevUnits.find(function(lu){return lu.id===su.id;});
-            // 로컬 cells가 정상 객체인 경우에만 사용 (string 오염 무시)
-            if(local&&typeof local.cells==='object'&&!Array.isArray(local.cells)&&Object.keys(local.cells).length>0)
-              su.cells=local.cells;
+            if(local&&_isValidCells(local.cells)) su.cells=local.cells;
           }
           return su;
         });
+        // 로컬에는 있는데 Sheets에 없는 호기 보존 (실수로 삭제된 경우 방지)
+        _prevUnits.forEach(function(lu){
+          if(!S.equipUnits.find(function(su){return su.id===lu.id;})){
+            console.warn('[보호] Sheets 누락 호기 보존:', lu.unitName);
+            S.equipUnits.push(lu);
+          }
+        });
+      } else if(S.equipUnits&&S.equipUnits.length){
+        // Sheets가 0개인데 로컬에 호기가 있으면 로컬 유지
+        console.warn('[보호] Sheets equipUnits 비어있음 — 로컬 데이터 유지');
       }
+
+      // ── equipSiteOrder / equipProjects ──
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
       if(data.equipProjects)S.equipProjects=data.equipProjects;
-      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length)S.visionTemplate=data.visionTemplate;
-      if(data.visionEquips)S.visionEquips=data.visionEquips;
+
+      // ── visionTemplate: 카테고리 있을 때만 교체 ──
+      if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length)
+        S.visionTemplate=data.visionTemplate;
+
+      // ── visionEquips: data 안전 병합 ──
+      if(data.visionEquips&&data.visionEquips.length){
+        var _prevVE=S.visionEquips||[];
+        S.visionEquips=data.visionEquips.map(function(ve){
+          if(ve.data&&typeof ve.data!=='object') ve.data={};
+          if(!ve.data||!Object.keys(ve.data).length){
+            var lv=_prevVE.find(function(x){return x.id===ve.id;});
+            if(lv&&lv.data&&Object.keys(lv.data).length) ve.data=lv.data;
+          }
+          return ve;
+        });
+      }
+
       saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
