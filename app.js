@@ -62,6 +62,29 @@ function loadData(){
             if(nb&&nb.items){var nt=nb.items.find(function(i){return i.id==='vi_type';});if(nt)nt.options=oldOpts;}
           }
         })();
+        // vc_board 카테고리 누락 시 추가 + Vision 내 Board 그룹 잔재 정리
+        (function(){
+          var cats=S.visionTemplate.categories||[];
+          if(cats.find(function(c){return c.id==='vc_board';}))return;
+          var defBoard=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_board';});
+          if(!defBoard)return;
+          var pcIdx=-1; for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_pc'){pcIdx=i;break;}}
+          if(pcIdx>=0) cats.splice(pcIdx,0,deepCopy(defBoard)); else cats.push(deepCopy(defBoard));
+          var visCat=cats.find(function(c){return c.id==='vc_vision';});
+          if(visCat&&visCat.groups){
+            visCat.groups=visCat.groups.filter(function(g){
+              return g.id!=='vg_fg'&&g.id!=='vg_sync'&&g.id!=='vg_trig';
+            });
+          }
+        })();
+        // vi_ram specPlaceholder 누락 시 추가
+        (function(){
+          var cats=S.visionTemplate.categories||[];
+          var pcCat=cats.find(function(c){return c.id==='vc_pc';});
+          if(!pcCat||!pcCat.items)return;
+          var ram=pcCat.items.find(function(i){return i.id==='vi_ram';});
+          if(ram&&!ram.specPlaceholder) ram.specPlaceholder='예: DDR5-4800 16GB';
+        })();
         return;
       }
     }
@@ -423,9 +446,40 @@ function barCls(sc){
   return           isHq?'bar-hq-plan':'bar-out-plan';
 }
 
+/* ── 테마 (다크/라이트) ── */
+function initTheme(){
+  var saved=localStorage.getItem('trip_theme')||'dark';
+  document.documentElement.setAttribute('data-theme',saved);
+  var btn=document.getElementById('themeToggle');
+  if(btn) btn.textContent=saved==='dark'?'🌙':'☀️';
+}
+function toggleTheme(){
+  var cur=document.documentElement.getAttribute('data-theme')||'dark';
+  var next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('trip_theme',next);
+  var btn=document.getElementById('themeToggle');
+  if(btn) btn.textContent=next==='dark'?'🌙':'☀️';
+}
+
+/* ── 모바일 사이드바 토글 ── */
+function openSidebar(view){
+  var sb=view==='gantt'?document.getElementById('ganttSidebar')
+        :view==='equip'?document.getElementById('equipSidebar')
+        :document.getElementById('visionSidebar');
+  if(sb) sb.classList.add('open');
+}
+function closeSidebar(view){
+  var sb=view==='gantt'?document.getElementById('ganttSidebar')
+        :view==='equip'?document.getElementById('equipSidebar')
+        :document.getElementById('visionSidebar');
+  if(sb) sb.classList.remove('open');
+}
+
 /* ── 시작 ── */
 // 모든 스크립트 로드 후 실행 (renderAll 등이 gantt.js에 정의되므로 DOMContentLoaded 사용)
 document.addEventListener('DOMContentLoaded', function(){
+  initTheme();
   loadData();
   renderAll(); // 캐시/DEF 데이터로 즉시 표시
   loadFromSheets(function(){

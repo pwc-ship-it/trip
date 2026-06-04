@@ -673,7 +673,7 @@ function _viTypeIllumCountChange(id,ti,val){
    board-multi 렌더 (수량→상세 입력)
 ══════════════════════════════════════════ */
 function _renderViBoardMulti(item,val,id){
-  var entries=Array.isArray(val)&&val.length?val:[];
+  var entries=Array.isArray(val)&&val.length?val:[{model:'',board:'',fw:''}];
   var count=entries.length;
   var labels=item.labels||['모델명','BOARD 버전','FIRMWARE'];
   var labelsJson=JSON.stringify(labels).replace(/"/g,'&quot;');
@@ -803,8 +803,9 @@ function _viRenumberCamEntries(wrapperId){
 
 function _renderViSpecQty(item,val,id){
   var obj=(val&&typeof val==='object')?val:{spec:'',qty:''};
+  var ph=item.specPlaceholder||'사양 입력';
   return '<div class="vi-spec-qty">'+
-    '<input type="text" id="'+id+'_spec" class="spec-inp" value="'+_esc(obj.spec||'')+'" placeholder="사양 입력">'+
+    '<input type="text" id="'+id+'_spec" class="spec-inp" value="'+_esc(obj.spec||'')+'" placeholder="'+_esc(ph)+'">'+
     '<input type="number" id="'+id+'_qty" class="qty-inp" value="'+_esc(String(obj.qty||''))+'" min="0" placeholder="수량">'+
     '<span class="qty-lbl">EA</span></div>';
 }

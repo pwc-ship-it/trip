@@ -146,7 +146,7 @@ var DEF = {
         "items": [
           {"id":"vi_cpu",      "name":"CPU",       "type":"spec-qty",     "order":0,"showInGrid":false},
           {"id":"vi_mainboard","name":"MAIN BOARD","type":"spec-qty",     "order":1,"showInGrid":false},
-          {"id":"vi_ram",      "name":"RAM",       "type":"spec-qty",     "order":2,"showInGrid":false},
+          {"id":"vi_ram",      "name":"RAM",       "type":"spec-qty",     "order":2,"showInGrid":false,"specPlaceholder":"예: DDR5-4800 16GB"},
           {"id":"vi_ssd",      "name":"SSD",       "type":"ssd-multi",    "order":3,"showInGrid":false},
           {"id":"vi_hdd",      "name":"HDD",       "type":"ssd-multi",    "order":4,"showInGrid":false},
           {"id":"vi_lancard",  "name":"LANCARD",   "type":"lancard-multi","order":5,"showInGrid":false}
