@@ -79,6 +79,24 @@ function _migrateVisionTemplate(){
     var maxOrder=basic.items.reduce(function(m,i){return Math.max(m,i.order||0);},-1);
     basic.items.push({id:'vi_notes',name:'특이사항',type:'textarea',order:maxOrder+1,showInGrid:false});
   })();
+  // Migration 6: vc_pc → type-pc 변환 + Board에서 FG/Sync 제거
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var pcCat=cats.find(function(c){return c.id==='vc_pc';});
+    if(pcCat){
+      if(!pcCat.items)pcCat.items=[];
+      var hasPcItem=pcCat.items.find(function(i){return i.id==='vi_pc'&&i.type==='type-pc';});
+      if(!hasPcItem){
+        pcCat.items=[{id:'vi_pc',name:'PC',type:'type-pc',order:0,showInGrid:false}];
+      } else if(pcCat.items.length>1){
+        pcCat.items=[hasPcItem];
+      }
+    }
+    var boardCat=cats.find(function(c){return c.id==='vc_board';});
+    if(boardCat&&boardCat.groups){
+      boardCat.groups=boardCat.groups.filter(function(g){return g.id!=='vg_fg'&&g.id!=='vg_sync';});
+    }
+  })();
 }
 
 function loadData(){
