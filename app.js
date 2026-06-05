@@ -142,8 +142,9 @@ function loadData(){
         return;
       }
     }
-  }catch(e){}
-  // 캐시 없으면 DEF 기본 데이터
+  }catch(e){console.warn('[loadData] 캐시 파싱 실패:', e.message);}
+  // 캐시 없으면 DEF 기본 데이터 — dirty 플래그 제거 (DEF 샘플 데이터를 Sheets에 올리지 않음)
+  try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
   var def=deepCopy(DEF);
   S.groups=def.groups||[];S.sites=def.sites;S.projects=def.projects;
   S.schedules=def.schedules;S.events=def.events;S.workTasks=def.workTasks||[];
@@ -242,25 +243,58 @@ function saveData(){
     try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
     return;
   }
-  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
-      projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-      equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-      visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
-  }).then(function(r){return r.json();})
-  .then(function(data){
-    if(data.error){console.warn('자동저장 실패:',data.error);updateConnStatus('err');}
-    else{
-      // Sheets 저장 확인됨 — dirty 플래그 해제
-      try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
-      updateConnStatus('ok');
-    }
-  })
-  .catch(function(err){
-    console.warn('자동저장 실패:',err.message);
-    updateConnStatus('err');
-    // dirty 플래그는 유지 (다음 로드 시 로컬 데이터 보호)
-  });
+  updateConnStatus('saving');
+  // 3. Sheets 최신 schedules 먼저 조회 → merge → 저장 (다른 사용자 입력 보호)
+  function _doPost(){
+    return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
+        projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
+        equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
+        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
+    }).then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){
+        console.error('[saveData] Sheets 저장 실패:',data.error);
+        updateConnStatus('err');
+      } else {
+        try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+        updateConnStatus('ok');
+      }
+    })
+    .catch(function(err){
+      console.error('[saveData] Sheets 저장 실패:',err.message);
+      updateConnStatus('err');
+      // dirty 플래그는 유지 (다음 로드 시 로컬 데이터 보호)
+    });
+  }
+  // Sheets에서 최신 schedules 조회 후 merge (다른 사용자가 추가한 일정 보존)
+  fetch(url+'?action=load')
+    .then(function(r){return r.json();})
+    .then(function(sheetsData){
+      if(sheetsData.error||!sheetsData.schedules) return;
+      // Sheets에 있지만 로컬에 없는 일정 = 다른 사용자가 추가한 것 → 로컬에 병합
+      var localIds={};
+      S.schedules.forEach(function(s){localIds[s.id]=true;});
+      var added=0;
+      sheetsData.schedules.forEach(function(sc){
+        if(!localIds[sc.id]){
+          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+          if(typeof sc.hidden==='string'){
+            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          }
+          S.schedules.push(sc);
+          localIds[sc.id]=true;
+          added++;
+        }
+      });
+      if(added>0){
+        console.log('[saveData] 다른 사용자 일정 '+added+'건 병합');
+        // 병합된 schedules로 로컬 캐시만 업데이트 (렌더링은 사용자 액션 시에만)
+        saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+      }
+    })
+    .catch(function(){/* 조회 실패 시 기존 데이터로 저장 진행 */})
+    .then(function(){return _doPost();});
 }
 function updateConnStatus(state){
   var led=document.getElementById('connLed');
@@ -272,7 +306,28 @@ function updateConnStatus(state){
     var hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
     txt.textContent='저장됨 '+hm;
   }
-  else if(state==='err'){led.className='conn-led err';txt.textContent='저장 실패';}
+  else if(state==='saving'){led.className='conn-led chk';txt.textContent='저장 중...';}
+  else if(state==='err'){
+    led.className='conn-led err';txt.textContent='저장 실패 ⚠';
+    // 저장 실패 시 상단 배너로 경고 (5초 후 자동 숨김)
+    _showSaveFailBanner();
+  }
+}
+var _saveFailBannerTimer=null;
+function _showSaveFailBanner(){
+  var banner=document.getElementById('saveFailBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='saveFailBanner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b52020;color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;';
+    banner.innerHTML='⚠ Sheets 저장 실패 — 네트워크 확인 후 페이지 새로고침을 권장합니다. <span style="text-decoration:underline;cursor:pointer" onclick="document.getElementById(\'saveFailBanner\').style.display=\'none\'">닫기</span>';
+    document.body.appendChild(banner);
+  }
+  banner.style.display='block';
+  if(_saveFailBannerTimer) clearTimeout(_saveFailBannerTimer);
+  _saveFailBannerTimer=setTimeout(function(){
+    if(banner) banner.style.display='none';
+  }, 8000);
 }
 
 
@@ -400,8 +455,12 @@ function loadFromSheets(callback){
       }
       if(data.projects&&data.projects.length)S.projects=data.projects;
 
-      // ── schedules ──
+      // ── schedules: merge 방식 (로컬 전용 일정 보존) ──
       if(data.schedules&&data.schedules.length){
+        var _sheetsSids={};
+        data.schedules.forEach(function(s){_sheetsSids[s.id]=true;});
+        // 로컬에만 있는 일정 보존 (Sheets 로드 전 로컬에서 추가된 것)
+        var _localSafe=(S.schedules||[]).filter(function(s){return !_sheetsSids[s.id];});
         S.schedules=data.schedules.map(function(sc){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string'){
@@ -409,9 +468,13 @@ function loadFromSheets(callback){
           }
           return sc;
         });
+        if(_localSafe.length){
+          console.warn('[보호] Sheets 미반영 로컬 일정 보존:',_localSafe.length,'건');
+          S.schedules=S.schedules.concat(_localSafe);
+        }
       }
-      if(data.events)S.events=data.events;
-      if(data.workTasks)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
+      if(data.events&&data.events.length)S.events=data.events;
+      if(data.workTasks&&data.workTasks.length)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
 
       // ── equipItems: Sheets에 항목이 있을 때만 교체 ──
       if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
@@ -549,6 +612,21 @@ document.addEventListener('DOMContentLoaded', function(){
       fetch(url+'?action=ping').catch(function(){});
     }, 4*60*1000); // 4분
   })();
+  // 5분마다 배경 데이터 갱신 — 렌더링 없이 S와 캐시만 최신화
+  // (다음 저장 시 최신 Sheets 데이터 기준으로 merge되어 다른 사용자 입력 보호)
+  (function bgRefresh(){
+    var url=getSheetsUrl();
+    if(!url||location.protocol==='file:')return;
+    setInterval(function(){
+      var mc=document.getElementById('mc');
+      var isModalOpen=(mc&&mc.innerHTML&&mc.innerHTML.length>0);
+      if(isModalOpen) return; // 모달/폼 입력 중에는 배경 갱신 건너뜀
+      if(_activeTab==='vision') return; // Vision 탭은 자체 2분 타이머가 처리
+      // 배경에서 데이터만 갱신 (S + 캐시 업데이트, 렌더링 없음)
+      // 다음 저장 시 최신 데이터 기준으로 merge되어 다른 사용자 입력 보호
+      loadFromSheets(function(){ /* 렌더링 없음 — 깜빡임 방지 */ });
+    }, 5*60*1000); // 5분
+  })();
 });
 
 /* ════════════════════════════════════════════
@@ -618,8 +696,37 @@ function refreshVisionFromSheets(silent){
         updated=true;
       }
       if(updated){
-        saveData();
-        if(_activeTab==='vision'&&typeof renderVisionTab==='function') renderVisionTab();
+        // Sheets에서 방금 받은 데이터로 schedules/events/workTasks도 동기화
+        // (stale한 로컬 일정이 Sheets에 push되는 것 방지 — 핵심 데이터 보호)
+        if(data.schedules&&data.schedules.length){
+          var _vSheetsSids={};
+          data.schedules.forEach(function(s){_vSheetsSids[s.id]=true;});
+          var _vLocalSafe=(S.schedules||[]).filter(function(s){return !_vSheetsSids[s.id];});
+          S.schedules=data.schedules.map(function(sc){
+            sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+            if(typeof sc.hidden==='string'){
+              sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+            }
+            return sc;
+          });
+          if(_vLocalSafe.length) S.schedules=S.schedules.concat(_vLocalSafe);
+        }
+        if(data.events&&data.events.length) S.events=data.events;
+        if(data.workTasks&&data.workTasks.length) S.workTasks=data.workTasks.map(function(wt){
+          wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;
+        });
+        // localOnly equips가 있을 때만 Sheets에 push (그렇지 않으면 캐시만 갱신)
+        // → 매 2분마다 불필요한 Sheets write + stale 데이터 push를 완전 차단
+        if(localOnly.length>0){
+          saveData(); // read-before-write merge 후 Sheets 저장
+        } else {
+          saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+        }
+        // Vision 탭 렌더링: 모달이 열려 있지 않을 때만 갱신 (입력 중 초기화 방지)
+        var _mc=document.getElementById('mc');
+        if(_activeTab==='vision'&&typeof renderVisionTab==='function'&&(!_mc||!_mc.innerHTML)){
+          renderVisionTab();
+        }
       }
       if(!silent){
         var sheetsCount=(data.visionEquips&&data.visionEquips.length)||0;
