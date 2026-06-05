@@ -4,6 +4,11 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
 
 /* ── 상태 ── */
 var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[]};
+/* 삭제된 일정 ID 추적 — merge 시 재복원 방지 */
+var _deletedScIdMap={};
+function _markDeletedSc(id){_deletedScIdMap[id]=true;}
+function _clearDeletedSc(id){delete _deletedScIdMap[id];}
+function _isDeletedSc(id){return !!_deletedScIdMap[id];}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function normDate(s){
@@ -244,7 +249,8 @@ function saveData(){
     return;
   }
   updateConnStatus('saving');
-  // 3. Sheets 최신 schedules 먼저 조회 → merge → 저장 (다른 사용자 입력 보호)
+  // 3. 다른 사용자 일정 보호: Sheets schedules를 메모리 캐시(30초)로 조회 후 merge → 저장
+  // 연속 저장(설비 셀 수정 등)에서는 캐시 재사용 → GET 중복 방지
   function _doPost(){
     return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
@@ -258,6 +264,8 @@ function saveData(){
         updateConnStatus('err');
       } else {
         try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+        // Sheets 저장 성공 → 삭제 기록 초기화 (이미 Sheets에서도 제거됨)
+        _deletedScIdMap={};
         updateConnStatus('ok');
       }
     })
@@ -267,17 +275,14 @@ function saveData(){
       // dirty 플래그는 유지 (다음 로드 시 로컬 데이터 보호)
     });
   }
-  // Sheets에서 최신 schedules 조회 후 merge (다른 사용자가 추가한 일정 보존)
-  fetch(url+'?action=load')
-    .then(function(r){return r.json();})
-    .then(function(sheetsData){
-      if(sheetsData.error||!sheetsData.schedules) return;
-      // Sheets에 있지만 로컬에 없는 일정 = 다른 사용자가 추가한 것 → 로컬에 병합
+  function _mergeAndPost(sheetsData){
+    if(sheetsData&&!sheetsData.error&&sheetsData.schedules&&sheetsData.schedules.length){
       var localIds={};
       S.schedules.forEach(function(s){localIds[s.id]=true;});
       var added=0;
       sheetsData.schedules.forEach(function(sc){
-        if(!localIds[sc.id]){
+        // 로컬에 없고 삭제하지 않은 일정만 병합 (삭제한 일정은 재복원 금지)
+        if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string'){
             sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
@@ -289,12 +294,24 @@ function saveData(){
       });
       if(added>0){
         console.log('[saveData] 다른 사용자 일정 '+added+'건 병합');
-        // 병합된 schedules로 로컬 캐시만 업데이트 (렌더링은 사용자 액션 시에만)
         saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
       }
-    })
-    .catch(function(){/* 조회 실패 시 기존 데이터로 저장 진행 */})
-    .then(function(){return _doPost();});
+    }
+    return _doPost();
+  }
+  // 캐시 TTL(30초) 내이면 재사용, 초과 시 Sheets에서 새로 조회
+  var _now=Date.now();
+  if(S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<30000){
+    _mergeAndPost(S._schCache.data);
+  } else {
+    fetch(url+'?action=load')
+      .then(function(r){return r.json();})
+      .then(function(sheetsData){
+        S._schCache={data:sheetsData,ts:Date.now()};
+        return _mergeAndPost(sheetsData);
+      })
+      .catch(function(){return _doPost();});
+  }
 }
 function updateConnStatus(state){
   var led=document.getElementById('connLed');
@@ -459,8 +476,8 @@ function loadFromSheets(callback){
       if(data.schedules&&data.schedules.length){
         var _sheetsSids={};
         data.schedules.forEach(function(s){_sheetsSids[s.id]=true;});
-        // 로컬에만 있는 일정 보존 (Sheets 로드 전 로컬에서 추가된 것)
-        var _localSafe=(S.schedules||[]).filter(function(s){return !_sheetsSids[s.id];});
+        // 로컬에만 있는 일정 보존 (Sheets 로드 전 로컬에서 추가된 것, 단 삭제한 것은 제외)
+        var _localSafe=(S.schedules||[]).filter(function(s){return !_sheetsSids[s.id]&&!_isDeletedSc(s.id);});
         S.schedules=data.schedules.map(function(sc){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string'){
@@ -529,7 +546,10 @@ function loadFromSheets(callback){
         });
       }
 
-      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+      var _cacheSnap={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
+      saveCache(_cacheSnap);
+      // saveData()의 30초 merge 캐시도 갱신 (로드 직후 저장 시 추가 GET 방지)
+      S._schCache={data:_cacheSnap,ts:Date.now()};
       if(led){led.className='conn-led ok';txt.textContent='연결 정상';}
       if(callback)callback();
     })
@@ -701,7 +721,7 @@ function refreshVisionFromSheets(silent){
         if(data.schedules&&data.schedules.length){
           var _vSheetsSids={};
           data.schedules.forEach(function(s){_vSheetsSids[s.id]=true;});
-          var _vLocalSafe=(S.schedules||[]).filter(function(s){return !_vSheetsSids[s.id];});
+          var _vLocalSafe=(S.schedules||[]).filter(function(s){return !_vSheetsSids[s.id]&&!_isDeletedSc(s.id);});
           S.schedules=data.schedules.map(function(sc){
             sc.start=normDate(sc.start);sc.end=normDate(sc.end);
             if(typeof sc.hidden==='string'){

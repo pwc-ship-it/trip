@@ -244,7 +244,7 @@ function saveSc(exId){
   }
   saveData();cm();renderAll();
 }
-function delSc(id){if(!confirm('이 출장 일정을 삭제할까요?'))return;S.schedules=S.schedules.filter(function(s){return s.id!==id;});saveData();cm();renderAll();}
+function delSc(id){if(!confirm('이 출장 일정을 삭제할까요?'))return;S.schedules=S.schedules.filter(function(s){return s.id!==id;});_markDeletedSc(id);saveData();cm();renderAll();}
 
 /* ── 사이트 관리 모달 (좌우 분할) ── */
 function showSiteM(){
