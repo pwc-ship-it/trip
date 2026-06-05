@@ -235,83 +235,93 @@ function restoreFromBackupFile(){
   };
   document.body.appendChild(input);input.click();document.body.removeChild(input);
 }
+/* ── Sheets 저장 직렬화 상태 ── */
+var _saveDebounceTimer=null; // debounce 타이머
+var _saveInFlight=false;     // 현재 Sheets POST 진행 중
+var _savePending=false;      // 진행 중에 추가 저장 요청 있음
+
 function saveData(){
-  // 1. 즉시 localStorage 캐시 업데이트 (새로고침 시 최신 상태 보장)
+  // 1. 즉시 localStorage 캐시 업데이트 (새로고침·오프라인 시 최신 상태 보장)
   var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
   saveCache(snapshot);
-  // 로컬 변경이 Sheets에 아직 미확인 상태임을 표시
   try{localStorage.setItem(CACHE_DIRTY_KEY,'1');}catch(e){}
-  // 2. 비동기로 Sheets에 저장
+
   var url=getSheetsUrl();
   if(!url||location.protocol==='file:'){
-    // file:// 환경은 Sheets 없이 로컬만 사용 — dirty 플래그 즉시 해제
     try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
     return;
   }
+  // 2. debounce 300ms — 연속 수정 시 마지막 것만 Sheets에 전송
+  if(_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
+  _saveDebounceTimer=setTimeout(_flushToSheets, 300);
+}
+
+function _flushToSheets(){
+  _saveDebounceTimer=null;
+  var url=getSheetsUrl();
+  if(!url||location.protocol==='file:') return;
+
+  // 3. 직렬화 — 이미 저장 중이면 pending 표시 후 완료 시 재실행
+  if(_saveInFlight){_savePending=true;return;}
+  _saveInFlight=true;
   updateConnStatus('saving');
-  // 3. 다른 사용자 일정 보호: Sheets schedules를 메모리 캐시(30초)로 조회 후 merge → 저장
-  // 연속 저장(설비 셀 수정 등)에서는 캐시 재사용 → GET 중복 방지
-  function _doPost(){
-    return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
-        projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
-        equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
-    }).then(function(r){return r.json();})
-    .then(function(data){
-      if(data.error){
-        console.error('[saveData] Sheets 저장 실패:',data.error);
-        updateConnStatus('err');
-      } else {
-        try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
-        // Sheets 저장 성공 → 삭제 기록 초기화 (이미 Sheets에서도 제거됨)
-        _deletedScIdMap={};
-        updateConnStatus('ok');
-      }
-    })
-    .catch(function(err){
-      console.error('[saveData] Sheets 저장 실패:',err.message);
-      updateConnStatus('err');
-      // dirty 플래그는 유지 (다음 로드 시 로컬 데이터 보호)
-    });
-  }
-  function _mergeAndPost(sheetsData){
-    if(sheetsData&&!sheetsData.error&&sheetsData.schedules&&sheetsData.schedules.length){
-      var localIds={};
-      S.schedules.forEach(function(s){localIds[s.id]=true;});
-      var added=0;
-      sheetsData.schedules.forEach(function(sc){
-        // 로컬에 없고 삭제하지 않은 일정만 병합 (삭제한 일정은 재복원 금지)
-        if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
-          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-          if(typeof sc.hidden==='string'){
-            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
-          }
-          S.schedules.push(sc);
-          localIds[sc.id]=true;
-          added++;
+
+  // 4. merge 함수
+  function _mergeSchedules(sheetsData){
+    if(!sheetsData||sheetsData.error||!sheetsData.schedules||!sheetsData.schedules.length) return;
+    var localIds={};
+    S.schedules.forEach(function(s){localIds[s.id]=true;});
+    var added=0;
+    sheetsData.schedules.forEach(function(sc){
+      if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
+        sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+        if(typeof sc.hidden==='string'){
+          sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
         }
-      });
-      if(added>0){
-        console.log('[saveData] 다른 사용자 일정 '+added+'건 병합');
-        saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+        S.schedules.push(sc);localIds[sc.id]=true;added++;
       }
+    });
+    if(added>0){
+      console.log('[saveData] 다른 사용자 일정 '+added+'건 병합');
+      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
     }
-    return _doPost();
   }
-  // 캐시 TTL(30초) 내이면 재사용, 초과 시 Sheets에서 새로 조회
+
+  // 5. 저장 완료 처리 (성공/실패 공통)
+  function _onDone(ok){
+    _saveInFlight=false;
+    if(ok){
+      try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+      _deletedScIdMap={};
+      updateConnStatus('ok');
+    } else {
+      updateConnStatus('err');
+    }
+    // pending 요청이 있으면 즉시 재실행
+    if(_savePending){_savePending=false;_flushToSheets();}
+  }
+
+  // 6. Sheets 조회 캐시(30초) → merge → POST
   var _now=Date.now();
-  if(S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<30000){
-    _mergeAndPost(S._schCache.data);
-  } else {
-    fetch(url+'?action=load')
-      .then(function(r){return r.json();})
-      .then(function(sheetsData){
-        S._schCache={data:sheetsData,ts:Date.now()};
-        return _mergeAndPost(sheetsData);
-      })
-      .catch(function(){return _doPost();});
-  }
+  var _cacheOk=S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<30000;
+  var fetchPromise=_cacheOk
+    ? Promise.resolve(S._schCache.data)
+    : fetch(url+'?action=load').then(function(r){return r.json();}).then(function(d){S._schCache={data:d,ts:_now};return d;});
+
+  fetchPromise
+    .catch(function(){return null;}) // GET 실패해도 POST는 진행
+    .then(function(sheetsData){
+      _mergeSchedules(sheetsData);
+      return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
+          projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
+          equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
+          visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
+      });
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){_onDone(!data.error);})
+    .catch(function(err){console.error('[saveData]',err.message);_onDone(false);});
 }
 function updateConnStatus(state){
   var led=document.getElementById('connLed');
