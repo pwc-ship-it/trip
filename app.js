@@ -266,23 +266,43 @@ function _flushToSheets(){
   _saveInFlight=true;
   updateConnStatus('saving');
 
-  // 4. merge 함수
-  function _mergeSchedules(sheetsData){
-    if(!sheetsData||sheetsData.error||!sheetsData.schedules||!sheetsData.schedules.length) return;
-    var localIds={};
-    S.schedules.forEach(function(s){localIds[s.id]=true;});
-    var added=0;
-    sheetsData.schedules.forEach(function(sc){
-      if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
-        sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-        if(typeof sc.hidden==='string'){
-          sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+  // 4. merge 함수 — schedules/workTasks/events 모두 Sheets 데이터와 병합
+  function _mergeFromSheets(sheetsData){
+    if(!sheetsData||sheetsData.error) return;
+    var changed=false;
+    // ── schedules merge (삭제한 것 제외)
+    if(sheetsData.schedules&&sheetsData.schedules.length){
+      var localIds={};
+      S.schedules.forEach(function(s){localIds[s.id]=true;});
+      sheetsData.schedules.forEach(function(sc){
+        if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
+          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+          if(typeof sc.hidden==='string'){
+            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          }
+          S.schedules.push(sc);localIds[sc.id]=true;changed=true;
         }
-        S.schedules.push(sc);localIds[sc.id]=true;added++;
+      });
+    }
+    // ── workTasks: 로컬이 비어있고 Sheets에 데이터가 있으면 Sheets 우선
+    if(sheetsData.workTasks&&sheetsData.workTasks.length){
+      if(!S.workTasks||!S.workTasks.length){
+        S.workTasks=sheetsData.workTasks.map(function(wt){
+          wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;
+        });
+        console.warn('[보호] 로컬 workTasks 비어있음 → Sheets 데이터 복원:',S.workTasks.length,'건');
+        changed=true;
       }
-    });
-    if(added>0){
-      console.log('[saveData] 다른 사용자 일정 '+added+'건 병합');
+    }
+    // ── events: 로컬이 비어있고 Sheets에 데이터가 있으면 Sheets 우선
+    if(sheetsData.events&&sheetsData.events.length){
+      if(!S.events||!S.events.length){
+        S.events=sheetsData.events;
+        console.warn('[보호] 로컬 events 비어있음 → Sheets 데이터 복원:',S.events.length,'건');
+        changed=true;
+      }
+    }
+    if(changed){
       saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
     }
   }
@@ -311,7 +331,7 @@ function _flushToSheets(){
   fetchPromise
     .catch(function(){return null;}) // GET 실패해도 POST는 진행
     .then(function(sheetsData){
-      _mergeSchedules(sheetsData);
+      _mergeFromSheets(sheetsData);
       return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
           projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
