@@ -475,11 +475,10 @@ function _renderGridView(main){
               row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+totalEquipRows+'" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>';
             }
 
-            /* 라인/호기+Type: type 첫 sub-row에만 rowspan (line/unit 이미 _esc 완료) */
+            /* 라인/호기: type 첫 sub-row에만 rowspan (line/unit 이미 _esc 완료, Type 배지 없음) */
             if(isFirstSub){
               var lineUnit=(line&&unit)?line+'-'+unit:(line||unit||'');
-              row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">'+
-                (typeBadge?typeBadge+' ':'')+lineUnit+'</td>';
+              row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">'+lineUnit+'</td>';
             }
 
             /* 등록일: 설비 첫 행에만 rowspan */
