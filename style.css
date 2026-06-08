@@ -787,7 +787,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-eq-sub td{border-top:1px dashed var(--bd-subtle);background:rgba(0,0,0,.03)}
 .vi-eq-cont .vi-site-cell,.vi-eq-cont .vi-line-cell,.vi-eq-cont .vi-date-cell{opacity:.35;font-style:italic}
 /* rowspan 병합 셀 — 상단 정렬 */
-.vi-td-merge{vertical-align:top!important;border-bottom:none!important}
+.vi-td-merge{vertical-align:middle!important;border-bottom:none!important}
 .vi-eq-first .vi-td-merge{border-top:1px solid var(--bd-main)}
 /* Vision 그리드 커스텀 tooltip */
 #vi-tooltip{position:fixed;z-index:9999;background:var(--bg-card);border:1px solid var(--bd-main);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--tx-main);box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none;max-width:280px;line-height:1.6;display:none}

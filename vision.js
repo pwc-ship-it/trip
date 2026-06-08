@@ -301,13 +301,14 @@ function _renderGridView(main){
   function vis(key){return cv[key]!==false;}
 
   /* ── 헤더 2단 생성 ── */
-  var colSite=90,colLineUnit=175;
-  /* 고정 헤더 항목 수 계산 (사이트/라인+호기 2개는 항상 있음, 등록일/S/N 조건부) */
-  var fixedCols=2+(vis('date')?1:0)+(vis('sn')?1:0);
+  var colSite=90,colLineUnit=175,colType=120;
+  /* 고정 헤더 항목 수 계산 (사이트/라인+호기/Vision Type 3개는 항상 있음, 등록일/S/N 조건부) */
+  var fixedCols=3+(vis('date')?1:0)+(vis('sn')?1:0);
 
   var hdr1Parts=['<tr>',
     '<th class="vi-th fix-col" rowspan="2" style="left:0;min-width:'+colSite+'px">사이트</th>',
-    '<th class="vi-th fix-col" rowspan="2" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">라인/호기</th>'
+    '<th class="vi-th fix-col" rowspan="2" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">라인/호기</th>',
+    '<th class="vi-th fix-col" rowspan="2" style="left:'+(colSite+colLineUnit)+'px;min-width:'+colType+'px">Vision Type</th>'
   ];
   if(vis('date'))hdr1Parts.push('<th class="vi-th" rowspan="2" style="min-width:75px;font-size:10px">등록일</th>');
   if(vis('sn'))hdr1Parts.push('<th class="vi-th" rowspan="2" style="min-width:80px">S/N</th>');
@@ -453,6 +454,14 @@ function _renderGridView(main){
         });
         var totalEquipRows=typeSubRows.reduce(function(s,n){return s+n;},0);
 
+        /* 항목별 독립 rowspan 계산 헬퍼 */
+        function getSpan(len,si,nrows){
+          if(len===0)return si===0?nrows:-1;
+          if(si>=len)return -1;
+          if(si===len-1)return Math.max(1,nrows-si);
+          return 1;
+        }
+
         types.forEach(function(type,typeIdx){
           var nrows=typeSubRows[typeIdx];
           var typeBadge=type?_viTypeBadges([type]):'';
@@ -463,6 +472,8 @@ function _renderGridView(main){
           var pcs=(d.vi_pc&&Array.isArray(d.vi_pc[type]))?d.vi_pc[type]:[];
           /* 보드: 이 Vision Type에 해당하는 것만 필터 */
           var boards=allBoards.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);});
+          var progLen=progs.length,camLen=cams.length,illumLen=illums.length;
+          var boardLen=boards.length,pcLen=pcs.length;
 
           for(var si=0;si<nrows;si++){
             var isFirstType=(typeIdx===0&&si===0);
@@ -475,10 +486,12 @@ function _renderGridView(main){
               row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+totalEquipRows+'" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>';
             }
 
-            /* 라인/호기: type 첫 sub-row에만 rowspan (line/unit 이미 _esc 완료, Type 배지 없음) */
+            /* 라인/호기: type 첫 sub-row에만 rowspan (Type 배지 없음, 순수 라인/호기 텍스트만) */
             if(isFirstSub){
               var lineUnit=(line&&unit)?line+'-'+unit:(line||unit||'');
               row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">'+lineUnit+'</td>';
+              /* Vision Type: 별도 열 */
+              row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+(colSite+colLineUnit)+'px;min-width:'+colType+'px">'+(typeBadge||_esc(type||''))+'</td>';
             }
 
             /* 등록일: 설비 첫 행에만 rowspan */
@@ -492,76 +505,96 @@ function _renderGridView(main){
               row+='<td class="vi-td vi-td-merge" rowspan="'+nrows+'" style="min-width:80px;white-space:nowrap" data-tip="'+snTip+'">'+_esc(sn)+'</td>';
             }
 
-            /* Program */
-            var prog=progs[si]||null;
+            /* Program (이름/버전 동일 span) */
+            var progSpan=getSpan(progLen,si,nrows);
             if(vis('prog_name')){
-              var ptip=_esc(progTip(prog,latestDate));
-              row+='<td class="vi-td" style="min-width:88px;white-space:nowrap" data-tip="'+ptip+'">'+(prog?_esc(prog.name||''):'')+'</td>';
+              if(progSpan>=0){
+                var prog=progs[si]||null;
+                var ptip=_esc(progTip(prog,latestDate));
+                row+='<td class="vi-td" rowspan="'+progSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+ptip+'">'+(prog?_esc(prog.name||''):'')+'</td>';
+              }
             }
             if(vis('prog_ver')){
-              var ptip2=_esc(progTip(prog,latestDate));
-              row+='<td class="vi-td" style="min-width:72px;white-space:nowrap" data-tip="'+ptip2+'">'+(prog?_esc(prog.version||''):'')+'</td>';
+              if(progSpan>=0){
+                var prog2=progs[si]||null;
+                var ptip2=_esc(progTip(prog2,latestDate));
+                row+='<td class="vi-td" rowspan="'+progSpan+'" style="min-width:72px;white-space:nowrap" data-tip="'+ptip2+'">'+(prog2?_esc(prog2.version||''):'')+'</td>';
+              }
             }
 
-            /* Camera */
+            /* Camera (독립 span) */
+            var camSpan=getSpan(camLen,si,nrows);
             if(vis('camera')){
-              var cam=cams[si]||null;
-              var ctip=_esc(camTip(cam,latestDate));
-              row+='<td class="vi-td" style="min-width:100px;white-space:nowrap" data-tip="'+ctip+'">'+(cam?_esc(cam.model||''):'')+'</td>';
+              if(camSpan>=0){
+                var cam=cams[si]||null;
+                var ctip=_esc(camTip(cam,latestDate));
+                row+='<td class="vi-td" rowspan="'+camSpan+'" style="min-width:100px;white-space:nowrap" data-tip="'+ctip+'">'+(cam?_esc(cam.model||''):'')+'</td>';
+              }
             }
 
-            /* Illumination */
+            /* Illumination (독립 span) */
+            var illumSpan=getSpan(illumLen,si,nrows);
             if(vis('illum')){
-              var illum=illums[si]||null;
-              var itip=_esc(illumTip(illum,latestDate));
-              row+='<td class="vi-td" style="min-width:100px;white-space:nowrap" data-tip="'+itip+'">'+(illum?_esc(illum.model||''):'')+'</td>';
+              if(illumSpan>=0){
+                var illum=illums[si]||null;
+                var itip=_esc(illumTip(illum,latestDate));
+                row+='<td class="vi-td" rowspan="'+illumSpan+'" style="min-width:100px;white-space:nowrap" data-tip="'+itip+'">'+(illum?_esc(illum.model||''):'')+'</td>';
+              }
             }
 
-            /* Trigger Board (Type마다 반복) */
-            var board=boards[si]||null;
+            /* Trigger Board (용도/FW 동일 span) */
+            var boardSpan=getSpan(boardLen,si,nrows);
+            var board=boardSpan>=0?(boards[si]||null):null;
             if(vis('board_usage')){
-              var btip=_esc(boardTip(board,latestDate));
-              row+='<td class="vi-td" style="min-width:88px;white-space:nowrap" data-tip="'+btip+'">'+(board?_esc(board.model||''):'')+'</td>';
+              if(boardSpan>=0){
+                var btip=_esc(boardTip(board,latestDate));
+                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip+'">'+(board?_esc(board.model||''):'')+'</td>';
+              }
             }
             if(vis('board_fw')){
-              var btip2=_esc(boardTip(board,latestDate));
-              row+='<td class="vi-td" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
+              if(boardSpan>=0){
+                var btip2=_esc(boardTip(board,latestDate));
+                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
+              }
             }
 
-            /* PC 열 (행방향: si 인덱스의 PC 1개) */
+            /* PC 열 (모든 필드 동일 span) */
+            var pcSpan=getSpan(pcLen,si,nrows);
             if(maxPc>0&&visiblePcFields.length>0){
-              var pc=pcs[si]||null;
-              var ptipStr=_esc(pcTip(pc,latestDate));
-              /* LAN 총 포트 수 */
-              var lanVal='';
-              if(pc&&Array.isArray(pc.lancard)&&pc.lancard.length){
-                var totalPorts=pc.lancard.reduce(function(s,r){return s+(parseInt(r.ports)||0);},0);
-                if(!totalPorts)totalPorts=pc.lancard.filter(function(r){return r.speed;}).length;
-                lanVal=totalPorts?totalPorts+'개':'';
-              }
-              /* FG FW만 */
-              var fgVal=(pc&&Array.isArray(pc.fg))?pc.fg.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
-              /* Sync FW만 */
-              var syncVal=(pc&&Array.isArray(pc.sync))?pc.sync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
-
-              visiblePcFields.forEach(function(f){
-                var fval='';
-                if(pc){
-                  switch(f){
-                    case 'name': fval=pc.name||''; break;
-                    case 'cpu':  fval=pc.cpu?(pc.cpu.spec||''):''; break;
-                    case 'vga':  fval=pc.vga?(pc.vga.spec||''):''; break;
-                    case 'ram':  fval=(Array.isArray(pc.ram)&&pc.ram.length)?pc.ram.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                    case 'ssd':  fval=(Array.isArray(pc.ssd)&&pc.ssd.length)?pc.ssd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                    case 'hdd':  fval=(Array.isArray(pc.hdd)&&pc.hdd.length)?pc.hdd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                    case 'lan':  fval=lanVal; break;
-                    case 'fg':   fval=fgVal; break;
-                    case 'sync': fval=syncVal; break;
-                    case 'os':   fval=pc.os||''; break;
-                  }
+              if(pcSpan>=0){
+                var pc=pcs[si]||null;
+                var ptipStr=_esc(pcTip(pc,latestDate));
+                /* LAN 총 포트 수 */
+                var lanVal='';
+                if(pc&&Array.isArray(pc.lancard)&&pc.lancard.length){
+                  var totalPorts=pc.lancard.reduce(function(s,r){return s+(parseInt(r.ports)||0);},0);
+                  if(!totalPorts)totalPorts=pc.lancard.filter(function(r){return r.speed;}).length;
+                  lanVal=totalPorts?totalPorts+'개':'';
                 }
-                row+='<td class="vi-td" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+ptipStr+'">'+_esc(fval)+'</td>';
-              });
+                /* FG FW만 */
+                var fgVal=(pc&&Array.isArray(pc.fg))?pc.fg.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
+                /* Sync FW만 */
+                var syncVal=(pc&&Array.isArray(pc.sync))?pc.sync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
+
+                visiblePcFields.forEach(function(f){
+                  var fval='';
+                  if(pc){
+                    switch(f){
+                      case 'name': fval=pc.name||''; break;
+                      case 'cpu':  fval=pc.cpu?(pc.cpu.spec||''):''; break;
+                      case 'vga':  fval=pc.vga?(pc.vga.spec||''):''; break;
+                      case 'ram':  fval=(Array.isArray(pc.ram)&&pc.ram.length)?pc.ram.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
+                      case 'ssd':  fval=(Array.isArray(pc.ssd)&&pc.ssd.length)?pc.ssd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
+                      case 'hdd':  fval=(Array.isArray(pc.hdd)&&pc.hdd.length)?pc.hdd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
+                      case 'lan':  fval=lanVal; break;
+                      case 'fg':   fval=fgVal; break;
+                      case 'sync': fval=syncVal; break;
+                      case 'os':   fval=pc.os||''; break;
+                    }
+                  }
+                  row+='<td class="vi-td" rowspan="'+pcSpan+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+ptipStr+'">'+_esc(fval)+'</td>';
+                });
+              }
             }
 
             row+='</tr>';
