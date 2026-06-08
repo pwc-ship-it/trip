@@ -839,11 +839,10 @@ function refreshVisionFromSheets(silent){
         // Vision 탭 렌더링: 모달이 열려 있지 않을 때만 갱신 (입력 중 초기화 방지)
         var _mc=document.getElementById('mc');
         if(_activeTab==='vision'&&typeof renderVisionTab==='function'&&(!_mc||!_mc.innerHTML)){
-          // 상세 뷰에서는 사이드바만 갱신 (폼 깜박임·스크롤 초기화 방지)
-          if(typeof _visionView!=='undefined'&&_visionView==='detail'){
-            if(typeof renderVisionSidebar==='function') renderVisionSidebar();
-          } else {
-            renderVisionTab();
+          // 사이드바는 항상 갱신, 그리드 뷰는 renderVisionMain()(스크롤 보존 포함)만 호출
+          if(typeof renderVisionSidebar==='function') renderVisionSidebar();
+          if(typeof _visionView==='undefined'||_visionView!=='detail'){
+            if(typeof renderVisionMain==='function') renderVisionMain();
           }
         }
       }
