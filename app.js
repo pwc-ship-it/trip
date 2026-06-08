@@ -9,9 +9,23 @@ var _deletedScIdMap={};
 function _markDeletedSc(id){_deletedScIdMap[id]=true;}
 function _clearDeletedSc(id){delete _deletedScIdMap[id];}
 function _isDeletedSc(id){return !!_deletedScIdMap[id];}
-/* 삭제된 visionEquip ID 추적 — refreshVisionFromSheets/loadFromSheets merge 시 재복원 방지 */
-var _deletedViIdMap={};
-function _markDeletedVi(id){_deletedViIdMap[id]=true;}
+/* 삭제된 visionEquip ID 추적 — refreshVisionFromSheets/loadFromSheets merge 시 재복원 방지
+   localStorage 영속화: 새로고침/재로드 후에도 삭제 기록 유지 (24시간 후 자동 정리) */
+var _DELETED_VI_LS_KEY='bu3_del_vi';
+var _deletedViIdMap=(function(){
+  try{
+    var d=JSON.parse(localStorage.getItem(_DELETED_VI_LS_KEY)||'{}');
+    var cutoff=Date.now()-86400000; // 24시간 이전 항목 정리
+    var dirty=false;
+    Object.keys(d).forEach(function(id){if(typeof d[id]!=='number'||d[id]<cutoff){delete d[id];dirty=true;}});
+    if(dirty)try{localStorage.setItem(_DELETED_VI_LS_KEY,JSON.stringify(d));}catch(e2){}
+    return d;
+  }catch(e){return {};}
+})();
+function _markDeletedVi(id){
+  _deletedViIdMap[id]=Date.now();
+  try{localStorage.setItem(_DELETED_VI_LS_KEY,JSON.stringify(_deletedViIdMap));}catch(e){}
+}
 function _isDeletedVi(id){return !!_deletedViIdMap[id];}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
@@ -421,6 +435,27 @@ function _flushToSheets(){
         changed=true;
       }
     }
+    // ── sites: Sheets에만 있는 사이트를 로컬에 추가 (다기기 동기화 보호)
+    if(sheetsData.sites&&sheetsData.sites.length){
+      var _lsids={};S.sites.forEach(function(s){_lsids[s.id]=true;});
+      sheetsData.sites.forEach(function(ss){
+        if(!_lsids[ss.id]){S.sites.push(ss);_lsids[ss.id]=true;changed=true;console.warn('[보호] Sheets 사이트 병합:',ss.name);}
+      });
+    }
+    // ── groups: Sheets에만 있는 그룹을 로컬에 추가
+    if(sheetsData.groups&&sheetsData.groups.length){
+      var _lgids={};S.groups.forEach(function(g){_lgids[g.id]=true;});
+      sheetsData.groups.forEach(function(sg){
+        if(!_lgids[sg.id]){S.groups.push(sg);_lgids[sg.id]=true;changed=true;}
+      });
+    }
+    // ── projects: Sheets에만 있는 프로젝트를 로컬에 추가
+    if(sheetsData.projects&&sheetsData.projects.length){
+      var _lpids={};S.projects.forEach(function(p){_lpids[p.id]=true;});
+      sheetsData.projects.forEach(function(sp){
+        if(!_lpids[sp.id]){S.projects.push(sp);changed=true;}
+      });
+    }
     if(changed){
       saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
     }
@@ -617,6 +652,13 @@ function loadFromSheets(callback){
           if(!ns.country){if(old&&old.country)ns.country=old.country;else if(def&&def.country)ns.country=def.country;}
           if(!ns.region){if(old&&old.region)ns.region=old.region;else if(def&&def.region)ns.region=def.region;}
           return ns;
+        });
+        // 로컬에만 있는 사이트 보존 (Sheets 미반영 신규 사이트)
+        oldSites.forEach(function(os){
+          if(!S.sites.find(function(s){return s.id===os.id;})){
+            console.warn('[보호] Sheets 미반영 로컬 사이트 보존:',os.name);
+            S.sites.push(os);
+          }
         });
       }
       if(data.projects&&data.projects.length)S.projects=data.projects;
@@ -847,8 +889,6 @@ function refreshVisionFromSheets(silent){
       if(data.visionEquips&&data.visionEquips.length){
         var sheetsIds={};
         data.visionEquips.forEach(function(e){sheetsIds[e.id]=true;});
-        // Sheets에서 사라진 것이 확인된 ID는 추적 해제
-        Object.keys(_deletedViIdMap).forEach(function(id){if(!sheetsIds[id])delete _deletedViIdMap[id];});
         var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id]&&!_isDeletedVi(e.id);});
         var _prevVE=S.visionEquips||[];
         S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){

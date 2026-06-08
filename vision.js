@@ -129,9 +129,14 @@ function renderVisionSidebar(){
   equips.forEach(function(e){
     var sid=e.siteId||'기타'; if(!bysite[sid])bysite[sid]=[]; bysite[sid].push(e);
   });
-  /* S.sites 전체 순서 사용 (bysite에 없는 사이트는 건너뜀) */
+  /* 이름 기준 정렬 */
   var siteOrder=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
   Object.keys(bysite).forEach(function(k){ if(siteOrder.indexOf(k)<0)siteOrder.push(k); });
+  siteOrder.sort(function(a,b){
+    var na=(S.sites.find(function(s){return s.id===a;})||{}).name||a;
+    var nb=(S.sites.find(function(s){return s.id===b;})||{}).name||b;
+    return na.localeCompare(nb,'ko');
+  });
 
   var listHtml='';
   siteOrder.forEach(function(sid){
@@ -142,6 +147,9 @@ function renderVisionSidebar(){
     var isOpen=_viCollapsed[sid]!==true;
     var isSiteFiltered=(_visionFilterSite===sid);
     var sidEsc=sid.replace(/'/g,"\\'");
+    var sortedEquips=bysite[sid].slice().sort(function(a,b){
+      return _viEquipLabel(a).localeCompare(_viEquipLabel(b),'ko');
+    });
     listHtml+=
       '<div class="vi-sb-site-sec" draggable="true" data-sid="'+_esc(sid)+'"'+
         ' ondragstart="_viSiteDragStart(event,\''+sidEsc+'\')"'+
@@ -161,7 +169,7 @@ function renderVisionSidebar(){
         '</div>'+
         (isOpen?
           '<div class="vi-sb-equip-list">'+
-            bysite[sid].map(function(e){
+            sortedEquips.map(function(e){
               var sel=e.id===_visionSelId?' sel':'';
               return '<div class="vi-sb-eq-item'+sel+'" onclick="openVisionDetail(\''+e.id+'\')">'+
                 '<span class="vi-sb-eq-name">'+_esc(_viEquipLabel(e))+'</span>'+
