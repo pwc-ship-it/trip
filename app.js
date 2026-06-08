@@ -4,10 +4,23 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
 
 /* ── 상태 ── */
 var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[]};
-/* 삭제된 일정 ID 추적 — merge 시 재복원 방지 */
-var _deletedScIdMap={};
-function _markDeletedSc(id){_deletedScIdMap[id]=true;}
-function _clearDeletedSc(id){delete _deletedScIdMap[id];}
+/* 삭제된 일정 ID 추적 — merge 시 재복원 방지
+   localStorage 영속화: 새로고침/재로드 후에도 삭제 기록 유지 (24시간 후 자동 정리) */
+var _DELETED_SC_LS_KEY='bu3_del_sc';
+var _deletedScIdMap=(function(){
+  try{
+    var d=JSON.parse(localStorage.getItem(_DELETED_SC_LS_KEY)||'{}');
+    var cutoff=Date.now()-86400000;
+    var dirty=false;
+    Object.keys(d).forEach(function(id){if(typeof d[id]!=='number'||d[id]<cutoff){delete d[id];dirty=true;}});
+    if(dirty)try{localStorage.setItem(_DELETED_SC_LS_KEY,JSON.stringify(d));}catch(e2){}
+    return d;
+  }catch(e){return {};}
+})();
+function _markDeletedSc(id){
+  _deletedScIdMap[id]=Date.now();
+  try{localStorage.setItem(_DELETED_SC_LS_KEY,JSON.stringify(_deletedScIdMap));}catch(e){}
+}
 function _isDeletedSc(id){return !!_deletedScIdMap[id];}
 /* 삭제된 visionEquip ID 추적 — refreshVisionFromSheets/loadFromSheets merge 시 재복원 방지
    localStorage 영속화: 새로고침/재로드 후에도 삭제 기록 유지 (24시간 후 자동 정리) */
@@ -403,6 +416,16 @@ function _flushToSheets(){
   function _mergeFromSheets(sheetsData){
     if(!sheetsData||sheetsData.error) return;
     var changed=false;
+    // ── deletedScheduleIds: 다른 기기에서 삭제한 일정 ID를 로컬에도 반영
+    if(sheetsData.deletedScheduleIds&&sheetsData.deletedScheduleIds.length){
+      sheetsData.deletedScheduleIds.forEach(function(id){
+        if(!_isDeletedSc(id))_markDeletedSc(id);
+      });
+      // 로컬 S.schedules에서 삭제 대상 제거
+      var beforeLen=S.schedules.length;
+      S.schedules=S.schedules.filter(function(sc){return !_isDeletedSc(sc.id);});
+      if(S.schedules.length<beforeLen)changed=true;
+    }
     // ── schedules merge (삭제한 것 제외)
     if(sheetsData.schedules&&sheetsData.schedules.length){
       var localIds={};
@@ -466,7 +489,7 @@ function _flushToSheets(){
     _saveInFlight=false;
     if(ok){
       try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
-      _deletedScIdMap={};
+      S._schCache=null; // 캐시 무효화 — 다음 saveData 시 Sheets에서 최신 데이터 재조회
       updateConnStatus('ok');
     } else {
       updateConnStatus('err');
@@ -490,7 +513,8 @@ function _flushToSheets(){
         body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
           projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
           equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-          visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
+          visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
+          deletedScheduleIds:Object.keys(_deletedScIdMap)})
       });
     })
     .then(function(r){return r.json();})
@@ -663,6 +687,13 @@ function loadFromSheets(callback){
       }
       if(data.projects&&data.projects.length)S.projects=data.projects;
 
+      // ── deletedScheduleIds: 다른 기기에서 삭제한 일정 ID를 로컬에도 반영 ──
+      if(data.deletedScheduleIds&&data.deletedScheduleIds.length){
+        data.deletedScheduleIds.forEach(function(id){
+          if(!_isDeletedSc(id))_markDeletedSc(id);
+        });
+      }
+
       // ── schedules: merge 방식 (로컬 전용 일정 보존) ──
       if(data.schedules&&data.schedules.length){
         var _sheetsSids={};
@@ -675,11 +706,17 @@ function loadFromSheets(callback){
             sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
           }
           return sc;
-        });
+        }).filter(function(sc){return !_isDeletedSc(sc.id);}); // Sheets에 남아있어도 삭제된 것은 제거
         if(_localSafe.length){
           console.warn('[보호] Sheets 미반영 로컬 일정 보존:',_localSafe.length,'건');
           S.schedules=S.schedules.concat(_localSafe);
         }
+        // 중복 ID 제거 (네트워크 경합으로 같은 일정이 복수 등록된 경우)
+        var _seenIds={};
+        S.schedules=S.schedules.filter(function(sc){
+          if(_seenIds[sc.id])return false;
+          _seenIds[sc.id]=true;return true;
+        });
       }
       if(data.events&&data.events.length)S.events=data.events;
       if(data.workTasks&&data.workTasks.length)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});

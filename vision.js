@@ -129,14 +129,9 @@ function renderVisionSidebar(){
   equips.forEach(function(e){
     var sid=e.siteId||'기타'; if(!bysite[sid])bysite[sid]=[]; bysite[sid].push(e);
   });
-  /* 이름 기준 정렬 */
+  /* S.sites 순서 사용 (드래그 변경 가능, 이름순은 헤더 버튼으로) */
   var siteOrder=S.sites.map(function(s){return s.id;}).filter(function(id){return bysite[id];});
   Object.keys(bysite).forEach(function(k){ if(siteOrder.indexOf(k)<0)siteOrder.push(k); });
-  siteOrder.sort(function(a,b){
-    var na=(S.sites.find(function(s){return s.id===a;})||{}).name||a;
-    var nb=(S.sites.find(function(s){return s.id===b;})||{}).name||b;
-    return na.localeCompare(nb,'ko');
-  });
 
   var listHtml='';
   siteOrder.forEach(function(sid){
@@ -185,7 +180,8 @@ function renderVisionSidebar(){
   }
 
   var allCollapsed=siteOrder.length>0&&siteOrder.every(function(sid){return _viCollapsed[sid]===true;});
-  var toggleAllBtn='<div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 8px 2px;border-bottom:1px solid var(--border-color)">'+
+  var toggleAllBtn='<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px 2px;border-bottom:1px solid var(--border-color)">'+
+    '<button class="btn" style="font-size:10px;padding:2px 7px" onclick="_viSortByName()" title="사이트 이름순 정렬">이름순</button>'+
     '<button class="btn" style="font-size:10px;padding:2px 7px" onclick="_viToggleAllSites('+(!allCollapsed)+')" title="'+(allCollapsed?'전체 펼치기':'전체 접기')+'">'+
       (allCollapsed?'▶ 전체 펼치기':'▼ 전체 접기')+
     '</button>'+
@@ -209,6 +205,14 @@ function _viToggleAllSites(collapse){
   var bysite={};
   (S.visionEquips||[]).forEach(function(e){ var sid=e.siteId||'기타'; bysite[sid]=true; });
   Object.keys(bysite).forEach(function(sid){ _viCollapsed[sid]=collapse; });
+  renderVisionSidebar();
+}
+
+function _viSortByName(){
+  S.sites.sort(function(a,b){
+    return (a.name||a.id).localeCompare(b.name||b.id,'ko');
+  });
+  saveData();
   renderVisionSidebar();
 }
 
