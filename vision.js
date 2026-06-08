@@ -486,11 +486,13 @@ function _renderGridView(main){
               row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+totalEquipRows+'" style="left:0;min-width:'+colSite+'px">'+_esc(sname)+'</td>';
             }
 
-            /* 라인/호기: type 첫 sub-row에만 rowspan (Type 배지 없음, 순수 라인/호기 텍스트만) */
-            if(isFirstSub){
+            /* 라인/호기: 설비 전체(사이트와 동일) rowspan */
+            if(isFirstType){
               var lineUnit=(line&&unit)?line+'-'+unit:(line||unit||'');
-              row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">'+lineUnit+'</td>';
-              /* Vision Type: 별도 열 */
+              row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+totalEquipRows+'" style="left:'+colSite+'px;min-width:'+colLineUnit+'px">'+lineUnit+'</td>';
+            }
+            /* Vision Type: 별도 열 (Type별 nrows 병합) */
+            if(isFirstSub){
               row+='<td class="vi-td fix-col vi-td-merge" rowspan="'+nrows+'" style="left:'+(colSite+colLineUnit)+'px;min-width:'+colType+'px">'+(typeBadge||_esc(type||''))+'</td>';
             }
 
@@ -558,12 +560,11 @@ function _renderGridView(main){
               }
             }
 
-            /* PC 열 (모든 필드 동일 span) */
+            /* PC 열 (모든 필드 동일 span, 각 필드별 개별 툴팁) */
             var pcSpan=getSpan(pcLen,si,nrows);
             if(maxPc>0&&visiblePcFields.length>0){
               if(pcSpan>=0){
                 var pc=pcs[si]||null;
-                var ptipStr=_esc(pcTip(pc,latestDate));
                 /* LAN 총 포트 수 */
                 var lanVal='';
                 if(pc&&Array.isArray(pc.lancard)&&pc.lancard.length){
@@ -577,22 +578,52 @@ function _renderGridView(main){
                 var syncVal=(pc&&Array.isArray(pc.sync))?pc.sync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
 
                 visiblePcFields.forEach(function(f){
-                  var fval='';
+                  var fval='', ftip='';
                   if(pc){
                     switch(f){
-                      case 'name': fval=pc.name||''; break;
-                      case 'cpu':  fval=pc.cpu?(pc.cpu.spec||''):''; break;
-                      case 'vga':  fval=pc.vga?(pc.vga.spec||''):''; break;
-                      case 'ram':  fval=(Array.isArray(pc.ram)&&pc.ram.length)?pc.ram.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                      case 'ssd':  fval=(Array.isArray(pc.ssd)&&pc.ssd.length)?pc.ssd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                      case 'hdd':  fval=(Array.isArray(pc.hdd)&&pc.hdd.length)?pc.hdd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):''; break;
-                      case 'lan':  fval=lanVal; break;
-                      case 'fg':   fval=fgVal; break;
-                      case 'sync': fval=syncVal; break;
-                      case 'os':   fval=pc.os||''; break;
+                      case 'name':
+                        fval=pc.name||'';
+                        ftip=tdTip(tipRow('PC 이름',fval),latestDate);
+                        break;
+                      case 'cpu':
+                        fval=pc.cpu?(pc.cpu.spec||''):'';
+                        ftip=tdTip(tipSection('CPU',[tipRow('사양',pc.cpu?(pc.cpu.spec||''):''),tipRow('수량',pc.cpu&&pc.cpu.qty?pc.cpu.qty+'EA':'')]),latestDate);
+                        break;
+                      case 'vga':
+                        fval=pc.vga?(pc.vga.spec||''):'';
+                        ftip=tdTip(tipSection('VGA',[tipRow('사양',pc.vga?(pc.vga.spec||''):''),tipRow('수량',pc.vga&&pc.vga.qty?pc.vga.qty+'EA':'')]),latestDate);
+                        break;
+                      case 'ram':
+                        fval=(Array.isArray(pc.ram)&&pc.ram.length)?pc.ram.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):'';
+                        ftip=tdTip(tipSection('RAM',(Array.isArray(pc.ram)?pc.ram:[]).filter(function(r){return r.capacity;}).map(function(r){return tipRow(r.capacity,r.qty?'×'+r.qty+'EA':'');})),latestDate);
+                        break;
+                      case 'ssd':
+                        fval=(Array.isArray(pc.ssd)&&pc.ssd.length)?pc.ssd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):'';
+                        ftip=tdTip(tipSection('SSD',(Array.isArray(pc.ssd)?pc.ssd:[]).filter(function(r){return r.capacity;}).map(function(r){return tipRow(r.capacity,r.qty?'×'+r.qty+'EA':'');})),latestDate);
+                        break;
+                      case 'hdd':
+                        fval=(Array.isArray(pc.hdd)&&pc.hdd.length)?pc.hdd.filter(function(r){return r.capacity;}).map(function(r){return r.capacity+(r.qty?'×'+r.qty:'');}).join(', '):'';
+                        ftip=tdTip(tipSection('HDD',(Array.isArray(pc.hdd)?pc.hdd:[]).filter(function(r){return r.capacity;}).map(function(r){return tipRow(r.capacity,r.qty?'×'+r.qty+'EA':'');})),latestDate);
+                        break;
+                      case 'lan':
+                        fval=lanVal;
+                        ftip=tdTip(tipSection('LAN 카드',(Array.isArray(pc.lancard)?pc.lancard:[]).filter(function(r){return r.speed;}).map(function(r){return tipRow(r.speed+(r.ports?'×'+r.ports+'P':''),r.purpose||'');})),latestDate);
+                        break;
+                      case 'fg':
+                        fval=fgVal;
+                        ftip=tdTip(tipSection('Frame Grabber',(Array.isArray(pc.fg)?pc.fg:[]).filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
+                        break;
+                      case 'sync':
+                        fval=syncVal;
+                        ftip=tdTip(tipSection('Sync Board',(Array.isArray(pc.sync)?pc.sync:[]).filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
+                        break;
+                      case 'os':
+                        fval=pc.os||'';
+                        ftip=tdTip(tipRow('OS',fval),latestDate);
+                        break;
                     }
                   }
-                  row+='<td class="vi-td" rowspan="'+pcSpan+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+ptipStr+'">'+_esc(fval)+'</td>';
+                  row+='<td class="vi-td" rowspan="'+pcSpan+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(ftip)+'">'+_esc(fval)+'</td>';
                 });
               }
             }
@@ -715,6 +746,7 @@ function _viGridCellValue(equip, item){
 ══════════════════════════════════════════ */
 function openVisionDetail(id){
   _visionSelId=id; _visionView='detail';
+  var tip=document.getElementById('vi-tooltip'); if(tip)tip.style.display='none';
   renderVisionSidebar(); renderVisionMain();
 }
 function backToVisionGrid(){

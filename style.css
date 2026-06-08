@@ -785,6 +785,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-eq-first td{border-top:1px solid var(--bd-main)}
 .vi-eq-cont td{border-top:1px solid var(--bd-subtle);background:rgba(0,0,0,.06)}
 .vi-eq-sub td{border-top:1px dashed var(--bd-subtle);background:rgba(0,0,0,.03)}
+/* 그리드 sub행은 font-size 상속 차단 (.vi-eq-sub 자체는 사이드바용 10px이므로) */
+.vi-grid-row.vi-eq-sub td{font-size:12px;color:var(--tx-second)}
 .vi-eq-cont .vi-site-cell,.vi-eq-cont .vi-line-cell,.vi-eq-cont .vi-date-cell{opacity:.35;font-style:italic}
 /* rowspan 병합 셀 — 상단 정렬 */
 .vi-td-merge{vertical-align:middle!important;border-bottom:none!important}
