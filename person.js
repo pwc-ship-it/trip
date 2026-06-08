@@ -125,7 +125,7 @@ function calcUsNextSafeDate(trips, targetDays, inclCanada){
 // 롤링 12개월 창 안에서 해외 체류일을 뺀 국내 체류일
 function calcKoreaDays12M(trips, rolling12){
   var overseas={};
-  trips.forEach(function(t){
+  trips.filter(function(t){return t.region!=='korea';}).forEach(function(t){
     var s=new Date(Math.max(pd(t.start),rolling12.start));
     var e=new Date(Math.min(pd(t.end),rolling12.end));
     if(s>e) return;
@@ -155,7 +155,7 @@ function calcCurrentKoreaDays(trips){
   var pastTrips=trips.filter(function(t){return pd(t.end)<=TODAY;});
   if(!pastTrips.length) return 0;
   var lastEnd=pastTrips.reduce(function(mx,t){return pd(t.end)>pd(mx)?t.end:mx;},pastTrips[0].end);
-  var onTrip=trips.some(function(t){return TODAY>=pd(t.start)&&TODAY<=pd(t.end);});
+  var onTrip=trips.some(function(t){return t.region!=='korea'&&TODAY>=pd(t.start)&&TODAY<=pd(t.end);});
   if(onTrip) return 0;
   var returnDay=new Date(pd(lastEnd));
   returnDay.setDate(returnDay.getDate()+1);
@@ -1043,7 +1043,7 @@ function renderPersonTimeline(trips, colSpan){
     var stHtml=statusHtml(t.status);
     rows+='<div class="pm-tl-trip">'
       +'<span class="pm-trip-site" style="background:'+t.siteColor+'">'+t.siteName+'</span>'
-      +'<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#1e1e2a;color:#b0b0b8">'+(t.region==='americas'?'미국':t.region==='canada'?'캐나다':t.region==='europe'?'유럽':t.region==='china'?'중국':t.region==='vietnam'?'베트남':'기타')+'</span>'
+      +'<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#1e1e2a;color:#b0b0b8">'+(t.region==='americas'?'미국':t.region==='canada'?'캐나다':t.region==='europe'?'유럽':t.region==='china'?'중국':t.region==='vietnam'?'베트남':t.region==='korea'?'국내':'기타')+'</span>'
       +'<span style="flex:1;color:#a0a0a8;font-size:11px">'+fmtFull(t.start)+' → '+fmtFull(t.end)+'</span>'
       +'<span style="min-width:50px;text-align:right;color:#c8c8d4">'+t.days+'일</span>'
       +stHtml
