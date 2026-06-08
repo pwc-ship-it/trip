@@ -125,7 +125,19 @@ var DEF = {
         ]
       },
       {
-        "id": "vc_vision", "name": "Vision", "order": 2,
+        "id": "vc_controller", "name": "Controller", "order": 2,
+        "groups": [
+          {
+            "id":"vg_af_ctrl","name":"AF CONTROLLER","order":0,
+            "items":[
+              {"id":"vi_af_ctrl","name":"AF Controller","type":"spec-qty","order":0,"showInGrid":false,
+               "specPlaceholder":"예: 제조사 모델명"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vc_vision", "name": "Vision", "order": 3,
         "groups": [
           {
             "id":"vg_camera","name":"CAMERA","order":0,
@@ -142,7 +154,7 @@ var DEF = {
         ]
       },
       {
-        "id": "vc_pc", "name": "PC", "order": 3,
+        "id": "vc_pc", "name": "PC", "order": 4,
         "items": [
           {"id":"vi_pc","name":"PC","type":"type-pc","order":0,"showInGrid":false}
         ]

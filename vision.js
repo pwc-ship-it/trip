@@ -17,6 +17,7 @@ var VI_COL_VIS_DEFAULT = {
   sn:true, date:true,
   prog_name:true, prog_ver:true,
   board_fw:true, fg_fw:true, sync_fw:true,
+  ctrl_spec:true,
   camera:true, illum:true,
   pc_name:true, pc_cpu:true, pc_vga:true, pc_ram:true,
   pc_ssd:true, pc_hdd:true, pc_lan:true, pc_os:true
@@ -311,6 +312,9 @@ function _renderGridView(main){
   var boardCols=(vis('board_fw')?1:0)+(vis('fg_fw')?1:0)+(vis('sync_fw')?1:0);
   if(boardCols>0)hdr1Parts.push('<th class="vi-th vi-th-grp" colspan="'+boardCols+'" style="background:#332010">Board</th>');
 
+  /* Controller — rowspan=2 */
+  if(vis('ctrl_spec'))hdr1Parts.push('<th class="vi-th vi-th-grp" rowspan="2" style="background:#1a3040;vertical-align:middle;min-width:110px">AF Ctrl</th>');
+
   /* Camera — rowspan=2 (하나의 헤더 셀) */
   if(vis('camera'))hdr1Parts.push('<th class="vi-th vi-th-grp" rowspan="2" style="background:#1a3358;vertical-align:middle;min-width:100px">Camera</th>');
 
@@ -398,7 +402,7 @@ function _renderGridView(main){
   }
 
   /* ── 데이터 행 (rowspan 기반) ── */
-  var totalCols=fixedCols+progCols+boardCols+(vis('camera')?1:0)+(vis('illum')?1:0)+(maxPc>0?visiblePcFields.length:0);
+  var totalCols=fixedCols+progCols+boardCols+(vis('ctrl_spec')?1:0)+(vis('camera')?1:0)+(vis('illum')?1:0)+(maxPc>0?visiblePcFields.length:0);
   var bodyHtml='';
 
   if(!equips.length){
@@ -545,6 +549,12 @@ function _renderGridView(main){
             }
             if(isFirstType&&vis('sync_fw')){
               row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(syncTipHtml)+'">'+_esc(syncFwVal)+'</td>';
+            }
+
+            /* Controller: AF Controller spec (설비 단위 rowspan) */
+            if(isFirstType&&vis('ctrl_spec')){
+              var ctrlVal=(d['vi_af_ctrl']&&d['vi_af_ctrl'].spec)?d['vi_af_ctrl'].spec:'';
+              row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">'+_esc(ctrlVal)+'</td>';
             }
 
             /* Camera (독립 span) */
@@ -1445,7 +1455,7 @@ function _viTypeIllumCountChange(id,ti,val){
    board-multi 렌더 (수량→상세 입력)
 ══════════════════════════════════════════ */
 function _renderViBoardMulti(item,val,id){
-  var entries=Array.isArray(val)&&val.length?val:[{model:'',board:'',fw:''}];
+  var entries=Array.isArray(val)?val:[{model:'',board:'',fw:''}];
   var count=entries.length;
   var labels=item.labels||['모델명','BOARD 버전','FIRMWARE'];
   var labelsJson=JSON.stringify(labels).replace(/"/g,'&quot;');
@@ -1962,6 +1972,8 @@ function openViColumnSettings(){
     row('prog_name','이름')+row('prog_ver','버전')+
     '<div class="vi-col-cat-hdr">Board</div>'+
     row('board_fw','Trigger FW')+row('fg_fw','FG FW')+row('sync_fw','Sync FW')+
+    '<div class="vi-col-cat-hdr">Controller</div>'+
+    row('ctrl_spec','AF Ctrl Spec')+
     '<div class="vi-col-cat-hdr">Vision</div>'+
     row('camera','Camera 모델')+row('illum','조명 모델')+
     '<div class="vi-col-cat-hdr">PC</div>'+

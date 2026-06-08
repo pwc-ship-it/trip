@@ -165,6 +165,17 @@ function _migrateVisionTemplate(){
       cats.splice(visIdx,0,boardCat);
     }
   })();
+  // Migration 12: vc_controller 누락 시 vc_board 뒤에 추가
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    if(cats.find(function(c){return c.id==='vc_controller';}))return;
+    var defCtrl=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_controller';});
+    if(!defCtrl)return;
+    var boardIdx=-1;
+    for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_board'){boardIdx=i;break;}}
+    if(boardIdx>=0) cats.splice(boardIdx+1,0,deepCopy(defCtrl));
+    else cats.push(deepCopy(defCtrl));
+  })();
 }
 
 /* Vision 설비 데이터 마이그레이션 — pc.program → vi_program, pc.fg/sync → vi_fg/vi_sync */
@@ -421,7 +432,6 @@ function _flushToSheets(){
     if(ok){
       try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
       _deletedScIdMap={};
-      _deletedViIdMap={};
       updateConnStatus('ok');
     } else {
       updateConnStatus('err');
@@ -837,6 +847,8 @@ function refreshVisionFromSheets(silent){
       if(data.visionEquips&&data.visionEquips.length){
         var sheetsIds={};
         data.visionEquips.forEach(function(e){sheetsIds[e.id]=true;});
+        // Sheets에서 사라진 것이 확인된 ID는 추적 해제
+        Object.keys(_deletedViIdMap).forEach(function(id){if(!sheetsIds[id])delete _deletedViIdMap[id];});
         var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id]&&!_isDeletedVi(e.id);});
         var _prevVE=S.visionEquips||[];
         S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){
@@ -860,9 +872,11 @@ function refreshVisionFromSheets(silent){
         updated=true;
       }
       if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length){
-        S.visionTemplate=data.visionTemplate;
-        _migrateVisionTemplate();
-        updated=true;
+        if(typeof _visionEditMode==='undefined'||!_visionEditMode){
+          S.visionTemplate=data.visionTemplate;
+          _migrateVisionTemplate();
+          updated=true;
+        }
       }
       if(updated){
         // Sheets에서 방금 받은 데이터로 schedules/events/workTasks도 동기화
