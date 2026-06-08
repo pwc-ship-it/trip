@@ -112,7 +112,8 @@ function addBar(el,sched){
   var sp=d2px(sched.start),ep=d2px(sched.end)+Math.round(WPX/7),wp=Math.max(ep-sp,8);
   var days=dd(sched.start,sched.end),dr=fmt(sched.start)+'~'+fmt(sched.end);
   var tl=TYPE_LBL[sched.type]||sched.type;
-  var txt=dr+' · '+sched.name+' ['+tl+'] ('+days+'일)'+(sched.note?' · '+sched.note:'');
+  var domesticTag=sched.domestic?' [국내]':'';
+  var txt=dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'');
   var bar=document.createElement('div');bar.className='bar '+barCls(sched);bar.style.cssText='left:'+sp+'px;width:'+wp+'px';bar.title=txt;
   bar.onclick=(function(id){return function(){openEditSc(id);};})(sched.id);
   var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);

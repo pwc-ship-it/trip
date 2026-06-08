@@ -173,7 +173,7 @@ function aggregatePersonTrips(){
     var siteId=proj.siteId;
     var siteName=site?site.name:siteId;
     var siteColor=site?site.color:'#555';
-    var region=getSiteRegion(siteId);
+    var region=sc.domestic?'korea':getSiteRegion(siteId);
     var s=pd(sc.start),e=pd(sc.end);
     var status=TODAY>e?'done':(TODAY>=s?'going':'plan');
     var key=sc.name;
@@ -186,7 +186,8 @@ function aggregatePersonTrips(){
     persons[key].trips.push({
       siteId:siteId,siteName:siteName,siteColor:siteColor,
       region:region,start:sc.start,end:sc.end,
-      days:dd(sc.start,sc.end),status:status,task:sc.task,note:sc.note
+      days:dd(sc.start,sc.end),status:status,task:sc.task,note:sc.note,
+      domestic:sc.domestic||false
     });
   });
   Object.keys(persons).forEach(function(k){

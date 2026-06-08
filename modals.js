@@ -159,8 +159,10 @@ function showSM(ex){
   var days=ie?dd(ex.start,ex.end)+' 일':'-';
   var dateInfo=ie?(fmtFull(ex.start)+' → '+fmtFull(ex.end)):'';
   var isHidden=ie&&ex.hidden?true:false;
+  var isDomestic=ie&&ex.domestic?true:false;
   var html='<div class="mtit">'+(ie?'출장 일정 수정':'출장 일정 등록')+'</div>';
   html+='<div class="fg"><label class="fl">사이트</label><select id="f_site">'+so+'</select></div>';
+  html+='<div class="fg"><label class="fl">국내 여부</label><label class="chkrow" style="margin:0"><input type="checkbox" id="f_domestic"'+(isDomestic?' checked':'')+'>국내 출장 (현장이 아닌 국내에서 진행)</label></div>';
   html+='<div class="fg"><label class="fl">프로젝트</label><select id="f_proj">'+po+'</select></div>';
   html+='<div class="fg"><label class="fl">업무 유형</label><input type="text" id="f_task" value="'+(ie?ex.task:'')+'" placeholder="예: 셋업, 대응, 개조"></div>';
   html+='<div class="fg"><label class="fl">출장자 이름</label><input type="text" id="f_name" value="'+(ie?ex.name:'')+'" placeholder="이름 입력"></div>';
@@ -232,15 +234,16 @@ function saveSc(exId){
   var end=document.getElementById('f_end').value;
   var note=document.getElementById('f_note').value.trim();
   var hidden=document.getElementById('f_hidden').checked;
+  var domestic=document.getElementById('f_domestic').checked;
   var dateRe=/^\d{4}-\d{2}-\d{2}$/;
   if(!projId||!task||!name||!start||!end){alert('필수 항목을 모두 입력하세요.');return;}
   if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}
   if(start>end){alert('복귀일이 출발일보다 빠릅니다.');return;}
   if(exId){
     var i=S.schedules.findIndex(function(s){return s.id===exId;});
-    S.schedules[i]={id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden};
+    S.schedules[i]={id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic};
   } else {
-    S.schedules.push({id:'s'+Date.now(),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden});
+    S.schedules.push({id:'s'+Date.now(),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic});
   }
   saveData();cm();renderAll();
 }
