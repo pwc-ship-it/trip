@@ -9,6 +9,10 @@ var _deletedScIdMap={};
 function _markDeletedSc(id){_deletedScIdMap[id]=true;}
 function _clearDeletedSc(id){delete _deletedScIdMap[id];}
 function _isDeletedSc(id){return !!_deletedScIdMap[id];}
+/* 삭제된 visionEquip ID 추적 — refreshVisionFromSheets/loadFromSheets merge 시 재복원 방지 */
+var _deletedViIdMap={};
+function _markDeletedVi(id){_deletedViIdMap[id]=true;}
+function _isDeletedVi(id){return !!_deletedViIdMap[id];}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function normDate(s){
@@ -42,14 +46,14 @@ function _migrateVisionTemplate(){
     S.visionTemplate=deepCopy(DEF.visionTemplate);
     if(oldOpts){var nb=S.visionTemplate.categories.find(function(c){return c.id==='vc_basic';});if(nb&&nb.items){var nt=nb.items.find(function(i){return i.id==='vi_type';});if(nt)nt.options=oldOpts;}}
   })();
-  // Migration 2: vc_board 누락 시 추가 + Vision 내 Board 그룹 잔재 정리
+  // Migration 2: vc_board 누락 시 추가 (vc_vision 앞에 삽입) + Vision 내 Board 그룹 잔재 정리
   (function(){
     var cats=S.visionTemplate.categories||[];
     if(cats.find(function(c){return c.id==='vc_board';}))return;
     var defBoard=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_board';});
     if(!defBoard)return;
-    var pcIdx=-1;for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_pc'){pcIdx=i;break;}}
-    if(pcIdx>=0) cats.splice(pcIdx,0,deepCopy(defBoard)); else cats.push(deepCopy(defBoard));
+    var visIdx=-1;for(var i=0;i<cats.length;i++){if(cats[i].id==='vc_vision'){visIdx=i;break;}}
+    if(visIdx>=0) cats.splice(visIdx,0,deepCopy(defBoard)); else cats.push(deepCopy(defBoard));
     var visCat=cats.find(function(c){return c.id==='vc_vision';});
     if(visCat&&visCat.groups){
       visCat.groups=visCat.groups.filter(function(g){return g.id!=='vg_fg'&&g.id!=='vg_sync'&&g.id!=='vg_trig';});
@@ -84,7 +88,7 @@ function _migrateVisionTemplate(){
     var maxOrder=basic.items.reduce(function(m,i){return Math.max(m,i.order||0);},-1);
     basic.items.push({id:'vi_notes',name:'특이사항',type:'textarea',order:maxOrder+1,showInGrid:false});
   })();
-  // Migration 6: vc_pc → type-pc 변환 + Board에서 FG/Sync 제거
+  // Migration 6: vc_pc → type-pc 변환
   (function(){
     var cats=S.visionTemplate.categories||[];
     var pcCat=cats.find(function(c){return c.id==='vc_pc';});
@@ -96,10 +100,6 @@ function _migrateVisionTemplate(){
       } else if(pcCat.items.length>1){
         pcCat.items=[hasPcItem];
       }
-    }
-    var boardCat=cats.find(function(c){return c.id==='vc_board';});
-    if(boardCat&&boardCat.groups){
-      boardCat.groups=boardCat.groups.filter(function(g){return g.id!=='vg_fg'&&g.id!=='vg_sync';});
     }
   })();
   // Migration 7: vi_os/vi_license → 기본정보에서 제거, vg_program → Vision에서 제거
@@ -138,9 +138,36 @@ function _migrateVisionTemplate(){
     bc.items.splice(insertAt,0,{id:'vi_program',name:'Program',type:'type-program',order:5,showInGrid:true});
     bc.items.forEach(function(i){if(i.id==='vi_notes')i.order=6;});
   })();
+  // Migration 10: vc_board에 vg_fg / vg_sync 그룹 누락 시 추가
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var boardCat=cats.find(function(c){return c.id==='vc_board';});
+    if(!boardCat||!boardCat.groups)return;
+    var defBoard=(DEF.visionTemplate.categories||[]).find(function(c){return c.id==='vc_board';});
+    if(!defBoard||!defBoard.groups)return;
+    ['vg_fg','vg_sync'].forEach(function(gid){
+      if(!boardCat.groups.find(function(g){return g.id===gid;})){
+        var defGrp=defBoard.groups.find(function(g){return g.id===gid;});
+        if(defGrp) boardCat.groups.push(deepCopy(defGrp));
+      }
+    });
+  })();
+  // Migration 11: vc_board가 vc_vision 뒤에 있으면 앞으로 이동
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var boardIdx=-1,visIdx=-1;
+    for(var i=0;i<cats.length;i++){
+      if(cats[i].id==='vc_board') boardIdx=i;
+      if(cats[i].id==='vc_vision') visIdx=i;
+    }
+    if(boardIdx>=0&&visIdx>=0&&boardIdx>visIdx){
+      var boardCat=cats.splice(boardIdx,1)[0];
+      cats.splice(visIdx,0,boardCat);
+    }
+  })();
 }
 
-/* Vision 설비 데이터 마이그레이션 — pc.program → vi_program */
+/* Vision 설비 데이터 마이그레이션 — pc.program → vi_program, pc.fg/sync → vi_fg/vi_sync */
 function _migrateVisionEquips(){
   (S.visionEquips||[]).forEach(function(e){
     if(!e.data)return;
@@ -164,6 +191,33 @@ function _migrateVisionEquips(){
       });
       if(merged.length)e.data['vi_program'][type]=merged;
     });
+  });
+  // pc.fg / pc.sync → vi_fg / vi_sync 이관 (equip-level board-multi)
+  (S.visionEquips||[]).forEach(function(e){
+    if(!e.data)return;
+    var d=e.data;
+    function _migratePcBoard(key){
+      if(Array.isArray(d[key])&&d[key].length)return;
+      var arr=[],seen={};
+      var viPc2=d['vi_pc'];
+      if(!viPc2||typeof viPc2!=='object'||Array.isArray(viPc2))return;
+      Object.keys(viPc2).forEach(function(type){
+        var pcs=Array.isArray(viPc2[type])?viPc2[type]:[];
+        pcs.forEach(function(pc){
+          var sub=pc[key==='vi_fg'?'fg':'sync'];
+          if(!Array.isArray(sub))return;
+          sub.forEach(function(r){
+            if(r.model||r.board||r.fw){
+              var k=(r.model||'')+'|'+(r.board||'')+'|'+(r.fw||'');
+              if(!seen[k]){seen[k]=true;arr.push({model:r.model||'',board:r.board||'',fw:r.fw||''});}
+            }
+          });
+        });
+      });
+      if(arr.length)d[key]=arr;
+    }
+    _migratePcBoard('vi_fg');
+    _migratePcBoard('vi_sync');
   });
 }
 
@@ -367,6 +421,7 @@ function _flushToSheets(){
     if(ok){
       try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
       _deletedScIdMap={};
+      _deletedViIdMap={};
       updateConnStatus('ok');
     } else {
       updateConnStatus('err');
@@ -620,7 +675,7 @@ function loadFromSheets(callback){
       // ── visionEquips: data 안전 병합 ──
       if(data.visionEquips&&data.visionEquips.length){
         var _prevVE=S.visionEquips||[];
-        S.visionEquips=data.visionEquips.map(function(ve){
+        S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){
           if(ve.data&&typeof ve.data!=='object') ve.data={};
           if(!ve.data||!Object.keys(ve.data).length){
             var lv=_prevVE.find(function(x){return x.id===ve.id;});
@@ -782,9 +837,9 @@ function refreshVisionFromSheets(silent){
       if(data.visionEquips&&data.visionEquips.length){
         var sheetsIds={};
         data.visionEquips.forEach(function(e){sheetsIds[e.id]=true;});
-        var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id];});
+        var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id]&&!_isDeletedVi(e.id);});
         var _prevVE=S.visionEquips||[];
-        S.visionEquips=data.visionEquips.map(function(ve){
+        S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){
           if(ve.data&&typeof ve.data!=='object') ve.data={};
           var lv=_prevVE.find(function(x){return x.id===ve.id;});
           // data: Sheets가 비어있으면 로컬 유지

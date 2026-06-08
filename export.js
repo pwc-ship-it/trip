@@ -322,30 +322,19 @@ function _buildVisionSheet(wb){
   if(!S.visionEquips||!S.visionEquips.length) return;
   var ws=wb.addWorksheet('이력관리');
 
-  // 모든 템플릿 항목 수집 (순서대로)
-  var allItems=[];
-  (S.visionTemplate.categories||[]).forEach(function(cat){
-    if(cat.groups){
-      cat.groups.forEach(function(grp){
-        (grp.items||[]).forEach(function(item){
-          allItems.push({item:item, catName:cat.name, grpName:grp.name});
-        });
-      });
-    } else {
-      (cat.items||[]).forEach(function(item){
-        allItems.push({item:item, catName:cat.name, grpName:null});
-      });
-    }
-  });
-
-  // 헤더: 사이트 + 각 항목
-  var hdrs=[{label:'사이트',w:12},{label:'라인',w:10},{label:'호기',w:14},{label:'Type',w:20}];
-  var skipIds=['vi_site','vi_line','vi_unit','vi_type'];
-  allItems.forEach(function(x){
-    if(skipIds.indexOf(x.item.id)>=0) return;
-    var lbl=(x.grpName?x.grpName+' > ':'')+x.item.name;
-    hdrs.push({label:lbl, w:18, itemId:x.item.id, itemType:x.item.type});
-  });
+  var hdrs=[
+    {label:'사이트',      w:12},
+    {label:'라인',        w:10},
+    {label:'호기',        w:14},
+    {label:'Vision Type', w:20},
+    {label:'S/N',         w:16},
+    {label:'특이사항',    w:24},
+    {label:'프로그램',    w:26},
+    {label:'카메라',      w:32},
+    {label:'조명',        w:26},
+    {label:'트리거보드',  w:28},
+    {label:'PC 정보',     w:52}
+  ];
 
   ws.columns=hdrs.map(function(h){return {width:h.w};});
   ws.views=[{state:'frozen',ySplit:1}];
@@ -358,7 +347,53 @@ function _buildVisionSheet(wb){
   });
   hRow.height=28;
 
-  // 사이트별 그룹
+  /* ── 포맷 헬퍼 ── */
+  function fmtCams(arr){
+    if(!arr||!arr.length) return '';
+    return arr.map(function(c){
+      return (c.model||'')+(c.sn?' ['+c.sn+']':'');
+    }).join(' / ');
+  }
+  function fmtProgs(arr){
+    if(!arr||!arr.length) return '';
+    return arr.map(function(p){
+      return (p.name||'')+(p.version?' v'+p.version:'');
+    }).join(' / ');
+  }
+  function fmtBoards(allBoards,type){
+    if(!allBoards||!allBoards.length) return '';
+    return allBoards.filter(function(b){
+      return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);
+    }).map(function(b){
+      var parts=[];
+      if(b.model) parts.push(b.model);
+      if(b.board) parts.push(b.board);
+      if(b.fw)    parts.push('FW:'+b.fw);
+      return parts.join(' / ');
+    }).join('\n');
+  }
+  function fmtPcs(arr){
+    if(!arr||!arr.length) return '';
+    return arr.map(function(pc,i){
+      var parts=[pc.name||('PC'+(i+1))];
+      if(pc.cpu&&pc.cpu.spec)      parts.push('CPU: '+pc.cpu.spec+(pc.cpu.qty?'×'+pc.cpu.qty:''));
+      if(pc.mainboard&&pc.mainboard.spec) parts.push('MB: '+pc.mainboard.spec);
+      if(pc.vga&&pc.vga.spec)      parts.push('VGA: '+pc.vga.spec);
+      if(Array.isArray(pc.ram)&&pc.ram.length)
+        parts.push('RAM: '+pc.ram.map(function(r){return (r.capacity||'')+(r.qty?'×'+r.qty:'');}).join('+'));
+      if(Array.isArray(pc.ssd)&&pc.ssd.length)
+        parts.push('SSD: '+pc.ssd.map(function(s){return (s.capacity||'')+(s.qty?'×'+s.qty:'')+(s.drive?' ('+s.drive+')':'');}).join('+'));
+      if(Array.isArray(pc.fg)&&pc.fg.length)
+        parts.push('FG: '+pc.fg.map(function(f){return (f.model||'')+(f.board?'/'+f.board:'')+(f.fw?' FW:'+f.fw:'');}).join(', '));
+      if(Array.isArray(pc.lancard)&&pc.lancard.length)
+        parts.push('LAN: '+pc.lancard.map(function(l){return (l.speed||'')+(l.ports?'×'+l.ports:'')+(l.purpose?' ('+l.purpose+')':'');}).join(', '));
+      if(pc.os)      parts.push('OS: '+pc.os);
+      if(pc.license) parts.push('License: '+pc.license);
+      return parts.join(' | ');
+    }).join('\n');
+  }
+
+  /* ── 사이트별 그룹 ── */
   var bysite={};
   S.visionEquips.forEach(function(e){
     var sid=e.siteId||'기타';
@@ -374,7 +409,6 @@ function _buildVisionSheet(wb){
     var siteName=site?site.name:sid;
     var siteColor=site?site.color:'#555555';
 
-    // 사이트 구분행
     ws.mergeCells(rIdx,1,rIdx,hdrs.length);
     var sepCell=ws.getRow(rIdx).getCell(1);
     sepCell.value=siteName;
@@ -382,48 +416,43 @@ function _buildVisionSheet(wb){
     ws.getRow(rIdx).height=18;
     rIdx++;
 
-    bysite[sid].forEach(function(e,idx){
+    bysite[sid].forEach(function(e,eidx){
       var d=e.data||{};
-      var bg=idx%2===0?'#1c1c24':'#181820';
-      var row=ws.getRow(rIdx);
-
-      // 고정 4열
       var typeVal=d['vi_type'];
-      var typeStr=Array.isArray(typeVal)?typeVal.join(', '):(typeVal||'');
-      [d['vi_site']||siteName, d['vi_line']||'', d['vi_unit']||'', typeStr].forEach(function(v,i){
-        var cell=row.getCell(i+1);
-        cell.value=v;
-        _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:i===0?'center':'left'});
-      });
+      var types=Array.isArray(typeVal)?typeVal:(typeVal?[typeVal]:[null]);
+      var allBoards=Array.isArray(d['vi_board_trig'])?d['vi_board_trig']:[];
+      var snRaw=d['vi_sn'];
 
-      // 항목별 열
-      var colIdx=5;
-      hdrs.slice(4).forEach(function(h){
-        var val=d[h.itemId];
-        var cell=row.getCell(colIdx);
-        var displayVal='';
-        if(val!==undefined&&val!==null&&val!==''){
-          if(h.itemType==='multiselect') displayVal=Array.isArray(val)?val.join(', '):(val||'');
-          else if(h.itemType==='camera-multi'){
-            if(Array.isArray(val)){
-              displayVal=val.map(function(c){
-                return c.model+(c.count?'×'+c.count:'')+(c.sns&&c.sns.filter(Boolean).length?' ['+c.sns.filter(Boolean).join(', ')+']':'');
-              }).join(' / ');
-            }
-          }
-          else if(h.itemType==='spec-qty') displayVal=(val.spec||'')+(val.qty?' ×'+val.qty:'');
-          else if(h.itemType==='ssd-multi'||h.itemType==='lancard-multi'){
-            if(Array.isArray(val)) displayVal=val.map(function(r){return Object.values(r).filter(Boolean).join('/');}).join(', ');
-          }
-          else displayVal=String(val);
-        }
-        cell.value=displayVal;
-        _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:'left',wrap:true});
-        colIdx++;
-      });
+      types.forEach(function(type){
+        var bg=eidx%2===0?'#1c1c24':'#181820';
+        var sn=(snRaw&&typeof snRaw==='object')?(snRaw[type]||''):(snRaw||'');
+        var cams  =(d.vi_cameras     &&Array.isArray(d.vi_cameras[type]))    ?d.vi_cameras[type]    :[];
+        var illums=(d.vi_illumination&&Array.isArray(d.vi_illumination[type]))?d.vi_illumination[type]:[];
+        var progs =(d.vi_program     &&Array.isArray(d.vi_program[type]))    ?d.vi_program[type]    :[];
+        var pcs   =(d.vi_pc          &&Array.isArray(d.vi_pc[type]))         ?d.vi_pc[type]         :[];
 
-      row.height=17;
-      rIdx++;
+        var vals=[
+          d['vi_site']||siteName,
+          d['vi_line']||'',
+          d['vi_unit']||'',
+          type||'',
+          sn,
+          d['vi_notes']||'',
+          fmtProgs(progs),
+          fmtCams(cams),
+          fmtCams(illums),
+          fmtBoards(allBoards,type),
+          fmtPcs(pcs)
+        ];
+        var row=ws.getRow(rIdx);
+        vals.forEach(function(v,i){
+          var cell=row.getCell(i+1);
+          cell.value=v;
+          _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:i<=3?'center':'left',wrap:true});
+        });
+        row.height=Math.max(17,pcs.length*15);
+        rIdx++;
+      });
     });
   });
 }

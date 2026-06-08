@@ -99,7 +99,33 @@ var DEF = {
         ]
       },
       {
-        "id": "vc_vision", "name": "Vision", "order": 1,
+        "id": "vc_board", "name": "Board", "order": 1,
+        "groups": [
+          {
+            "id":"vg_trig","name":"TRIGGER BOARD","order":0,
+            "items":[
+              {"id":"vi_board_trig","name":"Trigger Board","type":"board-multi","order":0,"showInGrid":false,
+               "labels":["사용 용도","BOARD 버전","FIRMWARE"]}
+            ]
+          },
+          {
+            "id":"vg_fg","name":"FRAME GRABBER","order":1,
+            "items":[
+              {"id":"vi_fg","name":"Frame Grabber","type":"board-multi","order":0,"showInGrid":false,
+               "labels":["제조사","BOARD 버전","FIRMWARE"]}
+            ]
+          },
+          {
+            "id":"vg_sync","name":"SYNC BOARD","order":2,
+            "items":[
+              {"id":"vi_sync","name":"Sync Board","type":"board-multi","order":0,"showInGrid":false,
+               "labels":["제조사","BOARD 버전","FIRMWARE"]}
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vc_vision", "name": "Vision", "order": 2,
         "groups": [
           {
             "id":"vg_camera","name":"CAMERA","order":0,
@@ -111,18 +137,6 @@ var DEF = {
             "id":"vg_light","name":"ILLUMINATION","order":1,
             "items":[
               {"id":"vi_illumination","name":"Illumination","type":"type-illum","order":0,"showInGrid":false}
-            ]
-          }
-        ]
-      },
-      {
-        "id": "vc_board", "name": "Board", "order": 2,
-        "groups": [
-          {
-            "id":"vg_trig","name":"TRIGGER BOARD","order":0,
-            "items":[
-              {"id":"vi_board_trig","name":"Trigger Board","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["사용 용도","BOARD 버전","FIRMWARE"]}
             ]
           }
         ]

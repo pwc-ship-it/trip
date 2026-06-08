@@ -6,7 +6,6 @@
 /* ── 전역 상태 ── */
 var _visionView = 'grid';        // 'grid' | 'detail'
 var _visionSelId = null;
-var _visionFilterType = 'all';
 var _visionFilterSite = null;    // null = 전체 사이트, siteId = 해당 사이트만
 var _visionEditMode = false;
 var _viCollapsed = {};           // {siteId: true/false}
@@ -17,11 +16,10 @@ var _viDragSiteId = null;        // 드래그 중인 사이트 ID
 var VI_COL_VIS_DEFAULT = {
   sn:true, date:true,
   prog_name:true, prog_ver:true,
+  board_fw:true, fg_fw:true, sync_fw:true,
   camera:true, illum:true,
-  board_usage:true, board_fw:true,
   pc_name:true, pc_cpu:true, pc_vga:true, pc_ram:true,
-  pc_ssd:true, pc_hdd:true, pc_lan:true,
-  pc_fg:true, pc_sync:true, pc_os:true
+  pc_ssd:true, pc_hdd:true, pc_lan:true, pc_os:true
 };
 function _viColVis(key){
   if(!S.visionColVis)return true;
@@ -119,26 +117,8 @@ function renderVisionSidebar(){
   var sb=document.getElementById('visionSidebar');
   if(!sb)return;
 
-  /* Type 필터 버튼 */
-  var allTypes=[];
-  (S.visionEquips||[]).forEach(function(e){
-    var t=e.data&&e.data['vi_type'];
-    var types=Array.isArray(t)?t:(t?[t]:[]);
-    types.forEach(function(ty){ if(ty&&allTypes.indexOf(ty)<0) allTypes.push(ty); });
-  });
-  var typeBar='<div class="vi-type-filter">'+
-    '<button class="vi-type-btn'+(_visionFilterType==='all'?' on':'')+'" onclick="setVisionFilterType(\'all\')">전체</button>'+
-    allTypes.map(function(t){
-      return '<button class="vi-type-btn'+(_visionFilterType===t?' on':'')+'" onclick="setVisionFilterType(\''+_esc(t)+'\')">'+_esc(t)+'</button>';
-    }).join('')+
-  '</div>';
-
-  /* 필터 적용 (Type + Site) */
+  /* 필터 적용 (Site) */
   var equips=(S.visionEquips||[]).filter(function(e){
-    if(_visionFilterType!=='all'){
-      var t=e.data&&e.data['vi_type']; var types=Array.isArray(t)?t:(t?[t]:[]);
-      if(types.indexOf(_visionFilterType)<0)return false;
-    }
     if(_visionFilterSite&&e.siteId!==_visionFilterSite)return false;
     return true;
   });
@@ -192,10 +172,18 @@ function renderVisionSidebar(){
 
   if(!equips.length){
     listHtml='<div style="padding:20px 10px;text-align:center;color:#444;font-size:11px">'+
-      (_visionFilterType!=='all'||_visionFilterSite?'필터 결과 없음':'등록된 설비가 없습니다')+'</div>';
+      (_visionFilterSite?'필터 결과 없음':'등록된 설비가 없습니다')+'</div>';
   }
 
-  sb.innerHTML=typeBar+
+  var allCollapsed=siteOrder.length>0&&siteOrder.every(function(sid){return _viCollapsed[sid]===true;});
+  var toggleAllBtn='<div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 8px 2px;border-bottom:1px solid var(--border-color)">'+
+    '<button class="btn" style="font-size:10px;padding:2px 7px" onclick="_viToggleAllSites('+(!allCollapsed)+')" title="'+(allCollapsed?'전체 펼치기':'전체 접기')+'">'+
+      (allCollapsed?'▶ 전체 펼치기':'▼ 전체 접기')+
+    '</button>'+
+  '</div>';
+
+  sb.innerHTML=
+    (siteOrder.length?toggleAllBtn:'')+
     (_visionFilterSite?'<div class="vi-site-filter-bar">'+
       '<span style="font-size:10px;color:var(--tx-dim)">사이트 필터 적용 중</span>'+
       '<button class="btn" style="font-size:10px;padding:2px 6px" onclick="_viFilterSite(null)">전체 보기</button>'+
@@ -207,7 +195,13 @@ function renderVisionSidebar(){
 }
 
 function _viToggleSite(sid){ _viCollapsed[sid]=!_viCollapsed[sid]; renderVisionSidebar(); }
-function setVisionFilterType(t){ _visionFilterType=t; renderVisionTab(); }
+
+function _viToggleAllSites(collapse){
+  var bysite={};
+  (S.visionEquips||[]).forEach(function(e){ var sid=e.siteId||'기타'; bysite[sid]=true; });
+  Object.keys(bysite).forEach(function(sid){ _viCollapsed[sid]=collapse; });
+  renderVisionSidebar();
+}
 
 function _viFilterSite(sid){
   _visionFilterSite=(sid&&_visionFilterSite!==sid)?sid:null;
@@ -261,10 +255,6 @@ function _renderGridView(main){
 
   /* ── 필터된 설비 ── */
   var equips=(S.visionEquips||[]).filter(function(e){
-    if(_visionFilterType!=='all'){
-      var t=e.data&&e.data['vi_type']; var ts=Array.isArray(t)?t:(t?[t]:[]);
-      if(ts.indexOf(_visionFilterType)<0)return false;
-    }
     if(_visionFilterSite&&e.siteId!==_visionFilterSite)return false;
     return true;
   });
@@ -317,20 +307,20 @@ function _renderGridView(main){
   var progCols=(vis('prog_name')?1:0)+(vis('prog_ver')?1:0);
   if(progCols>0)hdr1Parts.push('<th class="vi-th vi-th-grp" colspan="'+progCols+'" style="background:#1a3050">Program</th>');
 
+  /* Board 그룹: Trigger FW + FG FW + Sync FW */
+  var boardCols=(vis('board_fw')?1:0)+(vis('fg_fw')?1:0)+(vis('sync_fw')?1:0);
+  if(boardCols>0)hdr1Parts.push('<th class="vi-th vi-th-grp" colspan="'+boardCols+'" style="background:#332010">Board</th>');
+
   /* Camera — rowspan=2 (하나의 헤더 셀) */
   if(vis('camera'))hdr1Parts.push('<th class="vi-th vi-th-grp" rowspan="2" style="background:#1a3358;vertical-align:middle;min-width:100px">Camera</th>');
 
   /* Illumination — rowspan=2 */
   if(vis('illum'))hdr1Parts.push('<th class="vi-th vi-th-grp" rowspan="2" style="background:#1a3320;vertical-align:middle;min-width:100px">조명</th>');
 
-  /* Trigger Board */
-  var boardCols=(vis('board_usage')?1:0)+(vis('board_fw')?1:0);
-  if(boardCols>0)hdr1Parts.push('<th class="vi-th vi-th-grp" colspan="'+boardCols+'" style="background:#332010">Trigger Board</th>');
-
-  /* PC 그룹 (행방향: 1개 PC의 필드 열만) */
-  var pcFieldVis=['name','cpu','vga','ram','ssd','hdd','lan','fg','sync','os'];
-  var pcColKeys={name:'pc_name',cpu:'pc_cpu',vga:'pc_vga',ram:'pc_ram',ssd:'pc_ssd',hdd:'pc_hdd',lan:'pc_lan',fg:'pc_fg',sync:'pc_sync',os:'pc_os'};
-  var pcColLabels={name:'이름',cpu:'CPU',vga:'VGA',ram:'RAM',ssd:'SSD',hdd:'HDD',lan:'LAN',fg:'FG FW',sync:'SYNC FW',os:'OS'};
+  /* PC 그룹 */
+  var pcFieldVis=['name','cpu','vga','ram','ssd','hdd','lan','os'];
+  var pcColKeys={name:'pc_name',cpu:'pc_cpu',vga:'pc_vga',ram:'pc_ram',ssd:'pc_ssd',hdd:'pc_hdd',lan:'pc_lan',os:'pc_os'};
+  var pcColLabels={name:'이름',cpu:'CPU',vga:'VGA',ram:'RAM',ssd:'SSD',hdd:'HDD',lan:'LAN',os:'OS'};
   var visiblePcFields=pcFieldVis.filter(function(f){return vis(pcColKeys[f]);});
   if(maxPc>0&&visiblePcFields.length>0){
     hdr1Parts.push('<th class="vi-th vi-th-grp" colspan="'+visiblePcFields.length+'" style="background:#201a38">PC</th>');
@@ -340,9 +330,10 @@ function _renderGridView(main){
   var hdr2Parts=['<tr>'];
   if(vis('prog_name'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">이름</th>');
   if(vis('prog_ver'))hdr2Parts.push('<th class="vi-th" style="min-width:72px;font-size:10px;font-weight:400">버전</th>');
+  if(vis('board_fw'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">Trig FW</th>');
+  if(vis('fg_fw'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">FG FW</th>');
+  if(vis('sync_fw'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">Sync FW</th>');
   /* Camera/조명은 rowspan=2이므로 hdr2에 불필요 */
-  if(vis('board_usage'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">용도</th>');
-  if(vis('board_fw'))hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">FW</th>');
   if(maxPc>0){
     visiblePcFields.forEach(function(f){
       hdr2Parts.push('<th class="vi-th" style="min-width:88px;font-size:10px;font-weight:400">'+_esc(pcColLabels[f])+'</th>');
@@ -407,7 +398,7 @@ function _renderGridView(main){
   }
 
   /* ── 데이터 행 (rowspan 기반) ── */
-  var totalCols=fixedCols+progCols+(vis('camera')?1:0)+(vis('illum')?1:0)+boardCols+(maxPc>0?visiblePcFields.length:0);
+  var totalCols=fixedCols+progCols+boardCols+(vis('camera')?1:0)+(vis('illum')?1:0)+(maxPc>0?visiblePcFields.length:0);
   var bodyHtml='';
 
   if(!equips.length){
@@ -453,6 +444,22 @@ function _renderGridView(main){
           return Math.max(1,cams.length,illums.length,progs.length,filtBds.length,pcs.length);
         });
         var totalEquipRows=typeSubRows.reduce(function(s,n){return s+n;},0);
+
+        /* FG / Sync FW — vi_fg/vi_sync 우선, 없으면 PC 서브섹션 폴백 (설비 단위) */
+        var equipFg=Array.isArray(d['vi_fg'])?d['vi_fg']:[];
+        if(!equipFg.length){
+          var _fgS={};
+          types.forEach(function(t2){var _p=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];_p.forEach(function(pc2){if(Array.isArray(pc2.fg))pc2.fg.forEach(function(f){if(f.model||f.board||f.fw){var _k=(f.model||'')+'|'+(f.fw||'');if(!_fgS[_k]){_fgS[_k]=true;equipFg.push(f);}}});});});
+        }
+        var equipSync=Array.isArray(d['vi_sync'])?d['vi_sync']:[];
+        if(!equipSync.length){
+          var _syncS={};
+          types.forEach(function(t2){var _p=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];_p.forEach(function(pc2){if(Array.isArray(pc2.sync))pc2.sync.forEach(function(s){if(s.model||s.board||s.fw){var _k=(s.model||'')+'|'+(s.fw||'');if(!_syncS[_k]){_syncS[_k]=true;equipSync.push(s);}}});});});
+        }
+        var fgFwVal=equipFg.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / ');
+        var syncFwVal=equipSync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / ');
+        var fgTipHtml=tdTip(tipSection('Frame Grabber',equipFg.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
+        var syncTipHtml=tdTip(tipSection('Sync Board',equipSync.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
 
         /* 항목별 독립 rowspan 계산 헬퍼 */
         function getSpan(len,si,nrows){
@@ -524,6 +531,22 @@ function _renderGridView(main){
               }
             }
 
+            /* Board: Trigger FW(type별) + FG FW(설비 단위) + Sync FW(설비 단위) */
+            var boardSpan=getSpan(boardLen,si,nrows);
+            var board=boardSpan>=0?(boards[si]||null):null;
+            if(vis('board_fw')){
+              if(boardSpan>=0){
+                var btip2=_esc(boardTip(board,latestDate));
+                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
+              }
+            }
+            if(isFirstType&&vis('fg_fw')){
+              row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(fgTipHtml)+'">'+_esc(fgFwVal)+'</td>';
+            }
+            if(isFirstType&&vis('sync_fw')){
+              row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(syncTipHtml)+'">'+_esc(syncFwVal)+'</td>';
+            }
+
             /* Camera (독립 span) */
             var camSpan=getSpan(camLen,si,nrows);
             if(vis('camera')){
@@ -544,22 +567,6 @@ function _renderGridView(main){
               }
             }
 
-            /* Trigger Board (용도/FW 동일 span) */
-            var boardSpan=getSpan(boardLen,si,nrows);
-            var board=boardSpan>=0?(boards[si]||null):null;
-            if(vis('board_usage')){
-              if(boardSpan>=0){
-                var btip=_esc(boardTip(board,latestDate));
-                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip+'">'+(board?_esc(board.model||''):'')+'</td>';
-              }
-            }
-            if(vis('board_fw')){
-              if(boardSpan>=0){
-                var btip2=_esc(boardTip(board,latestDate));
-                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
-              }
-            }
-
             /* PC 열 (모든 필드 동일 span, 각 필드별 개별 툴팁) */
             var pcSpan=getSpan(pcLen,si,nrows);
             if(maxPc>0&&visiblePcFields.length>0){
@@ -572,10 +579,6 @@ function _renderGridView(main){
                   if(!totalPorts)totalPorts=pc.lancard.filter(function(r){return r.speed;}).length;
                   lanVal=totalPorts?totalPorts+'개':'';
                 }
-                /* FG FW만 */
-                var fgVal=(pc&&Array.isArray(pc.fg))?pc.fg.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
-                /* Sync FW만 */
-                var syncVal=(pc&&Array.isArray(pc.sync))?pc.sync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / '):'';
 
                 visiblePcFields.forEach(function(f){
                   var fval='', ftip='';
@@ -608,14 +611,6 @@ function _renderGridView(main){
                       case 'lan':
                         fval=lanVal;
                         ftip=tdTip(tipSection('LAN 카드',(Array.isArray(pc.lancard)?pc.lancard:[]).filter(function(r){return r.speed;}).map(function(r){return tipRow(r.speed+(r.ports?'×'+r.ports+'P':''),r.purpose||'');})),latestDate);
-                        break;
-                      case 'fg':
-                        fval=fgVal;
-                        ftip=tdTip(tipSection('Frame Grabber',(Array.isArray(pc.fg)?pc.fg:[]).filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
-                        break;
-                      case 'sync':
-                        fval=syncVal;
-                        ftip=tdTip(tipSection('Sync Board',(Array.isArray(pc.sync)?pc.sync:[]).filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
                         break;
                       case 'os':
                         fval=pc.os||'';
@@ -1095,7 +1090,7 @@ function _renderViTypePc(item,val,id){
       '<div class="vi-type-pc-sec-hdr" style="border-left:3px solid '+color+';color:'+color+'">'+_esc(t)+'</div>'+
       '<div class="vi-type-pc-count-row">'+
         '<label>PC 수량</label>'+
-        '<input type="number" class="vi-type-pc-count qty-inp" min="0" max="10" value="'+count+'" '+
+        '<input type="number" class="vi-type-pc-count qty-inp" min="0" max="99" value="'+count+'" '+
           'oninput="_viTypePcCountChange(\''+id+'\','+ti+',this.value)">'+
         '<span class="qty-lbl">대</span>'+
       '</div>'+
@@ -1130,8 +1125,6 @@ function _renderViPcEntry(baseId,ti,pi,e){
       _viPcSubSec(eid,'hdd','HDD',e.hdd||[])+
       _viPcSubSec(eid,'hdd_rack','HDD RACK',e.hdd_rack||[])+
       _viPcSubSec(eid,'lancard','LANCARD',e.lancard||[])+
-      _viPcSubSec(eid,'fg','FRAME GRABBER',e.fg||[])+
-      _viPcSubSec(eid,'sync','SYNC BOARD',e.sync||[])+
       _viPcSpecRowText('OS','vi-pc-os',e.os||'')+
       _viPcSpecRowText('LICENSE','vi-pc-license',e.license||'')+
     '</div></div>';
@@ -1242,8 +1235,6 @@ function _collectViPcEntry(el){
     hdd:subRows('hdd',['capacity','qty','drive']),
     hdd_rack:subRows('hdd_rack',['model','qty']),
     lancard:subRows('lancard',['speed','ports','purpose']),
-    fg:subRows('fg',['model','board','fw']),
-    sync:subRows('sync',['model','board','fw']),
     os:g('vi-pc-os'),
     license:g('vi-pc-license')
   };
@@ -1902,6 +1893,7 @@ function delVisionEquip(id){
   var equip=S.visionEquips.find(function(e){return e.id===id;});
   var name=equip?_viEquipLabel(equip):id;
   if(!confirm('['+name+'] 설비를 삭제하시겠습니까?'))return;
+  _markDeletedVi(id);
   S.visionEquips=S.visionEquips.filter(function(e){return e.id!==id;});
   _visionSelId=null; _visionView='grid';
   saveData(); renderVisionTab();
@@ -1968,14 +1960,13 @@ function openViColumnSettings(){
     row('date','등록일')+row('sn','S/N')+
     '<div class="vi-col-cat-hdr">Program</div>'+
     row('prog_name','이름')+row('prog_ver','버전')+
+    '<div class="vi-col-cat-hdr">Board</div>'+
+    row('board_fw','Trigger FW')+row('fg_fw','FG FW')+row('sync_fw','Sync FW')+
     '<div class="vi-col-cat-hdr">Vision</div>'+
     row('camera','Camera 모델')+row('illum','조명 모델')+
-    '<div class="vi-col-cat-hdr">Trigger Board</div>'+
-    row('board_usage','용도')+row('board_fw','FW')+
     '<div class="vi-col-cat-hdr">PC</div>'+
     row('pc_name','이름')+row('pc_cpu','CPU')+row('pc_vga','VGA')+row('pc_ram','RAM')+
-    row('pc_ssd','SSD')+row('pc_hdd','HDD')+row('pc_lan','LAN (수량)')+
-    row('pc_fg','FG FW')+row('pc_sync','SYNC FW')+row('pc_os','OS')+
+    row('pc_ssd','SSD')+row('pc_hdd','HDD')+row('pc_lan','LAN (수량)')+row('pc_os','OS')+
     '</div>'+
     '<div class="mfoot"><button class="btn sm" onclick="cm()">취소</button><button class="btn sm pri" onclick="_doViColumnSettings()">적용</button></div>';
   mw(html);
