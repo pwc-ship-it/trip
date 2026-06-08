@@ -127,6 +127,44 @@ function _migrateVisionTemplate(){
       trigItem.labels=['사용 용도','BOARD 버전','FIRMWARE'];
     }
   })();
+  // Migration 9: vi_program → vc_basic에 추가 (없는 경우)
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var bc=cats.find(function(c){return c.id==='vc_basic';});
+    if(!bc||!bc.items)return;
+    if(bc.items.find(function(i){return i.id==='vi_program';}))return;
+    var snIdx=bc.items.findIndex(function(i){return i.id==='vi_sn';});
+    var insertAt=snIdx>=0?snIdx+1:bc.items.length;
+    bc.items.splice(insertAt,0,{id:'vi_program',name:'Program',type:'type-program',order:5,showInGrid:true});
+    bc.items.forEach(function(i){if(i.id==='vi_notes')i.order=6;});
+  })();
+}
+
+/* Vision 설비 데이터 마이그레이션 — pc.program → vi_program */
+function _migrateVisionEquips(){
+  (S.visionEquips||[]).forEach(function(e){
+    if(!e.data)return;
+    var viPc=e.data['vi_pc'];
+    if(!viPc||typeof viPc!=='object'||Array.isArray(viPc))return;
+    if(!e.data['vi_program'])e.data['vi_program']={};
+    Object.keys(viPc).forEach(function(type){
+      if(!Array.isArray(viPc[type]))return;
+      if(e.data['vi_program'][type]&&e.data['vi_program'][type].length){
+        viPc[type].forEach(function(pc){delete pc.program;});
+        return;
+      }
+      var merged=[],seen={};
+      viPc[type].forEach(function(pc){
+        if(!Array.isArray(pc.program))return;
+        pc.program.forEach(function(p){
+          var key=(p.name||'')+'@'+(p.version||'');
+          if(!seen[key]&&(p.name||p.version)){seen[key]=true;merged.push(p);}
+        });
+        delete pc.program;
+      });
+      if(merged.length)e.data['vi_program'][type]=merged;
+    });
+  });
 }
 
 function loadData(){
@@ -157,6 +195,8 @@ function loadData(){
         S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
         S.visionEquips=d.visionEquips||[];
         _migrateVisionTemplate();
+        _migrateVisionEquips();
+        try{var cv=JSON.parse(localStorage.getItem('viColVis')||'{}');S.visionColVis=cv;}catch(e){S.visionColVis={};}
         return;
       }
     }
@@ -168,6 +208,7 @@ function loadData(){
   S.schedules=def.schedules;S.events=def.events;S.workTasks=def.workTasks||[];
   S.equipItems=def.equipItems||[];S.equipUnits=def.equipUnits||[];
   S.visionTemplate=def.visionTemplate||{categories:[]};S.visionEquips=def.visionEquips||[];
+  S.visionColVis={};
 }
 function saveCache(data){
   try{

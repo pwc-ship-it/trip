@@ -756,6 +756,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 [data-theme="light"] .vi-chg-entry{background:#f4f4f8}
 [data-theme="light"] .vi-chg-fields span{background:rgba(70,70,180,.08);border-color:rgba(70,70,180,.2)}
 [data-theme="light"] .vi-eq-cont td{background:rgba(0,0,0,.03)}
+[data-theme="light"] .vi-eq-sub td{background:rgba(0,0,0,.015)}
 [data-theme="light"] .vi-sb-site-name-btn.active{color:#1a4a9a;background:rgba(58,106,170,.1)}
 [data-theme="light"] .vi-site-filter-bar{background:rgba(58,106,170,.07);border-color:rgba(58,106,170,.18);color:#1a4a9a}
 [data-theme="light"] .vi-site-filter-bar button{border-color:rgba(58,106,170,.3);color:#1a4a9a}
@@ -779,7 +780,19 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 /* Vision 그리드 다중행 설비 */
 .vi-eq-first td{border-top:1px solid var(--bd-main)}
 .vi-eq-cont td{border-top:1px solid var(--bd-subtle);background:rgba(0,0,0,.06)}
+.vi-eq-sub td{border-top:1px dashed var(--bd-subtle);background:rgba(0,0,0,.03)}
 .vi-eq-cont .vi-site-cell,.vi-eq-cont .vi-line-cell,.vi-eq-cont .vi-date-cell{opacity:.35;font-style:italic}
+/* rowspan 병합 셀 — 상단 정렬 */
+.vi-td-merge{vertical-align:top!important;border-bottom:none!important}
+.vi-eq-first .vi-td-merge{border-top:1px solid var(--bd-main)}
+/* Vision 그리드 커스텀 tooltip */
+#vi-tooltip{position:fixed;z-index:9999;background:var(--bg-card);border:1px solid var(--bd-main);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--tx-main);box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none;max-width:280px;line-height:1.6;display:none}
+#vi-tooltip .vit-section{margin-bottom:4px}
+#vi-tooltip .vit-label{color:var(--tx-faint);font-size:10px}
+#vi-tooltip .vit-row{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+#vi-tooltip .vit-sep{border-top:1px solid var(--bd-subtle);margin:5px 0}
+#vi-tooltip .vit-date{color:var(--tx-faint);font-size:10px}
+[data-theme="light"] #vi-tooltip{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.15)}
 /* Vision 상세 toolbar */
 .vi-detail-toolbar{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bd-light);background:var(--bg-panel)}
 

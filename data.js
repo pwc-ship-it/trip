@@ -94,7 +94,8 @@ var DEF = {
           {"id":"vi_type",    "name":"Type",     "type":"multiselect", "order":3, "showInGrid":false,
            "options":["Notching","Delamination","Foil","NGMarking","DNC_Notching","DNC_Cutting"]},
           {"id":"vi_sn",      "name":"S/N",      "type":"text",        "order":4, "showInGrid":false},
-          {"id":"vi_notes",   "name":"특이사항", "type":"textarea",    "order":5, "showInGrid":false}
+          {"id":"vi_program", "name":"Program",  "type":"type-program","order":5, "showInGrid":true},
+          {"id":"vi_notes",   "name":"특이사항", "type":"textarea",    "order":6, "showInGrid":false}
         ]
       },
       {
@@ -121,7 +122,7 @@ var DEF = {
             "id":"vg_trig","name":"TRIGGER BOARD","order":0,
             "items":[
               {"id":"vi_board_trig","name":"Trigger Board","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["모델명","BOARD 버전","FIRMWARE"]}
+               "labels":["사용 용도","BOARD 버전","FIRMWARE"]}
             ]
           }
         ]
