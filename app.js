@@ -114,6 +114,19 @@ function _migrateVisionTemplate(){
       vis.groups=vis.groups.filter(function(g){return g.id!=='vg_program';});
     }
   })();
+  // Migration 8: vi_board_trig labels[0] '모델명' → '사용 용도'
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    var boardCat=cats.find(function(c){return c.id==='vc_board';});
+    if(!boardCat||!boardCat.groups)return;
+    var trigGrp=boardCat.groups.find(function(g){return g.id==='vg_trig';});
+    if(!trigGrp||!trigGrp.items)return;
+    var trigItem=trigGrp.items.find(function(i){return i.id==='vi_board_trig';});
+    if(!trigItem)return;
+    if(!trigItem.labels||trigItem.labels[0]==='모델명'){
+      trigItem.labels=['사용 용도','BOARD 버전','FIRMWARE'];
+    }
+  })();
 }
 
 function loadData(){
@@ -732,9 +745,19 @@ function refreshVisionFromSheets(silent){
         var _prevVE=S.visionEquips||[];
         S.visionEquips=data.visionEquips.map(function(ve){
           if(ve.data&&typeof ve.data!=='object') ve.data={};
+          var lv=_prevVE.find(function(x){return x.id===ve.id;});
+          // data: Sheets가 비어있으면 로컬 유지
           if(!ve.data||!Object.keys(ve.data).length){
-            var lv=_prevVE.find(function(x){return x.id===ve.id;});
             if(lv&&lv.data&&Object.keys(lv.data).length) ve.data=lv.data;
+          }
+          // fieldUpdated/changelog: 로컬이 더 최신일 수 있으므로 항목 수가 많은 쪽 우선
+          if(lv){
+            if(lv.fieldUpdated&&Object.keys(lv.fieldUpdated).length>=Object.keys(ve.fieldUpdated||{}).length){
+              ve.fieldUpdated=lv.fieldUpdated;
+            }
+            if(lv.changelog&&lv.changelog.length>=(ve.changelog||[]).length&&lv.changelog.length>0){
+              ve.changelog=lv.changelog;
+            }
           }
           return ve;
         }).concat(localOnly);
@@ -775,7 +798,12 @@ function refreshVisionFromSheets(silent){
         // Vision 탭 렌더링: 모달이 열려 있지 않을 때만 갱신 (입력 중 초기화 방지)
         var _mc=document.getElementById('mc');
         if(_activeTab==='vision'&&typeof renderVisionTab==='function'&&(!_mc||!_mc.innerHTML)){
-          renderVisionTab();
+          // 상세 뷰에서는 사이드바만 갱신 (폼 깜박임·스크롤 초기화 방지)
+          if(typeof _visionView!=='undefined'&&_visionView==='detail'){
+            if(typeof renderVisionSidebar==='function') renderVisionSidebar();
+          } else {
+            renderVisionTab();
+          }
         }
       }
       if(!silent){

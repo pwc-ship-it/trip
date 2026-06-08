@@ -561,6 +561,14 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-sb-site-arr.open{transform:rotate(90deg)}
 .vi-sb-site-name{font-size:11px;font-weight:600;color:var(--tx-muted);flex:1}
 .vi-sb-site-cnt{font-size:9px;color:var(--tx-faint);background:var(--bg-hover);border-radius:8px;padding:1px 5px}
+.vi-sb-site-arr-btn{background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--tx-faint);font-size:9px;transition:transform .15s,color .1s;flex-shrink:0;border-radius:3px;line-height:1}
+.vi-sb-site-arr-btn:hover{color:var(--tx-second);background:var(--bg-hover)}
+.vi-sb-site-name-btn{background:none;border:none;padding:2px 4px;cursor:pointer;font-size:11px;font-weight:600;color:var(--tx-muted);flex:1;text-align:left;border-radius:3px;transition:color .1s,background .1s}
+.vi-sb-site-name-btn:hover{color:var(--tx-primary);background:var(--bg-hover)}
+.vi-sb-site-name-btn.active{color:#7aafee;background:rgba(58,106,170,.18)}
+.vi-site-filter-bar{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(58,106,170,.12);border-bottom:1px solid rgba(58,106,170,.25);font-size:10px;color:#7aafee}
+.vi-site-filter-bar button{background:none;border:1px solid rgba(58,106,170,.4);border-radius:3px;color:#7aafee;font-size:9px;padding:1px 6px;cursor:pointer}
+.vi-site-filter-bar button:hover{background:rgba(58,106,170,.25)}
 .vi-sb-equip-list{}
 .vi-sb-eq-item{display:flex;align-items:center;gap:5px;padding:4px 10px 4px 20px;cursor:pointer;border-bottom:1px solid var(--bd-subtle);transition:background .1s}
 .vi-sb-eq-item:hover{background:var(--bg-hover)}
@@ -744,6 +752,34 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 [data-theme="light"] .pm-expand-row td{background:var(--bg-deep)}
 [data-theme="light"] .vi-type-cam-sec-hdr,[data-theme="light"] .vi-type-illum-sec-hdr{color:var(--tx-second)}
 [data-theme="light"] .vi-board-entry-hdr{color:var(--tx-second)}
+[data-theme="light"] .vi-type-sn-inp{background:#fff;border-color:#bbb}
+[data-theme="light"] .vi-chg-entry{background:#f4f4f8}
+[data-theme="light"] .vi-chg-fields span{background:rgba(70,70,180,.08);border-color:rgba(70,70,180,.2)}
+[data-theme="light"] .vi-eq-cont td{background:rgba(0,0,0,.03)}
+[data-theme="light"] .vi-sb-site-name-btn.active{color:#1a4a9a;background:rgba(58,106,170,.1)}
+[data-theme="light"] .vi-site-filter-bar{background:rgba(58,106,170,.07);border-color:rgba(58,106,170,.18);color:#1a4a9a}
+[data-theme="light"] .vi-site-filter-bar button{border-color:rgba(58,106,170,.3);color:#1a4a9a}
+/* Vision Type S/N 다중 입력 */
+.vi-type-sn{display:flex;flex-direction:column;gap:5px;padding:2px 0}
+.vi-type-sn-row{display:flex;align-items:center;gap:6px}
+.vi-type-sn-lbl{font-size:10px;font-weight:600;color:#fff;border-radius:3px;padding:2px 7px;min-width:80px;text-align:center;white-space:nowrap}
+.vi-type-sn-inp{flex:1;padding:4px 7px;font-size:12px;background:var(--bg-input);border:1px solid var(--bd-main);border-radius:4px;color:var(--tx-primary)}
+.vi-type-sn-inp:focus{outline:none;border-color:#3a7acc}
+/* Vision 항목 최종수정일 */
+.vi-item-upd-date{font-size:9px;color:var(--tx-faint);margin-left:6px;font-style:italic}
+/* Vision 변경이력 */
+.vi-changelog-sec{margin-top:16px;padding-top:12px;border-top:1px solid var(--bd-light)}
+.vi-changelog-title{font-size:11px;font-weight:600;color:var(--tx-dim);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.vi-changelog-title::before{content:'⊙';font-size:9px;color:var(--tx-faint)}
+.vi-changelog-body{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.vi-chg-entry{display:flex;gap:8px;font-size:11px;padding:4px 6px;border-radius:4px;background:var(--bg-deep)}
+.vi-chg-date{color:var(--tx-faint);white-space:nowrap;flex-shrink:0;font-size:10px;padding-top:1px}
+.vi-chg-fields{color:var(--tx-second);flex:1;line-height:1.6}
+.vi-chg-fields span{display:inline-block;background:rgba(90,90,200,.15);border:1px solid rgba(90,90,200,.25);border-radius:3px;padding:0 5px;margin:1px 2px;font-size:10px}
+/* Vision 그리드 다중행 설비 */
+.vi-eq-first td{border-top:1px solid var(--bd-main)}
+.vi-eq-cont td{border-top:1px solid var(--bd-subtle);background:rgba(0,0,0,.06)}
+.vi-eq-cont .vi-site-cell,.vi-eq-cont .vi-line-cell,.vi-eq-cont .vi-date-cell{opacity:.35;font-style:italic}
 /* Vision 상세 toolbar */
 .vi-detail-toolbar{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bd-light);background:var(--bg-panel)}
 
