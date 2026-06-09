@@ -146,8 +146,14 @@ function renderGantt(){
   var body=document.getElementById('gbody');body.innerHTML='';
   // 오늘 날짜 문자열 (과거 일정 판별용)
   var _td=TODAY;var todayISO=_td.getFullYear()+'-'+String(_td.getMonth()+1).padStart(2,'0')+'-'+String(_td.getDate()).padStart(2,'0');
-  // S.sites 순서 기준으로 프로젝트 정렬
-  var siteOrder={};S.sites.forEach(function(s,i){siteOrder[s.id]=i;});
+  // 사이드바와 동일한 그룹→사이트 순서 기준으로 프로젝트 정렬
+  var siteOrder={};
+  var _so=0;
+  var _sideGroups=S.groups&&S.groups.length?S.groups:[{id:'_none'}];
+  _sideGroups.forEach(function(grp){
+    S.sites.forEach(function(s){if((s.groupId||'_none')===grp.id)siteOrder[s.id]=_so++;});
+  });
+  S.sites.forEach(function(s){if(siteOrder[s.id]===undefined)siteOrder[s.id]=_so++;});
   var projs=S.projects.filter(function(p){
     // 사이트/그룹 필터
     if(S.filterSite!=='all'){

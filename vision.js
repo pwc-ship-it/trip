@@ -214,7 +214,7 @@ function _viSortByName(){
     return (a.name||a.id).localeCompare(b.name||b.id,'ko');
   });
   saveData();
-  renderVisionSidebar();
+  renderVisionTab();
 }
 
 function _viFilterSite(sid){
@@ -238,7 +238,7 @@ function _viSiteDrop(event,targetSid){
   var item=S.sites.splice(fromIdx,1)[0];
   S.sites.splice(toIdx,0,item);
   _viDragSiteId=null;
-  saveData(); renderVisionSidebar();
+  saveData(); renderVisionTab();
 }
 function _viSiteDragEnd(){ _viDragSiteId=null; }
 
