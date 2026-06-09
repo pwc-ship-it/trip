@@ -828,6 +828,25 @@ function _renderDetailView(main){
       if(e.target.tagName==='INPUT'&&e.target.type==='text')_viAutoSizeInput(e.target);
     });
   }
+  /* 기존 호기 board-multi 섹션 강제 재렌더: 저장된 데이터에 Vision Type 체크박스 / PC 드롭다운이
+     없던 경우에도 현재 _viCurrentTypes · pcSelect 기준으로 UI를 올바르게 표시하기 위함 */
+  (function(){
+    (S.visionTemplate.categories||[]).forEach(function(cat){
+      var items=(cat.items||[]).concat(
+        (cat.groups||[]).reduce(function(acc,g){return acc.concat(g.items||[]);}, [])
+      );
+      items.forEach(function(bItem){
+        if(bItem.type!=='board-multi') return;
+        var bWrap=document.getElementById('viinp_'+bItem.id);
+        if(!bWrap) return;
+        var bData=_collectViField(bItem,'viinp_'+bItem.id);
+        var entries=Array.isArray(bData)?bData:[{model:'',board:'',fw:''}];
+        var tmp=document.createElement('div');
+        tmp.innerHTML=_renderViBoardMulti(bItem, entries, 'viinp_'+bItem.id);
+        bWrap.parentNode.replaceChild(tmp.firstChild, bWrap);
+      });
+    });
+  })();
 }
 
 /* ── 상세 폼 렌더 ── */
