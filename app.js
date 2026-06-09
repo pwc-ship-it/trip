@@ -203,6 +203,20 @@ function _migrateVisionTemplate(){
     if(boardIdx>=0) cats.splice(boardIdx+1,0,deepCopy(defCtrl));
     else cats.push(deepCopy(defCtrl));
   })();
+  // Migration 13: vi_fg / vi_sync 에 pcSelect:true 누락 시 추가
+  // 그룹 ID가 아닌 아이템 ID로 검색 — 커스텀 그룹에 배치된 경우도 패치
+  (function(){
+    var cats=S.visionTemplate.categories||[];
+    cats.forEach(function(cat){
+      var all=(cat.items||[]).concat(
+        (cat.groups||[]).reduce(function(a,g){return a.concat(g.items||[]);}, [])
+      );
+      all.forEach(function(it){
+        if((it.id==='vi_fg'||it.id==='vi_sync')&&it.type==='board-multi'&&!it.pcSelect)
+          it.pcSelect=true;
+      });
+    });
+  })();
 }
 
 /* Vision 설비 데이터 마이그레이션 — pc.program → vi_program, pc.fg/sync → vi_fg/vi_sync */

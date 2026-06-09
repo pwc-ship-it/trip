@@ -837,6 +837,8 @@ function _renderDetailView(main){
       );
       items.forEach(function(bItem){
         if(bItem.type!=='board-multi') return;
+        /* vi_fg / vi_sync 는 그룹 ID 무관하게 pcSelect 보장 */
+        if((bItem.id==='vi_fg'||bItem.id==='vi_sync')&&!bItem.pcSelect) bItem.pcSelect=true;
         var bWrap=document.getElementById('viinp_'+bItem.id);
         if(!bWrap) return;
         var bData=_collectViField(bItem,'viinp_'+bItem.id);
