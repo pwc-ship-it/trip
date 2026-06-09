@@ -635,8 +635,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-board-entry-fields{padding:6px 8px;display:flex;flex-direction:column;gap:4px}
 .vi-board-entry-field{display:flex;align-items:center;gap:6px;font-size:11px}
 .vi-board-entry-field label{width:70px;flex-shrink:0;color:var(--tx-faint);font-size:11px}
-.vi-board-entry-field input{flex:1;min-width:0;padding:4px 7px;font-size:12px;background:var(--bg-input);border:1px solid var(--bd-light);border-radius:4px;color:var(--tx-primary);outline:none;font-family:inherit}
-.vi-board-entry-field input:focus{border-color:#1a6bbf}
+.vi-board-entry-field input:not([type="checkbox"]){flex:1;min-width:0;padding:4px 7px;font-size:12px;background:var(--bg-input);border:1px solid var(--bd-light);border-radius:4px;color:var(--tx-primary);outline:none;font-family:inherit}
+.vi-board-entry-field input:not([type="checkbox"]):focus{border-color:#1a6bbf}
 .vi-board-type-field{align-items:flex-start!important}
 .vi-board-type-chks{display:flex;flex-wrap:wrap;gap:6px 18px;padding:2px 0}
 .vi-board-type-chk-lbl{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx-second);cursor:pointer;white-space:nowrap}
