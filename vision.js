@@ -791,6 +791,8 @@ function _renderDetailView(main){
         (equip.updatedAt?'저장됨: '+equip.updatedAt:'')+
       '</span>'+
     '</div>';
+  var _wrap=document.getElementById('visionFormWrap');
+  if(_wrap)_viInitInputAutoSize(_wrap);
 }
 
 /* ── 상세 폼 렌더 ── */
@@ -1232,9 +1234,26 @@ function _viPcSubAdd(containerId,subType){
   var div=document.createElement('div'); div.className='vi-pc-sub-row';
   div.innerHTML=_viPcSubRowFields(subType,{}); // empty row
   container.appendChild(div);
+  _viInitInputAutoSize(div);
 }
 
 function _viPcSubDel(btn){ var row=btn.parentNode; row.parentNode.removeChild(row); }
+
+function _viAutoSizeInput(inp){
+  var len=Math.max(15,inp.value.length,(inp.placeholder||'').length);
+  inp.style.setProperty('width',len+'ch','important');
+}
+function _viInitInputAutoSize(container){
+  var inputs=container.querySelectorAll('.vi-type-pc-entry input[type="text"]:not(.vi-pc-name-inp)');
+  // sub-row div 직접 전달 시 fallback
+  if(!inputs.length&&container.className&&container.className.indexOf('vi-pc-sub-row')>=0){
+    inputs=container.querySelectorAll('input[type="text"]');
+  }
+  Array.prototype.forEach.call(inputs,function(inp){
+    _viAutoSizeInput(inp);
+    inp.addEventListener('input',function(){_viAutoSizeInput(this);});
+  });
+}
 
 function _collectViPcEntry(el){
   function g(cls){var e=el.querySelector('.'+cls);return e?e.value:'';}

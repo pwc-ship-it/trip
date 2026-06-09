@@ -675,9 +675,9 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-pc-spec-row .vi-pc-f-lbl{width:80px;flex-shrink:0;color:var(--tx-dim);font-size:11px}
 /* PC entry 내 모든 input에서 .vi-item-input의 width:100% 강제 해제 */
 .vi-type-pc-entry input[type="text"],.vi-type-pc-entry input[type="number"]{width:auto!important}
-.vi-pc-spec-row .spec-inp{flex:1 1 0%!important;min-width:50px;padding:5px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-spec-row .spec-inp{flex:none!important;width:15ch;min-width:50px;padding:5px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
 .vi-pc-spec-row .spec-inp:focus{border-color:#1a6bbf}
-.vi-pc-spec-row .qty-inp{flex:0 0 42px!important;width:42px!important;text-align:center;padding:5px 4px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-spec-row .qty-inp{flex:none!important;width:44px!important;text-align:center;padding:5px 4px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit}
 .vi-pc-spec-row .qty-inp:focus{border-color:#1a6bbf}
 .vi-type-pc-entry-hdr{padding:4px 10px;background:var(--bg-deep);font-size:11px;font-weight:600;color:var(--tx-sub);display:flex;align-items:center;gap:8px}
 .vi-pc-entry-num{flex-shrink:0;font-size:11px;color:var(--tx-dim)}
@@ -685,13 +685,13 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-pc-name-inp:focus{background:var(--bg-inp);border-color:#1a6bbf}
 .vi-pc-name-inp::placeholder{color:var(--tx-dim);font-weight:400}
 .vi-pc-sub-sec{border-top:1px solid var(--bd-deep);padding-top:5px;margin-top:3px}
-.vi-pc-sub-sec-lbl{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--tx-dim);margin-bottom:3px}
+.vi-pc-sub-sec-lbl{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--tx-dim);margin-bottom:3px}
 .vi-pc-sub-add{font-size:10px;padding:2px 7px;background:none;border:1px dashed #3a3a60;border-radius:3px;color:#5a5aaa;cursor:pointer}
 .vi-pc-sub-add:hover{background:#1a1a30;color:#9090cc}
 .vi-pc-sub-rows{display:flex;flex-direction:column;gap:2px}
 .vi-pc-sub-row{display:flex;gap:4px;align-items:center;padding:1px 0}
-.vi-pc-sub-row input{flex:1;min-width:0;padding:3px 6px;font-size:11px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:3px;color:var(--tx-main);outline:none;font-family:inherit;width:auto!important}
-.vi-pc-sub-row input.qty-inp{flex:none;width:40px!important;text-align:center}
+.vi-pc-sub-row input{flex:none;width:15ch;padding:3px 6px;font-size:11px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:3px;color:var(--tx-main);outline:none;font-family:inherit}
+.vi-pc-sub-row input.qty-inp{flex:none;width:44px!important;text-align:center}
 .vi-pc-sub-row input:focus{border-color:#1a6bbf}
 .vi-pc-sub-del{background:none;border:none;cursor:pointer;color:#5a2020;font-size:13px;line-height:1;padding:0 3px;flex-shrink:0}
 .vi-pc-sub-del:hover{color:#e84040}
