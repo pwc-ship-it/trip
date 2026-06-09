@@ -429,13 +429,17 @@ function _renderGridView(main){
         var d=e.data||{};
         var et=d['vi_type']; var ts=Array.isArray(et)?et:(et?[et]:[null]);
         var allBds=Array.isArray(d['vi_board_trig'])?d['vi_board_trig']:[];
+        var _allBdsG=allBds.length>0&&allBds.every(function(b){
+          if(!b.types||!b.types.length)return true;
+          return ts.every(function(t){return b.types.indexOf(t)>=0;});
+        });
         ts.forEach(function(type){
           var cams=(d.vi_cameras&&Array.isArray(d.vi_cameras[type]))?d.vi_cameras[type]:[];
           var illums=(d.vi_illumination&&Array.isArray(d.vi_illumination[type]))?d.vi_illumination[type]:[];
           var progs=(d.vi_program&&Array.isArray(d.vi_program[type]))?d.vi_program[type]:[];
           var pcs=(d.vi_pc&&Array.isArray(d.vi_pc[type]))?d.vi_pc[type]:[];
-          var filtBds=allBds.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);});
-          siteRowCnt+=Math.max(1,cams.length,illums.length,progs.length,filtBds.length,pcs.length);
+          var filtBdsLen=_allBdsG?0:allBds.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);}).length;
+          siteRowCnt+=Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,pcs.length);
         });
       });
       bodyHtml+='<tr class="vi-site-grp-row"><td colspan="'+totalCols+'" style="color:'+scolor+';border-left:3px solid '+scolor+'">'+_esc(sname)+' ('+siteRowCnt+'행)</td></tr>';
@@ -451,14 +455,20 @@ function _renderGridView(main){
         var latestDate=_viLatestFieldDate(e);
         var createdAt=_esc(e.createdAt||'');
 
-        /* typeSubRows 계산 (보드는 type별 필터 적용) */
+        /* 모든 보드가 전체 Vision Type 적용이면 merged cell 사용 */
+        var allBoardsGlobal=allBoards.length>0&&allBoards.every(function(b){
+          if(!b.types||!b.types.length)return true;
+          return types.every(function(t){return b.types.indexOf(t)>=0;});
+        });
+
+        /* typeSubRows 계산 (allBoardsGlobal 시 보드는 행 수 계산에서 제외) */
         var typeSubRows=types.map(function(type){
           var cams=(d.vi_cameras&&Array.isArray(d.vi_cameras[type]))?d.vi_cameras[type]:[];
           var illums=(d.vi_illumination&&Array.isArray(d.vi_illumination[type]))?d.vi_illumination[type]:[];
           var progs=(d.vi_program&&Array.isArray(d.vi_program[type]))?d.vi_program[type]:[];
           var pcs=(d.vi_pc&&Array.isArray(d.vi_pc[type]))?d.vi_pc[type]:[];
-          var filtBds=allBoards.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);});
-          return Math.max(1,cams.length,illums.length,progs.length,filtBds.length,pcs.length);
+          var filtBdsLen=allBoardsGlobal?0:allBoards.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);}).length;
+          return Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,pcs.length);
         });
         var totalEquipRows=typeSubRows.reduce(function(s,n){return s+n;},0);
 
@@ -473,8 +483,8 @@ function _renderGridView(main){
           var _syncS={};
           types.forEach(function(t2){var _p=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];_p.forEach(function(pc2){if(Array.isArray(pc2.sync))pc2.sync.forEach(function(s){if(s.model||s.board||s.fw){var _k=(s.model||'')+'|'+(s.fw||'');if(!_syncS[_k]){_syncS[_k]=true;equipSync.push(s);}}});});});
         }
-        var fgFwVal=equipFg.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / ');
-        var syncFwVal=equipSync.filter(function(r){return r.fw;}).map(function(r){return r.fw;}).join(' / ');
+        var fgFwVal=equipFg.filter(function(r){return r.fw||r.pc;}).map(function(r){return (r.pc?r.pc+': ':'')+( r.fw||'');}).filter(Boolean).join(' / ');
+        var syncFwVal=equipSync.filter(function(r){return r.fw||r.pc;}).map(function(r){return (r.pc?r.pc+': ':'')+( r.fw||'');}).filter(Boolean).join(' / ');
         var fgTipHtml=tdTip(tipSection('Frame Grabber',equipFg.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.pc?'PC:'+r.pc:'',r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
         var syncTipHtml=tdTip(tipSection('Sync Board',equipSync.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.pc?'PC:'+r.pc:'',r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
 
@@ -552,9 +562,18 @@ function _renderGridView(main){
             var boardSpan=getSpan(boardLen,si,nrows);
             var board=boardSpan>=0?(boards[si]||null):null;
             if(vis('board_fw')){
-              if(boardSpan>=0){
-                var btip2=_esc(boardTip(board,latestDate));
-                row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
+              if(allBoardsGlobal){
+                /* 전체 타입 적용 보드: 첫 셀에만 병합 렌더, 나머지 행은 skip */
+                if(typeIdx===0&&si===0){
+                  var mergedFw=allBoards.filter(function(b){return b.fw;}).map(function(b){return _esc(b.fw);}).join(' / ');
+                  var mergedTip=allBoards.length>0?_esc(boardTip(allBoards[0],latestDate)):'';
+                  row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap" data-tip="'+mergedTip+'">'+mergedFw+'</td>';
+                }
+              } else {
+                if(boardSpan>=0){
+                  var btip2=_esc(boardTip(board,latestDate));
+                  row+='<td class="vi-td" rowspan="'+boardSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+btip2+'">'+(board?_esc(board.fw||''):'')+'</td>';
+                }
               }
             }
             if(isFirstType&&vis('fg_fw')){
@@ -655,6 +674,16 @@ function _renderGridView(main){
   }
 
   main.innerHTML='<div class="vi-grid-wrap"><table class="vi-grid"><thead>'+hdr1Parts.join('')+hdr2Parts.join('')+'</thead><tbody>'+bodyHtml+'</tbody></table></div>';
+  /* 스티키 헤더 row2 top 오프셋 보정 — row1 높이만큼 내려야 group header가 가려지지 않음 */
+  (function(){
+    var thead=main.querySelector('.vi-grid thead');
+    if(!thead)return;
+    var r1=thead.rows[0]; if(!r1)return;
+    var h1=r1.offsetHeight;
+    Array.prototype.forEach.call(thead.querySelectorAll('tr:last-child th'),function(th){
+      th.style.top=h1+'px';
+    });
+  })();
   _viBindTooltip(main);
 }
 
@@ -1556,7 +1585,11 @@ function _renderViBoardEntry(labels,e,idx,currentTypes,isPcSelect){
       '<select class="vi-board-pc-sel">'+opts+'</select>'+
     '</div>';
   } else {
-    var ct=currentTypes||_viCurrentTypes||[];
+    var ct=currentTypes||_viCurrentTypes;
+    if(!ct||!ct.length){
+      var _viTypeItem=_findItemById('vi_type');
+      ct=(_viTypeItem&&Array.isArray(_viTypeItem.options))?_viTypeItem.options:[];
+    }
     extra=ct.length?
       '<div class="vi-board-entry-field vi-board-type-field">'+
         '<label>Vision Type</label>'+
