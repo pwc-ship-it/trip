@@ -641,6 +641,8 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-board-type-chks{display:flex;flex-wrap:wrap;gap:4px 10px;padding:2px 0}
 .vi-board-type-chk-lbl{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--tx-second);cursor:pointer;white-space:nowrap}
 .vi-board-type-chk-lbl input[type="checkbox"]{cursor:pointer}
+.vi-board-pc-sel{flex:1;min-width:0;padding:4px 7px;font-size:12px;background:var(--bg-input);border:1px solid var(--bd-light);border-radius:4px;color:var(--tx-primary);outline:none;font-family:inherit;cursor:pointer}
+.vi-board-pc-sel:focus{border-color:#1a6bbf}
 /* ── empty state ── */
 .vi-type-empty{padding:10px 12px;font-size:11px;color:var(--tx-dim);background:var(--bg-deep);border:1px dashed var(--bd-main);border-radius:4px;text-align:center}
 /* ── 다중 헤더 그리드 ── */
@@ -695,6 +697,10 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .vi-pc-sub-row input:focus{border-color:#1a6bbf}
 .vi-pc-sub-del{background:none;border:none;cursor:pointer;color:#5a2020;font-size:13px;line-height:1;padding:0 3px;flex-shrink:0}
 .vi-pc-sub-del:hover{color:#e84040}
+/* 이력관리 상세 — 모든 text input 자동 크기 (최소 15ch, 내용에 맞게 자동 확장) */
+#visionFormWrap input[type="text"]{field-sizing:content;min-width:15ch;flex:none!important;width:auto!important}
+/* 수량/숫자 입력창 통일 (3자리 수용) */
+#visionFormWrap input[type="number"]{flex:none!important;width:44px!important;text-align:center}
 /* ── 특이사항 textarea ── */
 .vi-notes-area{width:100%;padding:6px 8px;font-size:12px;background:var(--bg-inp);border:1px solid var(--bd-inp);border-radius:4px;color:var(--tx-main);outline:none;font-family:inherit;resize:vertical;min-height:70px;line-height:1.5;box-sizing:border-box}
 .vi-notes-area:focus{border-color:#1a6bbf}

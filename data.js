@@ -112,14 +112,14 @@ var DEF = {
             "id":"vg_fg","name":"FRAME GRABBER","order":1,
             "items":[
               {"id":"vi_fg","name":"Frame Grabber","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["제조사","BOARD 버전","FIRMWARE"]}
+               "labels":["제조사","BOARD 버전","FIRMWARE"],"pcSelect":true}
             ]
           },
           {
             "id":"vg_sync","name":"SYNC BOARD","order":2,
             "items":[
               {"id":"vi_sync","name":"Sync Board","type":"board-multi","order":0,"showInGrid":false,
-               "labels":["제조사","BOARD 버전","FIRMWARE"]}
+               "labels":["제조사","BOARD 버전","FIRMWARE"],"pcSelect":true}
             ]
           }
         ]
