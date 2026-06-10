@@ -433,13 +433,18 @@ function _renderGridView(main){
           if(!b.types||!b.types.length)return true;
           return ts.every(function(t){return b.types.indexOf(t)>=0;});
         });
+        var _sFg=Array.isArray(d['vi_fg'])?d['vi_fg']:[];
+        var _sSync=Array.isArray(d['vi_sync'])?d['vi_sync']:[];
         ts.forEach(function(type){
           var cams=(d.vi_cameras&&Array.isArray(d.vi_cameras[type]))?d.vi_cameras[type]:[];
           var illums=(d.vi_illumination&&Array.isArray(d.vi_illumination[type]))?d.vi_illumination[type]:[];
           var progs=(d.vi_program&&Array.isArray(d.vi_program[type]))?d.vi_program[type]:[];
           var pcs=(d.vi_pc&&Array.isArray(d.vi_pc[type]))?d.vi_pc[type]:[];
           var filtBdsLen=_allBdsG?0:allBds.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);}).length;
-          siteRowCnt+=Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,pcs.length);
+          var tpcNames=pcs.map(function(p){return p.name;});
+          var tfgLen=_sFg.filter(function(f){return f.pc&&tpcNames.indexOf(f.pc)>=0;}).length;
+          var tsyncLen=_sSync.filter(function(f){return f.pc&&tpcNames.indexOf(f.pc)>=0;}).length;
+          siteRowCnt+=Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,tfgLen,tsyncLen,pcs.length);
         });
       });
       bodyHtml+='<tr class="vi-site-grp-row"><td colspan="'+totalCols+'" style="color:'+scolor+';border-left:3px solid '+scolor+'">'+_esc(sname)+' ('+siteRowCnt+'행)</td></tr>';
@@ -462,13 +467,18 @@ function _renderGridView(main){
         });
 
         /* typeSubRows 계산 (allBoardsGlobal 시 보드는 행 수 계산에서 제외) */
+        var _rawFg=Array.isArray(d['vi_fg'])?d['vi_fg']:[];
+        var _rawSync=Array.isArray(d['vi_sync'])?d['vi_sync']:[];
         var typeSubRows=types.map(function(type){
           var cams=(d.vi_cameras&&Array.isArray(d.vi_cameras[type]))?d.vi_cameras[type]:[];
           var illums=(d.vi_illumination&&Array.isArray(d.vi_illumination[type]))?d.vi_illumination[type]:[];
           var progs=(d.vi_program&&Array.isArray(d.vi_program[type]))?d.vi_program[type]:[];
           var pcs=(d.vi_pc&&Array.isArray(d.vi_pc[type]))?d.vi_pc[type]:[];
           var filtBdsLen=allBoardsGlobal?0:allBoards.filter(function(b){return !b.types||!b.types.length||(type&&b.types.indexOf(type)>=0);}).length;
-          return Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,pcs.length);
+          var tpcNames=pcs.map(function(p){return p.name;});
+          var tfgLen=_rawFg.filter(function(f){return f.pc&&tpcNames.indexOf(f.pc)>=0;}).length;
+          var tsyncLen=_rawSync.filter(function(f){return f.pc&&tpcNames.indexOf(f.pc)>=0;}).length;
+          return Math.max(1,cams.length,illums.length,progs.length,filtBdsLen,tfgLen,tsyncLen,pcs.length);
         });
         var totalEquipRows=typeSubRows.reduce(function(s,n){return s+n;},0);
 
@@ -483,10 +493,21 @@ function _renderGridView(main){
           var _syncS={};
           types.forEach(function(t2){var _p=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];_p.forEach(function(pc2){if(Array.isArray(pc2.sync))pc2.sync.forEach(function(s){if(s.model||s.board||s.fw){var _k=(s.model||'')+'|'+(s.fw||'');if(!_syncS[_k]){_syncS[_k]=true;equipSync.push(s);}}});});});
         }
-        var fgFwVal=equipFg.filter(function(r){return r.fw||r.pc;}).map(function(r){return (r.pc?r.pc+': ':'')+( r.fw||'');}).filter(Boolean).join(' / ');
-        var syncFwVal=equipSync.filter(function(r){return r.fw||r.pc;}).map(function(r){return (r.pc?r.pc+': ':'')+( r.fw||'');}).filter(Boolean).join(' / ');
-        var fgTipHtml=tdTip(tipSection('Frame Grabber',equipFg.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.pc?'PC:'+r.pc:'',r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
-        var syncTipHtml=tdTip(tipSection('Sync Board',equipSync.filter(function(r){return r.model||r.board||r.fw;}).map(function(r){return tipRow(r.model||'-',[r.pc?'PC:'+r.pc:'',r.board?'BD:'+r.board:'',r.fw?'FW:'+r.fw:''].filter(Boolean).join(' '));})),latestDate);
+        /* equip 수준에서 PC 매칭 여부 — per-type 렌더 vs fallback 분기용 */
+        var fgHasAnyMatch=equipFg.some(function(f){
+          if(!f.pc)return false;
+          return types.some(function(t2){
+            var p2=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];
+            return p2.some(function(pc2){return pc2.name===f.pc;});
+          });
+        });
+        var syncHasAnyMatch=equipSync.some(function(f){
+          if(!f.pc)return false;
+          return types.some(function(t2){
+            var p2=(d.vi_pc&&Array.isArray(d.vi_pc[t2]))?d.vi_pc[t2]:[];
+            return p2.some(function(pc2){return pc2.name===f.pc;});
+          });
+        });
 
         /* 항목별 독립 rowspan 계산 헬퍼 */
         function getSpan(len,si,nrows){
@@ -558,12 +579,35 @@ function _renderGridView(main){
               }
             }
 
-            /* Board: FG FW(설비 단위) + Sync FW(설비 단위) + Trigger FW(type별) */
-            if(isFirstType&&vis('fg_fw')){
-              row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(fgTipHtml)+'">'+_esc(fgFwVal)+'</td>';
+            /* Board: FG FW / Sync FW — PC 매칭 있으면 per-type, 없으면 equip 병합 fallback */
+            var typePcNames=pcs.map(function(p){return p.name;});
+            if(fgHasAnyMatch){
+              var typeFgs=equipFg.filter(function(f){return f.pc&&typePcNames.indexOf(f.pc)>=0;});
+              var fgSpan=getSpan(typeFgs.length,si,nrows);
+              if(vis('fg_fw')&&fgSpan>=0){
+                var fgEnt=typeFgs[si]||null;
+                var fgCellTip=fgEnt?_esc(tdTip(tipSection('Frame Grabber',[tipRow('PC',fgEnt.pc||''),tipRow('제조사',fgEnt.model||''),tipRow('보드버전',fgEnt.board||''),tipRow('FW',fgEnt.fw||'')]),latestDate)):'';
+                row+='<td class="vi-td" rowspan="'+fgSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+fgCellTip+'">'+(fgEnt?_esc(fgEnt.fw||''):'')+'</td>';
+              }
+            } else {
+              if(isFirstType&&si===0&&vis('fg_fw')){
+                var _fgFw=equipFg.filter(function(r){return r.fw;}).map(function(r){return _esc(r.fw);}).join(' / ');
+                row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap">'+_fgFw+'</td>';
+              }
             }
-            if(isFirstType&&vis('sync_fw')){
-              row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" data-tip="'+_esc(syncTipHtml)+'">'+_esc(syncFwVal)+'</td>';
+            if(syncHasAnyMatch){
+              var typeSyncs=equipSync.filter(function(f){return f.pc&&typePcNames.indexOf(f.pc)>=0;});
+              var syncSpan=getSpan(typeSyncs.length,si,nrows);
+              if(vis('sync_fw')&&syncSpan>=0){
+                var syncEnt=typeSyncs[si]||null;
+                var syncCellTip=syncEnt?_esc(tdTip(tipSection('Sync Board',[tipRow('PC',syncEnt.pc||''),tipRow('제조사',syncEnt.model||''),tipRow('보드버전',syncEnt.board||''),tipRow('FW',syncEnt.fw||'')]),latestDate)):'';
+                row+='<td class="vi-td" rowspan="'+syncSpan+'" style="min-width:88px;white-space:nowrap" data-tip="'+syncCellTip+'">'+(syncEnt?_esc(syncEnt.fw||''):'')+'</td>';
+              }
+            } else {
+              if(isFirstType&&si===0&&vis('sync_fw')){
+                var _syncFw=equipSync.filter(function(r){return r.fw;}).map(function(r){return _esc(r.fw);}).join(' / ');
+                row+='<td class="vi-td vi-td-merge" rowspan="'+totalEquipRows+'" style="min-width:88px;white-space:nowrap">'+_syncFw+'</td>';
+              }
             }
             var boardSpan=getSpan(boardLen,si,nrows);
             var board=boardSpan>=0?(boards[si]||null):null;
