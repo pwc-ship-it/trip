@@ -58,13 +58,13 @@ function renderSidebar(){
     }).length;
     var lbl=document.createElement('div');
     lbl.className='grplbl'+(S.filterSite===grpKey?' on':'');
-    lbl.innerHTML=grp.name+'<span class="scnt grp-cnt">'+grpCnt+'</span>';
+    lbl.innerHTML=_esc(grp.name)+'<span class="scnt grp-cnt">'+grpCnt+'</span>';
     lbl.onclick=(function(gk){return function(){S.filterSite=gk;renderAll();};})(grpKey);
     el.appendChild(lbl);
     grpSites.forEach(function(site){
       var cnt=S.schedules.filter(function(s){var p=S.projects.find(function(p){return p.id===s.projectId;});return p&&p.siteId===site.id&&_sVisible(s);}).length;
       var d=document.createElement('div');d.className='sit'+(S.filterSite===site.id?' on':'');
-      d.innerHTML='<div class="sdot" style="background:'+site.color+'"></div><span class="sname">'+site.name+'</span><span class="scnt">'+cnt+'</span>';
+      d.innerHTML='<div class="sdot" style="background:'+site.color+'"></div><span class="sname">'+_esc(site.name)+'</span><span class="scnt">'+cnt+'</span>';
       d.onclick=(function(sid){return function(){S.filterSite=sid;renderAll();};})(site.id);
       el.appendChild(d);
     });
@@ -144,6 +144,9 @@ function assignWtLanes(wts){
 
 function renderGantt(){
   var body=document.getElementById('gbody');body.innerHTML='';
+  // 숨김 보기 버튼 상태 동기화 (showHidden이 localStorage에서 복원된 경우 반영)
+  var _btn=document.getElementById('btnHidden');
+  if(_btn){_btn.textContent=S.showHidden?'숨김 숨기기':'숨김 보기';_btn.className='btn'+(S.showHidden?' warn':'');}
   // 오늘 날짜 문자열 (과거 일정 판별용)
   var _td=TODAY;var todayISO=_td.getFullYear()+'-'+String(_td.getMonth()+1).padStart(2,'0')+'-'+String(_td.getDate()).padStart(2,'0');
   // 사이드바와 동일한 그룹→사이트 순서 기준으로 프로젝트 정렬
@@ -202,7 +205,7 @@ function renderGantt(){
     }
     // 그룹 헤더
     var grp=document.createElement('div');grp.className='grprow';
-    var gf=document.createElement('div');gf.className='grpfix';gf.innerHTML='<span class="grpbadge" style="background:'+sc+'">'+(site?site.name:proj.siteId)+'</span><span class="grpname">'+proj.name+'</span>';
+    var gf=document.createElement('div');gf.className='grpfix';gf.innerHTML='<span class="grpbadge" style="background:'+sc+'">'+_esc(site?site.name:proj.siteId)+'</span><span class="grpname">'+_esc(proj.name)+'</span>';
     grp.appendChild(gf);grp.appendChild(makeTL(26,'grptl',evts,false));body.appendChild(grp);
     // 이벤트 행
     if(evts.length){var er=document.createElement('div');er.className='evrow';var ef=document.createElement('div');ef.className='evfix';ef.textContent='★ 주요 이벤트';er.appendChild(ef);er.appendChild(makeTL(22,'evtl',evts,true));body.appendChild(er);}
@@ -219,7 +222,7 @@ function renderGantt(){
         var wkf=document.createElement('div');wkf.className='wkfix';
         // 레인 레이블: 첫 번째 작업 제목 표시 (여러 개면 숫자)
         var laneLabel=laneTasks.length===1?laneTasks[0].title:(li+1)+'번 레인 ('+laneTasks.length+'건)';
-        wkf.innerHTML='<span class="wkfix-label">'+laneLabel+'</span>';
+        wkf.innerHTML='<span class="wkfix-label">'+_esc(laneLabel)+'</span>';
         var wktl=makeTL(22,'wktl',null,false);
         // 각 작업 바 추가
         laneTasks.forEach(function(wt){
@@ -238,9 +241,9 @@ function renderGantt(){
         row.className='grow '+(isEven?'even':'odd')+(isDone?' done':'')+(sched.hidden?' hidden-row':'');
         var gf2=document.createElement('div');gf2.className='gfix';
         var tc=TYPE_COLOR[sched.type]||'#555';var tl=TYPE_LBL[sched.type]||sched.type;
-        gf2.innerHTML='<div class="gtask">'+(idx===0?task:'')+'</div>'
-          +'<div class="gperson">'+sched.name
-          +'<span class="type-badge" style="background:'+tc+'">'+tl+'</span>'
+        gf2.innerHTML='<div class="gtask">'+(idx===0?_esc(task):'')+'</div>'
+          +'<div class="gperson">'+_esc(sched.name)
+          +'<span class="type-badge" style="background:'+tc+'">'+_esc(tl)+'</span>'
           +(isDone?'<span class="done-badge">완료</span>':'')
           +(sched.hidden?'<span class="hidden-badge">숨김</span>':'')
           +'<span class="gbadge">'+dr+' · '+days+'일</span></div>';

@@ -4,44 +4,185 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
 
 /* ── 상태 ── */
 var S={filterSite:'all',showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[]};
-/* 삭제된 일정 ID 추적 — merge 시 재복원 방지
-   localStorage 영속화: 새로고침/재로드 후에도 삭제 기록 유지 (24시간 후 자동 정리) */
-var _DELETED_SC_LS_KEY='bu3_del_sc';
-var _deletedScIdMap=(function(){
+/* ══════════════════════════════════════════
+   통합 Tombstone(삭제 기록) 모듈 — 모든 엔티티 타입의 삭제 ID 추적
+   - merge/pull 시 삭제 레코드 재복원(부활) 방지
+   - POST로 Sheets에 전파(deletedIds) → 다른 PC에서도 삭제 반영
+   - localStorage 영속화, 30일 후 자동 정리
+   - type = 엔티티 배열명: schedules, events, workTasks, sites, groups,
+     projects, equipItems, equipUnits, equipProjects, visionEquips
+══════════════════════════════════════════ */
+var _TOMB_LS_KEY='bu3_tomb_v1';
+var _tombMap=(function(){
+  var m={};
+  try{m=JSON.parse(localStorage.getItem(_TOMB_LS_KEY)||'{}')||{};}catch(e){m={};}
+  // 구 키(bu3_del_sc / bu3_del_vi)에서 1회 마이그레이션
   try{
-    var d=JSON.parse(localStorage.getItem(_DELETED_SC_LS_KEY)||'{}');
-    var cutoff=Date.now()-30*24*60*60*1000;
-    var dirty=false;
-    Object.keys(d).forEach(function(id){if(typeof d[id]!=='number'||d[id]<cutoff){delete d[id];dirty=true;}});
-    if(dirty)try{localStorage.setItem(_DELETED_SC_LS_KEY,JSON.stringify(d));}catch(e2){}
-    return d;
-  }catch(e){return {};}
+    var oldSc=JSON.parse(localStorage.getItem('bu3_del_sc')||'{}');
+    var oldVi=JSON.parse(localStorage.getItem('bu3_del_vi')||'{}');
+    if(Object.keys(oldSc).length){m.schedules=m.schedules||{};Object.keys(oldSc).forEach(function(id){if(!m.schedules[id])m.schedules[id]=oldSc[id];});localStorage.removeItem('bu3_del_sc');}
+    if(Object.keys(oldVi).length){m.visionEquips=m.visionEquips||{};Object.keys(oldVi).forEach(function(id){if(!m.visionEquips[id])m.visionEquips[id]=oldVi[id];});localStorage.removeItem('bu3_del_vi');}
+  }catch(e){}
+  // TTL 30일 정리
+  var cutoff=Date.now()-30*24*60*60*1000;
+  Object.keys(m).forEach(function(type){
+    Object.keys(m[type]||{}).forEach(function(id){
+      if(typeof m[type][id]!=='number'||m[type][id]<cutoff)delete m[type][id];
+    });
+    if(!Object.keys(m[type]).length)delete m[type];
+  });
+  try{localStorage.setItem(_TOMB_LS_KEY,JSON.stringify(m));}catch(e){}
+  return m;
 })();
-function _markDeletedSc(id){
-  _deletedScIdMap[id]=Date.now();
-  try{localStorage.setItem(_DELETED_SC_LS_KEY,JSON.stringify(_deletedScIdMap));}catch(e){}
+function _tombSave(){try{localStorage.setItem(_TOMB_LS_KEY,JSON.stringify(_tombMap));}catch(e){}}
+function _markDeleted(type,id){
+  if(!id)return;
+  if(!_tombMap[type])_tombMap[type]={};
+  _tombMap[type][id]=Date.now();
+  _tombSave();
 }
-function _isDeletedSc(id){return !!_deletedScIdMap[id];}
-/* 삭제된 visionEquip ID 추적 — refreshVisionFromSheets/loadFromSheets merge 시 재복원 방지
-   localStorage 영속화: 새로고침/재로드 후에도 삭제 기록 유지 (30일 후 자동 정리) */
-var _DELETED_VI_LS_KEY='bu3_del_vi';
-var _deletedViIdMap=(function(){
-  try{
-    var d=JSON.parse(localStorage.getItem(_DELETED_VI_LS_KEY)||'{}');
-    var cutoff=Date.now()-30*24*60*60*1000; // 30일 이전 항목 정리
-    var dirty=false;
-    Object.keys(d).forEach(function(id){if(typeof d[id]!=='number'||d[id]<cutoff){delete d[id];dirty=true;}});
-    if(dirty)try{localStorage.setItem(_DELETED_VI_LS_KEY,JSON.stringify(d));}catch(e2){}
-    return d;
-  }catch(e){return {};}
+function _isDeleted(type,id){return !!(_tombMap[type]&&_tombMap[type][id]);}
+/* 서버 tombstone 해제 요청 대기열 — 백업 복원으로 살린 레코드가 다시 삭제되지 않도록
+   localStorage 영속화 (POST 실패/새로고침에도 유지, 성공 시 비움) */
+var _TOMB_CLEAR_LS_KEY='bu3_tomb_clear';
+var _tombClearQueue=(function(){
+  try{return JSON.parse(localStorage.getItem(_TOMB_CLEAR_LS_KEY)||'[]')||[];}catch(e){return [];}
 })();
-function _markDeletedVi(id){
-  _deletedViIdMap[id]=Date.now();
-  try{localStorage.setItem(_DELETED_VI_LS_KEY,JSON.stringify(_deletedViIdMap));}catch(e){}
+function _tombClearSave(){try{localStorage.setItem(_TOMB_CLEAR_LS_KEY,JSON.stringify(_tombClearQueue));}catch(e){}}
+function _unmarkDeleted(type,id){
+  if(!id)return;
+  if(_tombMap[type]&&_tombMap[type][id]){delete _tombMap[type][id];_tombSave();}
+  if(!_tombClearQueue.some(function(t){return t.type===type&&t.id===id;})){
+    _tombClearQueue.push({id:id,type:type});_tombClearSave();
+  }
 }
-function _isDeletedVi(id){return !!_deletedViIdMap[id];}
+function _tombClearFlushDone(){if(_tombClearQueue.length){_tombClearQueue=[];_tombClearSave();}}
+/* POST용: [{id,type,ts},...] 배열 변환 */
+function _tombList(){
+  var out=[];
+  Object.keys(_tombMap).forEach(function(type){
+    Object.keys(_tombMap[type]).forEach(function(id){
+      out.push({id:id,type:type,ts:_tombMap[type][id]});
+    });
+  });
+  return out;
+}
+/* GET 응답의 deletedIds 흡수 — 다른 기기의 삭제 기록 반영. 변경 여부 반환
+   (해제 대기열에 있는 항목은 흡수하지 않음 — 백업 복원 직후 재삭제 방지) */
+function _absorbTombs(arr){
+  if(!arr||!arr.length)return false;
+  var changed=false;
+  arr.forEach(function(t){
+    if(!t||!t.id||!t.type)return;
+    if(_tombClearQueue.some(function(c){return c.type===t.type&&c.id===t.id;}))return;
+    if(!_isDeleted(t.type,t.id)){
+      if(!_tombMap[t.type])_tombMap[t.type]={};
+      _tombMap[t.type][t.id]=Number(t.ts)||Date.now();
+      changed=true;
+    }
+  });
+  if(changed)_tombSave();
+  return changed;
+}
+/* 기존 호출부 호환 shim (modals.js / vision.js 등에서 사용) */
+function _markDeletedSc(id){_markDeleted('schedules',id);}
+function _isDeletedSc(id){return _isDeleted('schedules',id);}
+function _markDeletedVi(id){_markDeleted('visionEquips',id);}
+function _isDeletedVi(id){return _isDeleted('visionEquips',id);}
+/* deletedScheduleIds 레거시 POST 필드용 */
+function _deletedScIds(){return Object.keys(_tombMap.schedules||{});}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
+/* ── 레코드 수정시각 마킹 (mt: epoch ms 숫자 — 동기화 충돌 시 최신 판정용) ── */
+function _touch(r){if(r)r.mt=Date.now();return r;}
+/* ── ID 생성 (timestamp base36 + 난수 — 다중 PC 동시 생성 충돌 방지) ── */
+function genId(prefix,arr){
+  var id;
+  do{ id=prefix+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
+  while(arr&&arr.some(function(r){return r.id===id;}));
+  return id;
+}
+/* ── HTML 이스케이프 (XSS 방지 — gantt.js/vision.js 공용, 로드 순서상 app.js에 정의) ── */
+function _esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+/* ══════════════════════════════════════════
+   공용 배열 병합 — Sheets 배열과 로컬 배열을 id 기준 병합
+   규칙: ① tombstone → 제외
+         ② 양쪽 존재 → mt(수정시각) 큰 쪽 승리
+         ③ 한쪽만 존재 → tombstone 아니면 포함
+   순서: Sheets 행 순서 우선, 로컬 전용은 뒤에 append (기존 동작 보존)
+   opts: { normFn: 레코드 정규화 함수(Sheets 행에 적용),
+           preferLocalOnTie: mt 동률/없음 시 로컬 우선(push 전 merge용; 기본은 Sheets 우선),
+           protectField: 'cells'|'data' — 승자의 해당 필드가 비어있고 패자가 차 있으면 패자 것 유지(레거시 안전망) }
+══════════════════════════════════════════ */
+function _mergeArr(type,localArr,sheetArr,opts){
+  opts=opts||{};
+  localArr=localArr||[];sheetArr=sheetArr||[];
+  var localMap={};
+  localArr.forEach(function(r){if(r&&r.id)localMap[r.id]=r;});
+  var out=[];var usedIds={};
+  sheetArr.forEach(function(sr){
+    if(!sr||!sr.id)return;
+    if(_isDeleted(type,sr.id))return;            // ① tombstone 제외
+    if(usedIds[sr.id])return;                     // Sheets 내 중복 방지
+    if(opts.normFn)sr=opts.normFn(sr)||sr;
+    var lr=localMap[sr.id];
+    var winner=sr,loser=lr;
+    if(lr){
+      var smt=Number(sr.mt||0),lmt=Number(lr.mt||0);
+      if(lmt>smt||(lmt===smt&&opts.preferLocalOnTie)){winner=lr;loser=sr;}
+    }
+    // protectField: 승자의 cells/data가 비어있으면 패자 것 보존 (mt 없는 레거시 레코드 안전망)
+    if(opts.protectField&&loser){
+      var f=opts.protectField;
+      var wv=winner[f],lv2=loser[f];
+      var wEmpty=!wv||(typeof wv==='object'&&!Object.keys(wv).length);
+      var lFull=lv2&&typeof lv2==='object'&&Object.keys(lv2).length;
+      if(wEmpty&&lFull)winner[f]=lv2;
+    }
+    // postMerge: 양쪽 존재 시 추가 필드 병합 콜백 (visionEquips changelog 등)
+    if(opts.postMerge&&loser)opts.postMerge(winner,loser);
+    out.push(winner);usedIds[sr.id]=true;
+  });
+  // 로컬 전용(Sheets 미반영 신규) 보존 — 단 tombstone 제외
+  localArr.forEach(function(lr){
+    if(!lr||!lr.id)return;
+    if(usedIds[lr.id])return;
+    if(_isDeleted(type,lr.id))return;
+    out.push(lr);usedIds[lr.id]=true;
+  });
+  return out;
+}
+/* 모든 엔티티 배열에서 tombstone 레코드 일괄 제거 — deletedIds 흡수 직후 호출 */
+function _purgeTombstoned(){
+  ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips'].forEach(function(type){
+    if(!S[type]||!S[type].length||!_tombMap[type])return;
+    S[type]=S[type].filter(function(r){return !r||!r.id||!_isDeleted(type,r.id);});
+  });
+}
+/* visionEquips 전용 postMerge — changelog/fieldUpdated는 항목 수 많은 쪽 유지 (append-only 메타데이터 보호) */
+function _viPostMerge(winner,loser){
+  if(loser.fieldUpdated&&Object.keys(loser.fieldUpdated).length>Object.keys(winner.fieldUpdated||{}).length){
+    winner.fieldUpdated=loser.fieldUpdated;
+  }
+  if(loser.changelog&&loser.changelog.length>(winner.changelog||[]).length){
+    winner.changelog=loser.changelog;
+  }
+}
+/* schedules 전용 정규화 (Sheets 행 → 로컬 형식) */
+function _normSchedRec(sc){
+  sc.start=normDate(sc.start);sc.end=normDate(sc.end);
+  if(typeof sc.hidden==='string'){
+    sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+  }
+  if(typeof sc.domestic==='string'){
+    sc.domestic=sc.domestic.toUpperCase()==='TRUE'||sc.domestic==='1'||sc.domestic==='true';
+  }
+  return sc;
+}
+/* workTasks 전용 정규화 */
+function _normWtRec(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;}
 function normDate(s){
   // 어떤 형식이든 YYYY-MM-DD로 정규화
   if(!s)return '';
@@ -274,6 +415,8 @@ function _migrateVisionEquips(){
 }
 
 function loadData(){
+  // showHidden 상태 복원 (PC별 일관성 유지)
+  try{S.showHidden=localStorage.getItem('bu3_showHidden')==='1';}catch(e){}
   // localStorage 캐시 있으면 우선 사용, 없으면 DEF
   try{
     var cached=localStorage.getItem(CACHE_KEY);
@@ -285,6 +428,9 @@ function loadData(){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string'){
             sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          }
+          if(typeof sc.domestic==='string'){
+            sc.domestic=sc.domestic.toUpperCase()==='TRUE'||sc.domestic==='1'||sc.domestic==='true';
           }
           return sc;
         });
@@ -316,11 +462,19 @@ function loadData(){
   S.visionTemplate=def.visionTemplate||{categories:[]};S.visionEquips=def.visionEquips||[];
   S.visionColVis={};
 }
+var _cacheQuotaWarned=false;
 function saveCache(data){
   try{
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
-  }catch(e){}
+  }catch(e){
+    // localStorage 용량(5MB) 초과 등 — 1회만 경고 (Sheets 저장은 별도 경로로 계속 동작)
+    if(!_cacheQuotaWarned){
+      _cacheQuotaWarned=true;
+      console.error('[saveCache] 로컬 캐시 저장 실패:',e.message);
+      alert('⚠ 브라우저 로컬 저장공간이 부족합니다.\n데이터가 많아져 오프라인 캐시 저장에 실패했습니다.\nSheets 동기화는 계속 동작하지만, 관리자에게 데이터 정리를 문의하세요.');
+    }
+  }
 }
 
 /* ── 데이터 보호: Sheets 로드 전 로컬 스냅샷 백업 ── */
@@ -387,6 +541,17 @@ function restoreFromBackupFile(){
         if(d.equipProjects)S.equipProjects=d.equipProjects;
         if(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)S.visionTemplate=d.visionTemplate;
         if(d.visionEquips)S.visionEquips=d.visionEquips;
+        // 복원 데이터가 병합에서 항상 이기도록 처리:
+        // ① 복원된 레코드의 tombstone 해제 (삭제됐던 레코드도 복원 의도대로 살림)
+        // ② 전 레코드 mt 갱신 (Sheets의 기존 버전이 복원본을 덮어쓰지 못하게)
+        ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips'].forEach(function(type){
+          (S[type]||[]).forEach(function(r){
+            if(!r||!r.id)return;
+            if(_isDeleted(type,r.id))_unmarkDeleted(type,r.id);
+            _touch(r);
+          });
+        });
+        if(S.visionTemplate)S.visionTemplate.mt=Date.now();
         saveData(); renderAll();
         alert('복원 완료되었습니다.');
       }catch(err){alert('복원 실패: '+err.message);}
@@ -426,76 +591,48 @@ function _flushToSheets(){
   _saveInFlight=true;
   updateConnStatus('saving');
 
-  // 4. merge 함수 — schedules/workTasks/events 모두 Sheets 데이터와 병합
+  // 4. merge 함수 — POST 직전 전 엔티티를 Sheets 데이터와 레코드 단위(mt) 병합
+  //    Sheets에 더 새 레코드가 있으면 로컬 stale 레코드를 교체 → 다른 PC의 최신 수정 보존
   function _mergeFromSheets(sheetsData){
     if(!sheetsData||sheetsData.error) return;
-    var changed=false;
-    // ── deletedScheduleIds: 다른 기기에서 삭제한 일정 ID를 로컬에도 반영
+    // ── tombstone 흡수: 다른 기기의 삭제 기록(deletedIds + 레거시 deletedScheduleIds) 반영
+    _absorbTombs(sheetsData.deletedIds);
     if(sheetsData.deletedScheduleIds&&sheetsData.deletedScheduleIds.length){
       sheetsData.deletedScheduleIds.forEach(function(id){
         if(!_isDeletedSc(id))_markDeletedSc(id);
       });
-      // 로컬 S.schedules에서 삭제 대상 제거
-      var beforeLen=S.schedules.length;
-      S.schedules=S.schedules.filter(function(sc){return !_isDeletedSc(sc.id);});
-      if(S.schedules.length<beforeLen)changed=true;
     }
-    // ── schedules merge (삭제한 것 제외)
-    if(sheetsData.schedules&&sheetsData.schedules.length){
-      var localIds={};
-      S.schedules.forEach(function(s){localIds[s.id]=true;});
-      sheetsData.schedules.forEach(function(sc){
-        if(!localIds[sc.id]&&!_isDeletedSc(sc.id)){
-          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-          if(typeof sc.hidden==='string'){
-            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
-          }
-          S.schedules.push(sc);localIds[sc.id]=true;changed=true;
-        }
-      });
-    }
-    // ── workTasks: 로컬이 비어있고 Sheets에 데이터가 있으면 Sheets 우선
-    if(sheetsData.workTasks&&sheetsData.workTasks.length){
-      if(!S.workTasks||!S.workTasks.length){
-        S.workTasks=sheetsData.workTasks.map(function(wt){
-          wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;
-        });
-        console.warn('[보호] 로컬 workTasks 비어있음 → Sheets 데이터 복원:',S.workTasks.length,'건');
-        changed=true;
+    _purgeTombstoned();
+    // ── 레코드 단위 병합 (mt 동률/없음 시 로컬 우선 — push 경로이므로 현행 동작 보존)
+    var T={preferLocalOnTie:true};
+    if(sheetsData.schedules&&sheetsData.schedules.length)
+      S.schedules=_mergeArr('schedules',S.schedules,sheetsData.schedules,{preferLocalOnTie:true,normFn:_normSchedRec});
+    if(sheetsData.events&&sheetsData.events.length)
+      S.events=_mergeArr('events',S.events,sheetsData.events,T);
+    if(sheetsData.workTasks&&sheetsData.workTasks.length)
+      S.workTasks=_mergeArr('workTasks',S.workTasks,sheetsData.workTasks,{preferLocalOnTie:true,normFn:_normWtRec});
+    if(sheetsData.sites&&sheetsData.sites.length)
+      S.sites=_mergeArr('sites',S.sites,sheetsData.sites,T);
+    if(sheetsData.groups&&sheetsData.groups.length)
+      S.groups=_mergeArr('groups',S.groups,sheetsData.groups,T);
+    if(sheetsData.projects&&sheetsData.projects.length)
+      S.projects=_mergeArr('projects',S.projects,sheetsData.projects,T);
+    if(sheetsData.equipItems&&sheetsData.equipItems.length)
+      S.equipItems=_mergeArr('equipItems',S.equipItems,sheetsData.equipItems,T);
+    if(sheetsData.equipUnits&&sheetsData.equipUnits.length)
+      S.equipUnits=_mergeArr('equipUnits',S.equipUnits,sheetsData.equipUnits,{preferLocalOnTie:true,protectField:'cells'});
+    if(sheetsData.equipProjects&&sheetsData.equipProjects.length)
+      S.equipProjects=_mergeArr('equipProjects',S.equipProjects,sheetsData.equipProjects,T);
+    if(sheetsData.visionEquips&&sheetsData.visionEquips.length)
+      S.visionEquips=_mergeArr('visionEquips',S.visionEquips,sheetsData.visionEquips,{preferLocalOnTie:true,protectField:'data',postMerge:_viPostMerge});
+    // ── visionTemplate: 단일 JSON 블롭 — Sheets가 더 최신(mt)일 때만 교체
+    if(sheetsData.visionTemplate&&sheetsData.visionTemplate.categories&&sheetsData.visionTemplate.categories.length){
+      if(Number(sheetsData.visionTemplate.mt||0)>Number((S.visionTemplate||{}).mt||0)){
+        S.visionTemplate=sheetsData.visionTemplate;
+        _migrateVisionTemplate();
       }
     }
-    // ── events: 로컬이 비어있고 Sheets에 데이터가 있으면 Sheets 우선
-    if(sheetsData.events&&sheetsData.events.length){
-      if(!S.events||!S.events.length){
-        S.events=sheetsData.events;
-        console.warn('[보호] 로컬 events 비어있음 → Sheets 데이터 복원:',S.events.length,'건');
-        changed=true;
-      }
-    }
-    // ── sites: Sheets에만 있는 사이트를 로컬에 추가 (다기기 동기화 보호)
-    if(sheetsData.sites&&sheetsData.sites.length){
-      var _lsids={};S.sites.forEach(function(s){_lsids[s.id]=true;});
-      sheetsData.sites.forEach(function(ss){
-        if(!_lsids[ss.id]){S.sites.push(ss);_lsids[ss.id]=true;changed=true;console.warn('[보호] Sheets 사이트 병합:',ss.name);}
-      });
-    }
-    // ── groups: Sheets에만 있는 그룹을 로컬에 추가
-    if(sheetsData.groups&&sheetsData.groups.length){
-      var _lgids={};S.groups.forEach(function(g){_lgids[g.id]=true;});
-      sheetsData.groups.forEach(function(sg){
-        if(!_lgids[sg.id]){S.groups.push(sg);_lgids[sg.id]=true;changed=true;}
-      });
-    }
-    // ── projects: Sheets에만 있는 프로젝트를 로컬에 추가
-    if(sheetsData.projects&&sheetsData.projects.length){
-      var _lpids={};S.projects.forEach(function(p){_lpids[p.id]=true;});
-      sheetsData.projects.forEach(function(sp){
-        if(!_lpids[sp.id]){S.projects.push(sp);changed=true;}
-      });
-    }
-    if(changed){
-      saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
-    }
+    saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
   }
 
   // 5. 저장 완료 처리 (성공/실패 공통)
@@ -503,6 +640,7 @@ function _flushToSheets(){
     _saveInFlight=false;
     if(ok){
       try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
+      _tombClearFlushDone(); // 서버 tombstone 해제 완료 — 대기열 비움
       S._schCache=null; // 캐시 무효화 — 다음 saveData 시 Sheets에서 최신 데이터 재조회
       updateConnStatus('ok');
       var _ctxt=document.getElementById('connTxt');
@@ -519,9 +657,9 @@ function _flushToSheets(){
     if(_savePending){_savePending=false;_flushToSheets();}
   }
 
-  // 6. Sheets 조회 캐시(30초) → merge → POST
+  // 6. Sheets 조회 캐시(10초) → merge → POST
   var _now=Date.now();
-  var _cacheOk=S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<30000;
+  var _cacheOk=S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<10000;
   var fetchPromise=_cacheOk
     ? Promise.resolve(S._schCache.data)
     : fetch(url+'?action=load').then(function(r){return r.json();}).then(function(d){S._schCache={data:d,ts:_now};return d;});
@@ -535,7 +673,9 @@ function _flushToSheets(){
           projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
           equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
           visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
-          deletedScheduleIds:Object.keys(_deletedScIdMap)})
+          deletedIds:_tombList(),
+          clearDeletedIds:_tombClearQueue,
+          deletedScheduleIds:_deletedScIds()})
       });
     })
     .then(function(r){return r.json();})
@@ -641,6 +781,7 @@ function forceLoadFromSheets(){
         S.schedules=data.schedules.map(function(sc){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string')sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
+          if(typeof sc.domestic==='string')sc.domestic=sc.domestic.toUpperCase()==='TRUE'||sc.domestic==='1'||sc.domestic==='true';
           return sc;
         }).filter(function(sc){return !_isDeletedSc(sc.id);});
         var _seen={};
@@ -699,21 +840,49 @@ function loadFromSheets(callback){
   var txt=document.getElementById('connTxt');
   if(led){led.className='conn-led chk';txt.textContent=isDirty?'미저장 동기화 중...':'동기화 중...';}
   if(isDirty){
-    // 로컬 데이터를 Sheets로 밀어넣고 dirty 해제 후 콜백
+    // 로컬 데이터를 Sheets로 밀어넣고 dirty 해제 후 콜백 (tombstone 포함 — 삭제 기록 전파)
     fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
         projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
         equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips})
+        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
+        deletedIds:_tombList(),
+        clearDeletedIds:_tombClearQueue,
+        deletedScheduleIds:_deletedScIds()})
     }).then(function(r){return r.json();})
     .then(function(data){
       if(!data.error){
         try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
-        if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
+        _tombClearFlushDone();
+        if(led){led.className='conn-led chk';txt.textContent='변경사항 확인 중...';}
+        // push 완료 후 Sheets 최신 데이터를 pull하여 다른 PC의 변경사항 반영
+        fetch(url+'?action=load')
+          .then(function(r2){if(!r2.ok)throw new Error('HTTP '+r2.status);return r2.json();})
+          .then(function(pulled){
+            if(!pulled.error){
+              _absorbTombs(pulled.deletedIds);
+              if(pulled.deletedScheduleIds&&pulled.deletedScheduleIds.length){
+                pulled.deletedScheduleIds.forEach(function(id){if(!_isDeletedSc(id))_markDeletedSc(id);});
+              }
+              _purgeTombstoned();
+              if(pulled.schedules&&pulled.schedules.length)S.schedules=_mergeArr('schedules',S.schedules,pulled.schedules,{normFn:_normSchedRec});
+              if(pulled.sites&&pulled.sites.length)S.sites=_mergeArr('sites',S.sites,pulled.sites);
+              if(pulled.projects&&pulled.projects.length)S.projects=_mergeArr('projects',S.projects,pulled.projects);
+              if(pulled.events&&pulled.events.length)S.events=_mergeArr('events',S.events,pulled.events);
+              if(pulled.workTasks&&pulled.workTasks.length)S.workTasks=_mergeArr('workTasks',S.workTasks,pulled.workTasks,{normFn:_normWtRec});
+              saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+            }
+            if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
+            if(callback)callback();
+          })
+          .catch(function(){
+            if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
+            if(callback)callback();
+          });
       } else {
         if(led){led.className='conn-led err';txt.textContent='동기화 실패';}
+        if(callback)callback();
       }
-      if(callback)callback();
     })
     .catch(function(){
       if(led){led.className='conn-led err';txt.textContent='동기화 실패';}
@@ -729,86 +898,46 @@ function loadFromSheets(callback){
       // ── Sheets 로드 전 로컬 스냅샷 보존 ──
       _saveLocalBackup();
 
-      // ── groups / sites / projects ──
-      if(data.groups&&data.groups.length)S.groups=data.groups;
+      // ── tombstone 흡수: 다른 기기의 삭제 기록(deletedIds + 레거시 deletedScheduleIds) 반영 ──
+      _absorbTombs(data.deletedIds);
+      if(data.deletedScheduleIds&&data.deletedScheduleIds.length){
+        data.deletedScheduleIds.forEach(function(id){
+          if(!_isDeletedSc(id))_markDeletedSc(id);
+        });
+      }
+      _purgeTombstoned();
+
+      // ── pull 병합: 레코드 단위(mt) — 동률/없음 시 Sheets 우선(현행 pull 동작), 로컬 전용 보존 ──
+      if(data.groups&&data.groups.length)S.groups=_mergeArr('groups',S.groups,data.groups);
       if(data.sites&&data.sites.length){
-        var oldSites=S.sites;
-        S.sites=data.sites.map(function(ns){
+        var oldSites=S.sites||[];
+        S.sites=_mergeArr('sites',S.sites,data.sites,{normFn:function(ns){
+          // Sheets 행에 누락된 보조 필드를 로컬/기본값에서 보완
           var old=oldSites.find(function(os){return os.id===ns.id;});
           var def=DEF.sites.find(function(ds){return ds.id===ns.id;});
           if(!ns.groupId&&old&&old.groupId)ns.groupId=old.groupId;
           if(!ns.country){if(old&&old.country)ns.country=old.country;else if(def&&def.country)ns.country=def.country;}
           if(!ns.region){if(old&&old.region)ns.region=old.region;else if(def&&def.region)ns.region=def.region;}
           return ns;
-        });
-        // 로컬에만 있는 사이트 보존 (Sheets 미반영 신규 사이트)
-        oldSites.forEach(function(os){
-          if(!S.sites.find(function(s){return s.id===os.id;})){
-            console.warn('[보호] Sheets 미반영 로컬 사이트 보존:',os.name);
-            S.sites.push(os);
-          }
-        });
+        }});
       }
-      if(data.projects&&data.projects.length)S.projects=data.projects;
+      if(data.projects&&data.projects.length)S.projects=_mergeArr('projects',S.projects,data.projects);
 
-      // ── deletedScheduleIds: 다른 기기에서 삭제한 일정 ID를 로컬에도 반영 ──
-      if(data.deletedScheduleIds&&data.deletedScheduleIds.length){
-        data.deletedScheduleIds.forEach(function(id){
-          if(!_isDeletedSc(id))_markDeletedSc(id);
-        });
-      }
-
-      // ── schedules: merge 방식 (로컬 전용 일정 보존) ──
+      // ── schedules ──
       if(data.schedules&&data.schedules.length){
-        var _sheetsSids={};
-        data.schedules.forEach(function(s){_sheetsSids[s.id]=true;});
-        // 로컬에만 있는 일정 보존 (Sheets 로드 전 로컬에서 추가된 것, 단 삭제한 것은 제외)
-        var _localSafe=(S.schedules||[]).filter(function(s){return !_sheetsSids[s.id]&&!_isDeletedSc(s.id);});
-        S.schedules=data.schedules.map(function(sc){
-          sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-          if(typeof sc.hidden==='string'){
-            sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
-          }
-          return sc;
-        }).filter(function(sc){return !_isDeletedSc(sc.id);}); // Sheets에 남아있어도 삭제된 것은 제거
-        if(_localSafe.length){
-          console.warn('[보호] Sheets 미반영 로컬 일정 보존:',_localSafe.length,'건');
-          S.schedules=S.schedules.concat(_localSafe);
-        }
-        // 중복 ID 제거 (네트워크 경합으로 같은 일정이 복수 등록된 경우)
-        var _seenIds={};
-        S.schedules=S.schedules.filter(function(sc){
-          if(_seenIds[sc.id])return false;
-          _seenIds[sc.id]=true;return true;
-        });
+        S.schedules=_mergeArr('schedules',S.schedules,data.schedules,{normFn:_normSchedRec});
       }
-      if(data.events&&data.events.length)S.events=data.events;
-      if(data.workTasks&&data.workTasks.length)S.workTasks=data.workTasks.map(function(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;});
+      if(data.events&&data.events.length)S.events=_mergeArr('events',S.events,data.events);
+      if(data.workTasks&&data.workTasks.length)S.workTasks=_mergeArr('workTasks',S.workTasks,data.workTasks,{normFn:_normWtRec});
 
-      // ── equipItems: Sheets에 항목이 있을 때만 교체 ──
-      if(data.equipItems&&data.equipItems.length)S.equipItems=data.equipItems;
-      // (Sheets가 빈 배열이면 로컬 유지 — 항목 정의는 절대 사라지면 안 됨)
+      // ── equipItems: Sheets가 빈 배열이면 로컬 유지 — 항목 정의는 절대 사라지면 안 됨 ──
+      if(data.equipItems&&data.equipItems.length)S.equipItems=_mergeArr('equipItems',S.equipItems,data.equipItems);
 
-      // ── equipUnits: cells 안전 병합 (핵심 보호) ──
+      // ── equipUnits: cells 안전 병합 (string 오염 차단 + 레거시 cells 보존) ──
       if(data.equipUnits&&data.equipUnits.length){
-        var _prevUnits=S.equipUnits||[];
-        S.equipUnits=data.equipUnits.map(function(su){
-          // string 오염 차단
-          if(su.cells&&typeof su.cells!=='object') su.cells={};
-          var hasCells=_isValidCells(su.cells);
-          if(!hasCells){
-            // Sheets에 cells 없으면 로컬 cells 보존
-            var local=_prevUnits.find(function(lu){return lu.id===su.id;});
-            if(local&&_isValidCells(local.cells)) su.cells=local.cells;
-          }
-          return su;
-        });
-        // 로컬에는 있는데 Sheets에 없는 호기 보존 (실수로 삭제된 경우 방지)
-        _prevUnits.forEach(function(lu){
-          if(!S.equipUnits.find(function(su){return su.id===lu.id;})){
-            console.warn('[보호] Sheets 누락 호기 보존:', lu.unitName);
-            S.equipUnits.push(lu);
-          }
+        S.equipUnits=_mergeArr('equipUnits',S.equipUnits,data.equipUnits,{
+          protectField:'cells',
+          normFn:function(su){if(su.cells&&typeof su.cells!=='object')su.cells={};return su;}
         });
       } else if(S.equipUnits&&S.equipUnits.length){
         // Sheets가 0개인데 로컬에 호기가 있으면 로컬 유지
@@ -817,24 +946,21 @@ function loadFromSheets(callback){
 
       // ── equipSiteOrder / equipProjects ──
       if(data.equipSiteOrder&&data.equipSiteOrder.length)S.equipSiteOrder=data.equipSiteOrder;
-      if(data.equipProjects)S.equipProjects=data.equipProjects;
+      if(data.equipProjects&&data.equipProjects.length)S.equipProjects=_mergeArr('equipProjects',S.equipProjects,data.equipProjects);
 
-      // ── visionTemplate: 카테고리 있을 때만 교체 → 마이그레이션도 함께 적용 ──
+      // ── visionTemplate: Sheets가 더 최신(mt)일 때만 교체 → 마이그레이션도 함께 적용 ──
       if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length){
-        S.visionTemplate=data.visionTemplate;
-        _migrateVisionTemplate();
+        if(Number(data.visionTemplate.mt||0)>=Number((S.visionTemplate||{}).mt||0)){
+          S.visionTemplate=data.visionTemplate;
+          _migrateVisionTemplate();
+        }
       }
 
-      // ── visionEquips: data 안전 병합 ──
+      // ── visionEquips: data 안전 병합 + changelog 보호 ──
       if(data.visionEquips&&data.visionEquips.length){
-        var _prevVE=S.visionEquips||[];
-        S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){
-          if(ve.data&&typeof ve.data!=='object') ve.data={};
-          if(!ve.data||!Object.keys(ve.data).length){
-            var lv=_prevVE.find(function(x){return x.id===ve.id;});
-            if(lv&&lv.data&&Object.keys(lv.data).length) ve.data=lv.data;
-          }
-          return ve;
+        S.visionEquips=_mergeArr('visionEquips',S.visionEquips,data.visionEquips,{
+          protectField:'data',postMerge:_viPostMerge,
+          normFn:function(ve){if(ve.data&&typeof ve.data!=='object')ve.data={};return ve;}
         });
       }
 
@@ -856,6 +982,7 @@ function loadFromSheets(callback){
 /* ── 숨김 토글 ── */
 function toggleShowHidden(){
   S.showHidden=!S.showHidden;
+  try{localStorage.setItem('bu3_showHidden',S.showHidden?'1':'0');}catch(e){}
   document.getElementById('btnHidden').textContent=S.showHidden?'숨김 숨기기':'숨김 보기';
   document.getElementById('btnHidden').className='btn'+(S.showHidden?' warn':'');
   renderGantt();
@@ -975,45 +1102,57 @@ function switchTab(tab){
   }
 }
 
-/* 이력관리 전용 Sheets Pull (isDirty 무관, visionEquips/visionTemplate만 갱신) */
+/* 이력관리 전용 Sheets Pull (visionEquips/visionTemplate 중심 갱신)
+   가드: ① 미저장 변경(dirty) 있으면 pull 대신 push-merge — 로컬 수정 보호
+         ② 상세 폼 편집 중이면 skip — 입력 중 데이터 교체 방지 */
 function refreshVisionFromSheets(silent){
   var url=getSheetsUrl();
   if(!url||location.protocol==='file:'){
     if(!silent) alert('Sheets 연결이 설정되지 않았습니다.\n⚙ Sheets 설정에서 URL을 확인해주세요.');
     return;
   }
+  // 가드 ①: dirty면 pull 금지 → push 경로(_flushToSheets)가 read-before-write merge 수행
+  var _vDirty=false;
+  try{_vDirty=!!localStorage.getItem(CACHE_DIRTY_KEY);}catch(e){}
+  if(_vDirty){
+    console.warn('[Vision 갱신] 미저장 변경 감지 → pull 대신 push-merge 실행');
+    _flushToSheets();
+    return;
+  }
+  // 가드 ②: 상세 폼 편집 중(입력 발생 or 폼에 포커스)이면 skip — 다음 주기에 재시도
+  if(typeof _visionView!=='undefined'&&_visionView==='detail'){
+    var _formEl=document.getElementById('visionFormWrap');
+    var _editing=(typeof _viFormDirty!=='undefined'&&_viFormDirty)||(_formEl&&_formEl.contains(document.activeElement));
+    if(_editing){
+      console.warn('[Vision 갱신] 상세 폼 편집 중 → 이번 주기 skip');
+      return;
+    }
+  }
   fetch(url+'?action=load')
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
       if(data.error)throw new Error(data.error);
+      // tombstone 흡수 + 로컬 정리
+      _absorbTombs(data.deletedIds);
+      if(data.deletedScheduleIds&&data.deletedScheduleIds.length){
+        data.deletedScheduleIds.forEach(function(id){if(!_isDeletedSc(id))_markDeletedSc(id);});
+      }
+      _purgeTombstoned();
       var updated=false;
+      var localOnly=[];
       if(data.visionEquips&&data.visionEquips.length){
         var sheetsIds={};
         data.visionEquips.forEach(function(e){sheetsIds[e.id]=true;});
-        var localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id]&&!_isDeletedVi(e.id);});
-        var _prevVE=S.visionEquips||[];
-        S.visionEquips=data.visionEquips.filter(function(ve){return !_isDeletedVi(ve.id);}).map(function(ve){
-          if(ve.data&&typeof ve.data!=='object') ve.data={};
-          var lv=_prevVE.find(function(x){return x.id===ve.id;});
-          // data: Sheets가 비어있으면 로컬 유지
-          if(!ve.data||!Object.keys(ve.data).length){
-            if(lv&&lv.data&&Object.keys(lv.data).length) ve.data=lv.data;
-          }
-          // fieldUpdated/changelog: 로컬이 더 최신일 수 있으므로 항목 수가 많은 쪽 우선
-          if(lv){
-            if(lv.fieldUpdated&&Object.keys(lv.fieldUpdated).length>=Object.keys(ve.fieldUpdated||{}).length){
-              ve.fieldUpdated=lv.fieldUpdated;
-            }
-            if(lv.changelog&&lv.changelog.length>=(ve.changelog||[]).length&&lv.changelog.length>0){
-              ve.changelog=lv.changelog;
-            }
-          }
-          return ve;
-        }).concat(localOnly);
+        localOnly=(S.visionEquips||[]).filter(function(e){return !sheetsIds[e.id]&&!_isDeletedVi(e.id);});
+        S.visionEquips=_mergeArr('visionEquips',S.visionEquips,data.visionEquips,{
+          protectField:'data',postMerge:_viPostMerge,
+          normFn:function(ve){if(ve.data&&typeof ve.data!=='object')ve.data={};return ve;}
+        });
         updated=true;
       }
       if(data.visionTemplate&&data.visionTemplate.categories&&data.visionTemplate.categories.length){
-        if(typeof _visionEditMode==='undefined'||!_visionEditMode){
+        if((typeof _visionEditMode==='undefined'||!_visionEditMode)
+          &&Number(data.visionTemplate.mt||0)>=Number((S.visionTemplate||{}).mt||0)){
           S.visionTemplate=data.visionTemplate;
           _migrateVisionTemplate();
           updated=true;
@@ -1023,22 +1162,10 @@ function refreshVisionFromSheets(silent){
         // Sheets에서 방금 받은 데이터로 schedules/events/workTasks도 동기화
         // (stale한 로컬 일정이 Sheets에 push되는 것 방지 — 핵심 데이터 보호)
         if(data.schedules&&data.schedules.length){
-          var _vSheetsSids={};
-          data.schedules.forEach(function(s){_vSheetsSids[s.id]=true;});
-          var _vLocalSafe=(S.schedules||[]).filter(function(s){return !_vSheetsSids[s.id]&&!_isDeletedSc(s.id);});
-          S.schedules=data.schedules.map(function(sc){
-            sc.start=normDate(sc.start);sc.end=normDate(sc.end);
-            if(typeof sc.hidden==='string'){
-              sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
-            }
-            return sc;
-          });
-          if(_vLocalSafe.length) S.schedules=S.schedules.concat(_vLocalSafe);
+          S.schedules=_mergeArr('schedules',S.schedules,data.schedules,{normFn:_normSchedRec});
         }
-        if(data.events&&data.events.length) S.events=data.events;
-        if(data.workTasks&&data.workTasks.length) S.workTasks=data.workTasks.map(function(wt){
-          wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;
-        });
+        if(data.events&&data.events.length) S.events=_mergeArr('events',S.events,data.events);
+        if(data.workTasks&&data.workTasks.length) S.workTasks=_mergeArr('workTasks',S.workTasks,data.workTasks,{normFn:_normWtRec});
         // localOnly equips가 있을 때만 Sheets에 push (그렇지 않으면 캐시만 갱신)
         // → 매 2분마다 불필요한 Sheets write + stale 데이터 push를 완전 차단
         if(localOnly.length>0){
