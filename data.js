@@ -11,8 +11,8 @@ var DEF = {
     {"id": "ESOT",    "name": "ESOT",        "color": "#7a4208", "groupId": "lges", "country": "canada",  "region": "canada"},
     {"id": "ESNA",    "name": "ESNA",        "color": "#0a5e40", "groupId": "lges", "country": "china",   "region": "china"},
     {"id": "ESNB",    "name": "ESNB",        "color": "#0e7050", "groupId": "lges", "country": "china",   "region": "china"},
-    {"id": "DSBJ",    "name": "DSBJ(소주)",  "color": "#1a8060", "groupId": "lges", "country": "china",   "region": "china"},
-    {"id": "SDD",     "name": "SDD(동관)",   "color": "#108050", "groupId": "lges", "country": "china",   "region": "china"},
+    {"id": "DSBJ",    "name": "DSBJ(소주)",  "color": "#1a8060", "groupId": "display", "country": "china",   "region": "china"},
+    {"id": "SDD",     "name": "SDD(동관)",   "color": "#108050", "groupId": "display", "country": "china",   "region": "china"},
     {"id": "SDV",     "name": "SDV",         "color": "#806010", "groupId": "lges", "country": "vietnam", "region": "vietnam"},
     {"id": "WA",      "name": "WA",          "color": "#8a2a10", "groupId": "lges", "country": "poland",  "region": "europe"}
   ],

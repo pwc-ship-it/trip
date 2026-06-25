@@ -117,9 +117,9 @@ function saveEv(exId){
   if(!projId||!date||!title){alert('모든 항목을 입력하세요.');return;}
   if(exId){
     var i=S.events.findIndex(function(e){return e.id===exId;});
-    S.events[i]={id:exId,projectId:projId,date:date,title:title,colorId:_selCol};
+    S.events[i]=_touch({id:exId,projectId:projId,date:date,title:title,colorId:_selCol});
   } else {
-    S.events.push({id:'e'+Date.now(),projectId:projId,date:date,title:title,colorId:_selCol});
+    S.events.push(_touch({id:genId('e',S.events),projectId:projId,date:date,title:title,colorId:_selCol}));
   }
   saveData();cm();renderAll();
 }
@@ -138,14 +138,14 @@ function saveWt(exId){
   if(start>end){alert('종료일이 시작일보다 빠릅니다.');return;}
   if(exId){
     var i=S.workTasks.findIndex(function(w){return w.id===exId;});
-    S.workTasks[i]={id:exId,projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId};
+    S.workTasks[i]=_touch({id:exId,projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId});
   } else {
-    S.workTasks.push({id:'wt'+Date.now(),projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId});
+    S.workTasks.push(_touch({id:genId('wt',S.workTasks),projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId}));
   }
   saveData();cm();renderAll();
 }
-function delEv(id){if(!confirm('이벤트를 삭제할까요?'))return;S.events=S.events.filter(function(e){return e.id!==id;});saveData();cm();renderAll();}
-function delWt(id){if(!confirm('작업을 삭제할까요?'))return;S.workTasks=S.workTasks.filter(function(w){return w.id!==id;});saveData();cm();renderAll();}
+function delEv(id){if(!confirm('이벤트를 삭제할까요?'))return;S.events=S.events.filter(function(e){return e.id!==id;});_markDeleted('events',id);saveData();cm();renderAll();}
+function delWt(id){if(!confirm('작업을 삭제할까요?'))return;S.workTasks=S.workTasks.filter(function(w){return w.id!==id;});_markDeleted('workTasks',id);saveData();cm();renderAll();}
 function openEditWt(id){var w=S.workTasks.find(function(x){return x.id===id;});if(w)showEM(null,w);}
 
 /* 출장 모달 */
@@ -162,7 +162,7 @@ function showSM(ex){
   var isDomestic=ie&&ex.domestic?true:false;
   var html='<div class="mtit">'+(ie?'출장 일정 수정':'출장 일정 등록')+'</div>';
   html+='<div class="fg"><label class="fl">사이트</label><select id="f_site">'+so+'</select></div>';
-  html+='<div class="fg"><label class="fl">국내 여부</label><label class="chkrow" style="margin:0"><input type="checkbox" id="f_domestic"'+(isDomestic?' checked':'')+'>국내 출장 (현장이 아닌 국내에서 진행)</label></div>';
+  html+='<div class="fg"><label class="fl">국내 여부</label><label class="chkrow" style="margin:0"><input type="checkbox" id="f_domestic"'+(isDomestic?' checked':'')+'>국내 출장 (현장이 아닌 국내에서 진행)</label><span id="f_dom_warn" style="display:none;font-size:10px;color:#d08020;margin-left:6px">⚠ 해외 사이트 — 출장일이 국내로 집계됩니다</span></div>';
   html+='<div class="fg"><label class="fl">프로젝트</label><select id="f_proj">'+po+'</select></div>';
   html+='<div class="fg"><label class="fl">업무 유형</label><input type="text" id="f_task" value="'+(ie?ex.task:'')+'" placeholder="예: 셋업, 대응, 개조"></div>';
   html+='<div class="fg"><label class="fl">출장자 이름</label><input type="text" id="f_name" value="'+(ie?ex.name:'')+'" placeholder="이름 입력"></div>';
@@ -178,7 +178,9 @@ function showSM(ex){
   html+='</div>';
   mw(html);
   // 이벤트 등록
-  document.getElementById('f_site').onchange=function(){upP();};
+  function _updDomWarn(){var sid=document.getElementById('f_site').value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');var warn=document.getElementById('f_dom_warn');if(warn)warn.style.display=(domCb&&domCb.checked&&reg!=='korea'&&reg!=='other')?'inline':'none';}
+  document.getElementById('f_site').onchange=function(){upP();var sid=this.value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');if(domCb&&reg!=='korea'&&reg!=='other'){domCb.checked=false;}_updDomWarn();};
+  document.getElementById('f_domestic').onchange=function(){_updDomWarn();};
   document.getElementById('f_start').onchange=function(){calcD();};
   document.getElementById('f_end').onchange=function(){calcD();};
   document.getElementById('f_cancel').onclick=function(){cm();};
@@ -191,6 +193,7 @@ function showSM(ex){
     setTimeout(function(){
       document.getElementById('f_proj').value=ex.projectId;
       calcD(); // 수정 모드에서 초기 날짜 표시
+      _updDomWarn(); // 해외 사이트 + 국내 체크 시 경고 표시
     },0);
   } else {
     upP();
@@ -241,9 +244,9 @@ function saveSc(exId){
   if(start>end){alert('복귀일이 출발일보다 빠릅니다.');return;}
   if(exId){
     var i=S.schedules.findIndex(function(s){return s.id===exId;});
-    S.schedules[i]={id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic};
+    S.schedules[i]=_touch({id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic});
   } else {
-    S.schedules.push({id:'s'+Date.now(),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic});
+    S.schedules.push(_touch({id:genId('s',S.schedules),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic}));
   }
   saveData();cm();renderAll();
 }
@@ -307,7 +310,13 @@ function buildGrpSiteRows(){
       var iname=document.createElement('input');iname.type='text';iname.value=site.name;
       iname.style.cssText='flex:1;min-width:60px;font-size:11px';
       iname.onchange=(function(sid){return function(){updSN(sid,this.value);};})(site.id);
-      // 지역 선택
+      // 간트 그룹 선택 (고객사별 간트차트 왼쪽 패널 분류)
+      var gsel=document.createElement('select');
+      gsel.title='간트차트 고객사 그룹';
+      gsel.style.cssText='font-size:10px;padding:2px 3px;max-width:90px;color:#ccc';
+      S.groups.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;if((site.groupId||'_none')===g.id)o.selected=true;gsel.appendChild(o);});
+      gsel.onchange=(function(sid){return function(){moveSiteGroup(sid,this.value);};})(site.id);
+      // 지역 선택 (출장일 집계용 지리적 위치)
       var rsel=document.createElement('select');
       rsel.title='출장일 집계 지역';
       rsel.style.cssText='font-size:10px;padding:2px 3px;max-width:80px;color:#ccc';
@@ -317,7 +326,7 @@ function buildGrpSiteRows(){
       btnP.onclick=(function(sid){return function(){addP(sid);};})(site.id);
       var btnD=document.createElement('button');btnD.className='btn sm red';btnD.textContent='삭제';
       btnD.onclick=(function(sid){return function(){delSite(sid);};})(site.id);
-      [ic,iname,rsel,btnP,btnD].forEach(function(el2){row.appendChild(el2);});
+      [ic,iname,gsel,rsel,btnP,btnD].forEach(function(el2){row.appendChild(el2);});
       el.appendChild(row);
     });
   });
@@ -343,34 +352,42 @@ function buildProjRows(){
 /* 그룹 CRUD */
 function addGroup(){
   var name=document.getElementById('ns_grp').value.trim();if(!name){alert('그룹명을 입력하세요.');return;}
-  var id='g'+Date.now();S.groups.push({id:id,name:name});
+  S.groups.push(_touch({id:genId('g',S.groups),name:name}));
   saveData();showSiteM();renderAll();
 }
 function delGroup(id){
   if(!confirm('그룹을 삭제하면 소속 사이트가 미분류됩니다. 계속할까요?'))return;
-  S.sites.forEach(function(s){if(s.groupId===id)s.groupId='_none';});
+  S.sites.forEach(function(s){if(s.groupId===id){s.groupId='_none';_touch(s);}});
   S.groups=S.groups.filter(function(g){return g.id!==id;});
+  _markDeleted('groups',id);
   saveData();showSiteM();renderAll();
 }
-function updGN(id,v){var g=S.groups.find(function(g){return g.id===id;});if(g){g.name=v.trim();saveData();renderSidebar();}}
-function moveSiteGroup(sid,gid){var s=S.sites.find(function(s){return s.id===sid;});if(s){s.groupId=gid;saveData();buildGrpSiteRows();renderSidebar();renderGantt();}}
+function updGN(id,v){var g=S.groups.find(function(g){return g.id===id;});if(g){g.name=v.trim();_touch(g);saveData();renderSidebar();}}
+function moveSiteGroup(sid,gid){var s=S.sites.find(function(s){return s.id===sid;});if(s){s.groupId=gid;_touch(s);saveData();buildGrpSiteRows();renderSidebar();renderGantt();}}
 
 /* 사이트 CRUD */
-function updSN(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.name=v.trim();saveData();renderSidebar();renderGantt();}}
-function updSC(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.color=v;saveData();renderSidebar();renderGantt();}}
-function updSiteRegion(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.region=v;saveData();}}
+function updSN(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.name=v.trim();_touch(s);saveData();renderSidebar();renderGantt();}}
+function updSC(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.color=v;_touch(s);saveData();renderSidebar();renderGantt();}}
+function updSiteRegion(id,v){var s=S.sites.find(function(s){return s.id===id;});if(s){s.region=v;_touch(s);saveData();}}
 function addSite(){
   var name=document.getElementById('ns_n').value.trim(),color=document.getElementById('ns_c').value;
   var gid=document.getElementById('ns_grpsel').value;
   if(!name){alert('사이트 이름을 입력하세요.');return;}
   var baseId=name.replace(/[^a-zA-Z0-9가-힣]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')||'site';
   var newId=baseId,n=2;while(S.sites.find(function(s){return s.id===newId;}))newId=baseId+'_'+n++;
-  S.sites.push({id:newId,name:name,color:color,groupId:gid});
+  S.sites.push(_touch({id:newId,name:name,color:color,groupId:gid}));
   saveData();showSiteM();renderAll();
 }
 function delSite(id){
   if(!confirm('사이트와 관련 항목을 모두 삭제합니까?'))return;
   var pids=S.projects.filter(function(p){return p.siteId===id;}).map(function(p){return p.id;});
+  // 연쇄 삭제 대상 전부 tombstone 마킹 (다른 PC에서 부활 방지)
+  pids.forEach(function(pid){_markDeleted('projects',pid);});
+  S.schedules.forEach(function(s){if(pids.indexOf(s.projectId)>=0)_markDeleted('schedules',s.id);});
+  S.events.forEach(function(e){if(pids.indexOf(e.projectId)>=0)_markDeleted('events',e.id);});
+  (S.equipProjects||[]).forEach(function(p){if(p.siteId===id)_markDeleted('equipProjects',p.id);});
+  (S.equipUnits||[]).forEach(function(u){if(u.siteId===id)_markDeleted('equipUnits',u.id);});
+  _markDeleted('sites',id);
   S.projects=S.projects.filter(function(p){return p.siteId!==id;});
   S.schedules=S.schedules.filter(function(s){return pids.indexOf(s.projectId)<0;});
   S.events=S.events.filter(function(e){return pids.indexOf(e.projectId)<0;});
@@ -383,15 +400,19 @@ function delSite(id){
 }
 
 /* 프로젝트 CRUD */
-function updPN(id,v){var p=S.projects.find(function(p){return p.id===id;});if(p){p.name=v.trim();saveData();renderGantt();}}
+function updPN(id,v){var p=S.projects.find(function(p){return p.id===id;});if(p){p.name=v.trim();_touch(p);saveData();renderGantt();}}
 function addP(sid){
   var name=prompt('새 프로젝트 이름:');if(!name)return;
   var baseId=name.replace(/[^a-zA-Z0-9가-힣]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')||'pjt';
   var newId=baseId,n=2;while(S.projects.find(function(p){return p.id===newId;}))newId=baseId+'_'+n++;
-  S.projects.push({id:newId,siteId:sid,name:name});saveData();showSiteM();renderAll();
+  S.projects.push(_touch({id:newId,siteId:sid,name:name}));saveData();showSiteM();renderAll();
 }
 function delPjt(id){
   if(!confirm('프로젝트와 관련 일정을 모두 삭제합니까?'))return;
+  // 연쇄 삭제 대상 tombstone 마킹
+  S.schedules.forEach(function(s){if(s.projectId===id)_markDeleted('schedules',s.id);});
+  S.events.forEach(function(e){if(e.projectId===id)_markDeleted('events',e.id);});
+  _markDeleted('projects',id);
   S.schedules=S.schedules.filter(function(s){return s.projectId!==id;});S.events=S.events.filter(function(e){return e.projectId!==id;});S.projects=S.projects.filter(function(p){return p.id!==id;});
   saveData();showSiteM();renderAll();
 }
