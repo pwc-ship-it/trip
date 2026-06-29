@@ -1,437 +1,145 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BU3 구매 관리</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>출장 일정 관리</title>
+  <meta name="description" content="Vision 현장 출장 일정 & 인원 출장일 관리">
+  <meta name="format-detection" content="date=no,telephone=no,address=no">
+  <script>
+    (function(){var t=localStorage.getItem('trip_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <link rel="stylesheet" href="style.css?v=20260612a">
 </head>
 <body>
-
-<!-- ══ 헤더 ══ -->
-<header class="app-header">
-  <span class="logo-icon">🛒</span>
-  <h1>BU3 구매 관리</h1>
-  <span class="subtitle">Purchase Management System</span>
-  <button class="btn btn-ghost btn-sm" id="sitesBtn" style="margin-left:auto">🏭 현장 관리</button>
-</header>
-
-<!-- ══ 앱 바디 ══ -->
-<div class="app-body">
-
-  <!-- 탭 네비 -->
-  <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="dashboard">📊 대시보드</button>
-    <button class="tab-btn" data-tab="field">🛒 현장 요청</button>
-    <button class="tab-btn" data-tab="upload">📄 품의서 업로드</button>
-    <button class="tab-btn" data-tab="list">📋 저장된 구매 리스트</button>
-  </nav>
-
-  <!-- ════ 탭1: 업로드 ════ -->
-  <div class="tab-pane" id="pane-upload">
-
-    <!-- 서브탭 -->
-    <div style="display:flex; gap:0; border-bottom:2px solid var(--gray200); margin-bottom:20px;">
-      <button class="tab-btn active" id="subTabHtml" onclick="switchSubTab('html')" style="font-size:13px; padding:8px 18px;">
-        📄 HTML 업로드
-      </button>
-      <button class="tab-btn" id="subTabManual" onclick="switchSubTab('manual')" style="font-size:13px; padding:8px 18px;">
-        ✏️ 직접 입력
-      </button>
-      <button class="tab-btn" id="subTabCheck" onclick="switchSubTab('check')" style="font-size:13px; padding:8px 18px;">
-        🔍 그룹웨어 확인
-      </button>
-    </div>
-
-    <!-- ── 서브탭A: HTML 업로드 ── -->
-    <div id="subPaneHtml">
-      <div class="upload-zone" id="dropZone">
-        <h3>📄 품의서 HTML 파일을 드래그하거나 클릭하세요</h3>
-        <button class="btn btn-primary" type="button" id="selectFileBtn">파일 선택</button>
-        <input type="file" id="fileInput" accept=".html,.htm" style="display:none">
-        <p>지원 형식: .html / .htm</p>
-        <div id="loadingMsg" class="loading-msg">🚀 데이터를 분석 중입니다...</div>
+  <div class="app">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="ttl">출장 일정 관리</span>
+        <div class="conn-dot" id="connStatus" onclick="checkConn()" title="클릭하면 연결 상태 확인">
+          <div class="conn-led" id="connLed"></div>
+          <span id="connTxt">연결 확인</span>
+        </div>
+        <button class="sidebar-toggle" id="themeToggle" onclick="toggleTheme()" title="다크/라이트 모드 전환">🌙</button>
       </div>
-
-      <div id="previewHeader" class="preview-header">
-        <div class="ph-item"><span class="ph-label">문서번호</span><span class="ph-value" id="pvDocNo">-</span></div>
-        <div class="ph-item"><span class="ph-label">구매요청번호</span><input class="ph-value" id="pvPrqNo" type="text" placeholder="없음" style="border:1px solid var(--gray200);border-radius:4px;padding:2px 6px;font-size:inherit;width:160px;"></div>
-        <div class="ph-item"><span class="ph-label">기안자</span><span class="ph-value" id="pvUser">-</span></div>
-        <div class="ph-item"><span class="ph-label">기안일</span><span class="ph-value" id="pvDate">-</span></div>
-        <div class="ph-item"><span class="ph-label">품목 수</span><span class="ph-value" id="pvCount">0</span></div>
-      </div>
-
-      <div class="tbl-wrap" id="previewTbl" style="display:none">
-        <table>
-          <thead>
-            <tr>
-              <th>프로젝트명</th><th>코드</th><th>품명</th><th>규격</th><th>수량</th><th>작업</th>
-            </tr>
-          </thead>
-          <tbody id="previewBody"></tbody>
-        </table>
-      </div>
-
-      <div class="action-bar" id="actionBar">
-        <button class="btn btn-ghost" id="addRowBtn">＋ 행 추가</button>
-        <button class="btn btn-success" id="saveUploadBtn">✅ 데이터베이스에 저장</button>
-      </div>
-    </div>
-
-    <!-- ── 서브탭C: 그룹웨어 확인 ── -->
-    <div id="subPaneCheck" style="display:none;">
-      <div class="upload-zone" id="imgDropZone">
-        <h3>🔍 그룹웨어 캡쳐 이미지를 드래그하거나 클릭하세요</h3>
-        <button class="btn btn-primary" type="button" id="selectImgBtn">이미지 선택</button>
-        <input type="file" id="imgInput" accept="image/*" style="display:none">
-        <p>지원 형식: .png, .jpg, .jpeg 등</p>
-        <div id="checkLoadingMsg" class="loading-msg">🔍 이미지를 분석 중입니다...</div>
-      </div>
-
-      <div id="checkResultSection" style="display:none; margin-top:20px;">
-        <div class="check-result-header">
-          <h3>확인 결과</h3>
-          <div class="check-result-stats">
-            <span id="checkTotalCount"></span>
-            <span id="checkRegisteredCount"></span>
-            <span id="checkUnregisteredCount"></span>
+      <div class="tright" id="topbarRight">
+        <div id="ganttTools" style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('gantt')" title="사이트 필터">☰</button>
+          <div class="leg">
+            <div class="legg">
+              <span class="legl">본사계열</span>
+              <div class="legi"><div class="legd" style="background:#4a4a6a"></div>완료</div>
+              <div class="legi"><div class="legd" style="background:#2176cc"></div>출장중</div>
+              <div class="legi"><div class="legd" style="background:#0f9e6e"></div>예정</div>
+            </div>
+            <div class="legs"></div>
+            <div class="legg">
+              <span class="legl">외주계열</span>
+              <div class="legi"><div class="legd" style="background:#5a4a2a"></div>완료</div>
+              <div class="legi"><div class="legd" style="background:#cc8010"></div>출장중</div>
+              <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
+            </div>
           </div>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:40px">#</th>
-                <th style="width:160px">문서번호</th>
-                <th>제목</th>
-                <th style="width:110px">등록 상태</th>
-              </tr>
-            </thead>
-            <tbody id="checkResultBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── 서브탭B: 직접 입력 ── -->
-    <div id="subPaneManual" style="display:none;">
-
-      <!-- 문서 정보 입력 -->
-      <div class="search-card" style="margin-bottom:16px;">
-        <div style="font-size:13px; font-weight:700; color:var(--gray600); margin-bottom:12px;">📋 문서 정보</div>
-        <div class="search-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px,1fr));">
-          <div class="sf">
-            <label>문서번호 <span style="color:var(--danger-light)">*</span></label>
-            <input type="text" id="mDocNoInput" placeholder="인텍플러스-2026-XXXXX">
+          <input type="text" id="ganttSearchInput" class="gantt-search" placeholder="검색" oninput="ganttSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div style="display:flex;gap:2px">
+            <button class="btn active" id="zoomBtn_week" onclick="setGanttZoom('week')">주</button>
+            <button class="btn" id="zoomBtn_biweek" onclick="setGanttZoom('biweek')">격주</button>
+            <button class="btn" id="zoomBtn_month" onclick="setGanttZoom('month')">월</button>
           </div>
-          <div class="sf">
-            <label>기안자</label>
-            <input type="text" id="mUserInput" placeholder="홍길동">
-          </div>
-          <div class="sf">
-            <label>기안일</label>
-            <input type="date" id="mDateInput">
-          </div>
-          <div class="sf">
-            <label>구매요청번호</label>
-            <input type="text" id="mPrqNoInput" placeholder="PRQ-XXXXX (없으면 공란)">
-          </div>
+          <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
+          <button class="btn" onclick="openModal('site')">사이트 관리</button>
+          <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
+          <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
         </div>
-        <div style="margin-top:10px; font-size:11px; color:var(--gray400);">
-          💡 스페어 부품 출고, 직접 구매 등 품의서 없이 배송 모니터링이 필요한 건을 등록하세요.
+        <div id="visionTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="btnVisionTplEdit" onclick="toggleVisionTemplateEdit()">템플릿 편집</button>
+          <button class="btn" onclick="openVisionImport()">진행율 가져오기</button>
+          <button class="btn" onclick="refreshVisionFromSheets(false)" title="Sheets에서 지금 바로 최신 이력관리 데이터를 가져옵니다">⟳ 동기화</button>
+          <span style="display:inline-block;width:1px;height:16px;background:#3a3a44;flex-shrink:0"></span>
+          <button class="btn" onclick="openViColumnSettings()">열 설정</button>
+          <button class="btn" onclick="openVisionCsvTemplate()" title="빈 양식 CSV 다운로드 (일괄 입력용)">CSV 양식</button>
+          <button class="btn" onclick="exportVisionCSV()">CSV 내보내기</button>
+          <button class="btn" onclick="openVisionCsvImport()">CSV 가져오기</button>
+          <input type="file" id="viCsvFileInput" accept=".csv" style="display:none" onchange="handleVisionCsvFile(this)">
         </div>
-      </div>
-
-      <!-- 품목 테이블 -->
-      <div class="tbl-wrap" style="margin-bottom:0;">
-        <table>
-          <thead>
-            <tr>
-              <th>프로젝트명</th><th>코드</th><th>품명</th><th>규격</th><th>수량</th><th style="width:60px">작업</th>
-            </tr>
-          </thead>
-          <tbody id="manualBody"></tbody>
-        </table>
-      </div>
-
-      <div class="action-bar show" style="margin-top:12px;">
-        <button class="btn btn-ghost" id="manualAddRowBtn">＋ 행 추가</button>
-        <button class="btn btn-success" id="manualSaveBtn">✅ 데이터베이스에 저장</button>
+        <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="btn" onclick="collapseAllEquip()">접기 전체</button>
+          <button class="btn" onclick="expandAllEquip()">펼치기 전체</button>
+          <button class="btn" id="btnEquipEdit" onclick="toggleEquipEdit()">수정 모드</button>
+          <button class="btn" id="btnAddEquipSite" onclick="openAddEquipSite()" style="display:none">+ 사이트</button>
+          <button class="btn" id="btnAddEquipProject" onclick="openAddEquipProject()" style="display:none">+ 프로젝트</button>
+          <button class="btn" id="btnAddEquipUnit" onclick="openAddEquipUnit()" style="display:none">+ 호기</button>
+          <button class="btn warn" id="btnAddEquipItem" onclick="openAddEquipItem()" style="display:none">+ 항목</button>
+        </div>
+        <button class="btn" onclick="downloadExcel()">⬇ 엑셀</button>
+        <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
+        <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
       </div>
     </div>
-
-  </div>
-
-  <!-- ════ 탭2: 조회 ════ -->
-  <div class="tab-pane" id="pane-list">
-
-    <!-- 검색 필터 -->
-    <div class="search-card">
-      <div class="search-grid">
-        <div class="sf"><label>문서번호</label><input type="text" id="sDoc" placeholder="인텍플러스-2026"></div>
-        <div class="sf"><label>기안자</label><input type="text" id="sUser" placeholder="홍길동"></div>
-        <div class="sf"><label>프로젝트명 (부분일치)</label><input type="text" id="sPname" placeholder="IBAZ-DSK"></div>
-        <div class="sf"><label>코드</label><input type="text" id="sCode" placeholder="IBAZT3EG02"></div>
-        <div class="sf"><label>품명</label><input type="text" id="sName" placeholder="DNC_ROLLER"></div>
-        <div class="sf"><label>규격</label><input type="text" id="sSpec" placeholder="ML097803"></div>
-        <div class="sf"><label>입고예정일 시작</label><input type="date" id="sArrFrom"></div>
-        <div class="sf"><label>입고예정일 종료</label><input type="date" id="sArrTo"></div>
-        <div class="sf">
-          <label>입고 상태</label>
-          <select id="sArrStat">
-            <option value="">전체</option>
-            <option value="done">입고완료</option>
-            <option value="pending">미완료</option>
-            <option value="nodate">입고일 미입력</option>
-          </select>
-        </div>
-        <div class="sf">
-          <label>배송 상태</label>
-          <select id="sShipStat">
-            <option value="">전체</option>
-            <option value="done">배송완료</option>
-            <option value="started">배송중</option>
-            <option value="none">배송 전</option>
-          </select>
-        </div>
-        <div class="sf">
-          <label>진행 단계</label>
-          <select id="sStage">
-            <option value="">전체</option>
-            <option value="pending_arrival">입고대기</option>
-            <option value="shipping">배송중</option>
-            <option value="done">완료</option>
-          </select>
-        </div>
-        <div class="sf sf-toggle">
-          <label>지연만 보기</label>
-          <label class="delay-toggle-wrap" id="sDelayOnlyToggle">
-            <input type="checkbox" id="sDelayOnly">
-            <span class="delay-toggle-slider"></span>
-            <span class="delay-toggle-lbl">지연 건만 표시</span>
-          </label>
-        </div>
-      </div>
-      <div class="search-btns">
-        <button class="btn btn-ghost" id="resetBtn">초기화</button>
-        <button class="btn btn-primary" id="searchBtn">🔍 검색</button>
-        <button class="btn btn-excel" id="exportBtn" style="display:none" onclick="exportExcel()">📊 엑셀 내보내기</button>
+    <div class="tab-bar">
+      <div class="tab-nav">
+        <button class="tab-btn on" id="tab_gantt" onclick="switchTab('gantt')">📅 간트 차트</button>
+        <button class="tab-btn" id="tab_person" onclick="switchTab('person')">👤 인원 출장일</button>
+        <button class="tab-btn" id="tab_equip" onclick="switchTab('equip')">🏭 설비 진행율</button>
+        <button class="tab-btn" id="tab_vision" onclick="switchTab('vision')">📋 이력관리</button>
       </div>
     </div>
-
-    <!-- 통계 -->
-    <div class="stat-row" id="statRow" style="display:none">
-      <div class="stat-card"><div class="sc-label">문서 수</div><div class="sc-value" id="scDoc">0</div><div class="sc-sub">건</div></div>
-      <div class="stat-card"><div class="sc-label">전체 품목</div><div class="sc-value" id="scItem">0</div><div class="sc-sub">개</div></div>
-      <div class="stat-card"><div class="sc-label">입고완료</div><div class="sc-value" id="scArrDone">0</div><div class="sc-sub">건</div></div>
-      <div class="stat-card"><div class="sc-label">입고일 미입력</div><div class="sc-value" id="scArrNone">0</div><div class="sc-sub">건</div></div>
-      <div class="stat-card"><div class="sc-label">배송완료</div><div class="sc-value" id="scShipDone">0</div><div class="sc-sub">건</div></div>
-    </div>
-
-    <!-- 뷰 전환 버튼 (결과 있을 때만 표시) -->
-    <div id="viewToggleBar" style="display:none; margin-bottom:12px;">
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-        <button class="view-toggle-btn active" id="btnViewDoc" onclick="switchView('doc')">
-          📋 문서별 보기
-        </button>
-        <button class="view-toggle-btn" id="btnViewAll" onclick="switchView('all')">
-          📦 전체 품목 펼쳐보기
-        </button>
-        <span id="viewAllCount" style="font-size:12px; color:var(--gray400); margin-left:4px;"></span>
-      </div>
-    </div>
-
-    <!-- 결과 (문서별) -->
-    <div id="listArea">
-      <div class="empty-state">
-        <div class="es-icon">📋</div>
-        <p>검색 버튼을 눌러 저장된 데이터를 불러오세요.</p>
-      </div>
-    </div>
-
-    <!-- 전체 품목 펼치기 뷰 -->
-    <div id="allItemsArea" style="display:none;"></div>
-  </div>
-
-  <!-- ════ 대시보드 (메인) ════ -->
-  <div class="tab-pane active" id="pane-dashboard">
-    <!-- 알림 배너 (대시보드 전용) -->
-    <div id="alertBanner">
-      <div class="alert-inner">
-        <div class="alert-title" id="alertToggle">
-          <span>🔔</span>
-          <span id="alertTitleText">확인이 필요한 항목이 있습니다</span>
-          <span class="toggle-arrow" id="alertArrow">▲</span>
+    <div class="content" id="view_gantt">
+      <div class="sidebar" id="ganttSidebar">
+        <div class="sbhead" style="display:flex;align-items:center;justify-content:space-between">
+          <span class="slbl">사이트 필터</span>
+          <button class="mobile-only sidebar-toggle" onclick="closeSidebar('gantt')" title="닫기" style="font-size:11px;padding:2px 6px">✕</button>
         </div>
-        <div class="alert-list" id="alertList"></div>
+        <div class="sbody" id="siteList"></div>
       </div>
-    </div>
-    <div id="dashContent">
-      <div class="empty-state"><div class="es-icon">⏳</div><p>불러오는 중...</p></div>
-    </div>
-  </div>
-
-  <!-- ════ 현장 요청 ════ -->
-  <div class="tab-pane" id="pane-field">
-    <div class="empty-state"><div class="es-icon">⏳</div><p>불러오는 중...</p></div>
-  </div>
-
-</div><!-- /app-body -->
-
-<!-- ══ 문서 상세 모달 ══ -->
-<div class="modal-backdrop" id="docModal">
-  <div class="modal">
-    <div class="modal-header">
-      <span style="font-size:18px">📄</span>
-      <h2 id="modalDocNo">-</h2>
-      <button class="modal-close" id="modalClose">✕</button>
-    </div>
-    <div class="modal-body">
-
-      <!-- 문서 정보 -->
-      <div class="modal-section">
-        <div class="modal-section-title">📋 문서 정보</div>
-        <div class="modal-info-grid">
-          <div class="mig-item"><span class="mig-label">문서번호</span><span class="mig-value" id="mDocNo">-</span></div>
-          <div class="mig-item"><span class="mig-label">기안자</span><span class="mig-value" id="mUser">-</span></div>
-          <div class="mig-item"><span class="mig-label">기안일</span><span class="mig-value" id="mDate">-</span></div>
-          <div class="mig-item"><span class="mig-label">품목 수</span><span class="mig-value" id="mCount">-</span></div>
-          <div class="mig-item mig-item-prq">
-            <span class="mig-label">구매요청번호</span>
-            <span class="mig-value" id="mPrqDisplay" style="color:var(--gray400)"></span>
-            <button class="btn-prq-edit" onclick="togglePrqEdit()" title="수정">✏️</button>
-          </div>
-          <div id="mPrqEditRow" style="display:none" class="mig-prq-edit">
-            <input type="text" id="mPrqInput" placeholder="PRQ-2410-001" style="flex:1;padding:5px 8px;border:1px solid var(--gray300);border-radius:6px;font-size:13px">
-            <button class="btn btn-sm btn-primary" onclick="savePrqNo()">저장</button>
-            <button class="btn btn-sm btn-ghost" onclick="togglePrqEdit()">취소</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 입고 상태 -->
-      <div class="modal-section">
-        <div class="modal-section-title">📦 입고 관리</div>
-        <div class="status-edit-grid">
-          <div class="seg">
-            <label>입고예정일</label>
-            <input type="date" id="mExpectedArrival">
-          </div>
-          <div class="seg" style="justify-content:flex-end;">
-            <label>입고완료 여부</label>
-            <label class="toggle-field" id="mArrDoneToggle">
-              <input type="checkbox" id="mArrDone">
-              <div>
-                <div class="tf-label">입고완료</div>
-                <div class="tf-sub">체크 시 알림 중단</div>
+      <div class="main">
+        <div class="gscroll" id="gscroll">
+          <div class="gwrap" id="gwrap">
+            <div class="ghrow">
+              <div class="ghinner">
+                <div class="ghfixed">
+                  <div class="ghc" style="width:68px;min-width:68px;max-width:68px">업무</div>
+                  <div class="ghc">출장자</div>
+                </div>
+                <div class="ghtl" id="ghTl"></div>
               </div>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- 배송 상태 -->
-      <div class="modal-section">
-        <div class="modal-section-title">🚚 배송 관리</div>
-        <div class="status-edit-grid">
-          <div class="seg">
-            <label>배송시작일</label>
-            <input type="date" id="mShipStart">
-          </div>
-          <div class="seg">
-            <label>배송완료예정일</label>
-            <input type="date" id="mShipDone">
-          </div>
-          <div class="seg" style="justify-content:flex-end;">
-            <label>배송완료 여부</label>
-            <label class="toggle-field" id="mShipDoneToggle">
-              <input type="checkbox" id="mShipDoneCk">
-              <div>
-                <div class="tf-label">배송완료</div>
-                <div class="tf-sub">체크 시 알림 중단</div>
+              <div class="ghdb">
+                <div class="ghdbf"></div>
+                <div class="ghdbt" id="ghDb"></div>
               </div>
-            </label>
-          </div>
-          <div class="seg seg-full">
-            <label>비고</label>
-            <textarea id="mMemo" placeholder="메모를 입력하세요..."></textarea>
+            </div>
+            <div id="gbody"></div>
           </div>
         </div>
       </div>
-
-      <!-- 연결된 현장 요청 (linked_doc_no가 있을 때만 표시) -->
-      <div id="mLinkedFrSection" style="display:none" class="modal-section">
-        <div class="modal-section-title">🔗 연결된 현장 요청</div>
-        <div id="mLinkedFrBody"></div>
-      </div>
-
-      <!-- 품목 리스트 -->
-      <div class="modal-section">
-        <div class="modal-section-title">📦 품목 리스트</div>
-        <div class="tbl-wrap items-tbl" style="margin-top:0">
-          <table>
-            <thead>
-              <tr><th>프로젝트명</th><th>코드</th><th>품명</th><th>규격</th><th>수량</th></tr>
-            </thead>
-            <tbody id="mItemBody"></tbody>
-          </table>
+    </div>
+    <div class="content" id="view_person" style="display:none">
+      <div class="pm-wrap" id="pmWrap">
+        </div>
+    </div>
+    <div class="content" id="view_equip" style="display:none">
+      <div class="sidebar" id="equipSidebar"></div>
+      <div class="main" style="overflow:hidden;display:flex;flex-direction:column">
+        <div id="eqSummary"></div>
+        <div class="eq-scroll" id="eqScroll">
+          <div id="eqGrid"></div>
         </div>
       </div>
-
-    </div><!-- /modal-body -->
-    <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" id="mDeleteBtn">🗑 이 문서 전체 삭제</button>
-      <button class="btn btn-ghost" id="mCancelBtn">닫기</button>
-      <button class="btn btn-success" id="mSaveBtn">💾 저장</button>
+    </div>
+    <div class="content" id="view_vision" style="display:none">
+      <div class="sidebar vi-sidebar" id="visionSidebar"></div>
+      <div class="main" id="visionMain" style="overflow:hidden;display:flex;flex-direction:column"></div>
     </div>
   </div>
-</div>
+  <div id="mc"></div>
 
-<!-- ══ 현장 관리 모달 ══ -->
-<div class="modal-backdrop" id="sitesModal">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-header">
-      <span style="font-size:18px">🏭</span>
-      <h2 style="font-family:'Noto Sans KR',sans-serif;font-size:16px">현장 관리</h2>
-      <button class="modal-close" id="sitesModalClose">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:8px;margin-bottom:20px">
-        <input type="text" id="newSiteName" placeholder="새 현장명 입력 (예: IBAZ-DSK)"
-               style="flex:1;padding:8px 10px;border:1px solid var(--gray200);border-radius:var(--radius);font-size:13px;font-family:inherit;color:var(--gray800)">
-        <button class="btn btn-primary btn-sm" id="addSiteBtn">+ 추가</button>
-      </div>
-      <div style="font-size:11px;color:var(--gray400);margin-bottom:12px">
-        💡 비활성 현장은 드롭다운에서 숨겨지며 데이터는 보존됩니다.
-      </div>
-      <div id="sitesListWrap"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 현장요청 상세 모달 ══ -->
-<div class="modal-backdrop" id="frModal" style="display:none">
-  <div class="modal modal-wider">
-    <div class="modal-header">
-      <span style="font-size:18px">📋</span>
-      <h2 id="frModalTitle" style="font-family:'Noto Sans KR',sans-serif;font-size:16px">현장 요청 상세</h2>
-      <button class="modal-close" onclick="document.getElementById('frModal').style.display='none'">✕</button>
-    </div>
-    <div class="modal-body" id="frModalBody"></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="document.getElementById('frModal').style.display='none'">닫기</button>
-    </div>
-  </div>
-</div>
-
-<!-- 토스트 -->
-<div id="toastWrap"></div>
-
-<script src="app.js"></script>
+  <script src="data.js?v=20260612a"></script>
+  <script src="app.js?v=20260612a"></script>
+  <script src="gantt.js?v=20260612a"></script>
+  <script src="modals.js?v=20260612a"></script>
+  <script src="person.js?v=20260612a"></script>
+  <script src="equip.js?v=20260612a"></script>
+  <script src="vision.js?v=20260612a"></script>
+  <script src="export.js?v=20260612a"></script>
 </body>
 </html>
