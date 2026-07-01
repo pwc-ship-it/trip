@@ -93,8 +93,10 @@ function _isDeletedVi(id){return _isDeleted('visionEquips',id);}
 function _deletedScIds(){return Object.keys(_tombMap.schedules||{});}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
-/* ── 레코드 수정시각 마킹 (mt: epoch ms 숫자 — 동기화 충돌 시 최신 판정용) ── */
-function _touch(r){if(r)r.mt=Date.now();return r;}
+/* ── 레코드 수정시각 마킹 (mt: epoch ms 숫자 — 동기화 충돌 시 최신 판정용) ──
+   단조 증가: 기존 mt가 미래(잘못된 PC 시계로 오염된 값 등)여도 항상 그보다 크게 찍어
+   수정본이 병합에서 확실히 이기도록 함. 정상 상황(now > 기존 mt)에선 Date.now()와 동일. */
+function _touch(r){if(r)r.mt=Math.max(Date.now(),(Number(r.mt)||0)+1);return r;}
 /* ── ID 생성 (timestamp base36 + 난수 — 다중 PC 동시 생성 충돌 방지) ── */
 function genId(prefix,arr){
   var id;
@@ -551,7 +553,7 @@ function restoreFromBackupFile(){
             _touch(r);
           });
         });
-        if(S.visionTemplate)S.visionTemplate.mt=Date.now();
+        if(S.visionTemplate)S.visionTemplate.mt=Math.max(Date.now(),(Number(S.visionTemplate.mt)||0)+1);
         saveData(); renderAll();
         alert('복원 완료되었습니다.');
       }catch(err){alert('복원 실패: '+err.message);}

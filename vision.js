@@ -43,14 +43,18 @@ function _viTypeColor(t){
 }
 
 /* ── 공통 유틸 ── */
-function _viId(){ return 've'+Date.now()+Math.floor(Math.random()*1000); }
+/* _esc()는 app.js로 이동 (gantt.js와 공용 — 로드 순서상 app.js에 정의) */
+function _viId(){ return genId('ve',S.visionEquips); }
 function _viToday(){
   var d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function _esc(s){
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+/* 상세 폼 편집 중 플래그 — refreshVisionFromSheets 자동 갱신 가드용 */
+var _viFormDirty=false;
+/* 템플릿 수정 공통: visionTemplate.mt 갱신 후 저장 (Sheets 병합 시 최신 판정용) */
+function _tplTouchSave(){
+  if(S.visionTemplate)S.visionTemplate.mt=Math.max(Date.now(),(Number(S.visionTemplate.mt)||0)+1);
+  saveData();
 }
 function _viEquipLabel(e){
   var line=(e.data&&e.data['vi_line'])||'';
@@ -841,6 +845,7 @@ function openVisionDetail(id){
 }
 function backToVisionGrid(){
   _visionView='grid';
+  _viFormDirty=false;
   renderVisionMain();
 }
 
@@ -870,6 +875,10 @@ function _renderDetailView(main){
     _wrap.addEventListener('input',function(e){
       if(e.target.tagName==='INPUT'&&e.target.type==='text')_viAutoSizeInput(e.target);
     });
+    // 편집 감지 — 자동 새로고침(refreshVisionFromSheets)이 입력 중 데이터를 덮어쓰지 않도록
+    _viFormDirty=false;
+    _wrap.addEventListener('input',function(){_viFormDirty=true;});
+    _wrap.addEventListener('change',function(){_viFormDirty=true;});
   }
   /* 기존 호기 board-multi 섹션 강제 재렌더: 저장된 데이터에 Vision Type 체크박스 / PC 드롭다운이
      없던 경우에도 현재 _viCurrentTypes · pcSelect 기준으로 UI를 올바르게 표시하기 위함 */
@@ -1895,6 +1904,8 @@ function saveVisionEquipData(){
   });
   if(changedFields.length){ equip.changelog.push({date:today,fields:changedFields}); }
 
+  _touch(equip);          // 동기화 충돌 판정용 수정시각 (updatedAt은 표시용 날짜라 별도)
+  _viFormDirty=false;     // 저장 완료 — 자동 새로고침 가드 해제
   saveData();
   var latestDt=_viLatestFieldDate(equip);
   var ts=document.getElementById('viSaveTs');
@@ -2080,8 +2091,8 @@ function _doAddVisionEquip(){
   var line=document.getElementById('vi_new_line').value.trim();
   if(!siteId){alert('사이트를 선택해주세요.');return;}
   var site=S.sites.find(function(s){return s.id===siteId;});
-  var equip={id:_viId(),siteId:siteId,createdAt:_viToday(),updatedAt:_viToday(),
-    data:{'vi_site':site?site.name:siteId,'vi_unit':unit,'vi_line':line}};
+  var equip=_touch({id:_viId(),siteId:siteId,createdAt:_viToday(),updatedAt:_viToday(),
+    data:{'vi_site':site?site.name:siteId,'vi_unit':unit,'vi_line':line}});
   S.visionEquips.push(equip);
   _visionSelId=equip.id; _visionView='detail';
   saveData(); cm(); renderVisionTab();
@@ -2100,8 +2111,8 @@ function delVisionEquip(id){
 function copyVisionEquip(srcId){
   var src=S.visionEquips.find(function(e){return e.id===srcId;});
   if(!src)return;
-  var newEquip={id:_viId(),siteId:src.siteId,createdAt:_viToday(),updatedAt:_viToday(),
-    data:deepCopy(src.data)};
+  var newEquip=_touch({id:_viId(),siteId:src.siteId,createdAt:_viToday(),updatedAt:_viToday(),
+    data:deepCopy(src.data)});
   if(newEquip.data['vi_unit']) newEquip.data['vi_unit']+=' (복사)';
   S.visionEquips.push(newEquip);
   _visionSelId=newEquip.id; _visionView='detail';
@@ -2134,8 +2145,8 @@ function _doVisionImport(){
   Array.prototype.forEach.call(chks,function(chk){
     var unit=S.equipUnits.find(function(u){return u.id===chk.value;}); if(!unit)return;
     var site=S.sites.find(function(s){return s.id===unit.siteId;});
-    var equip={id:_viId(),siteId:unit.siteId||'',createdAt:_viToday(),updatedAt:_viToday(),
-      data:{'vi_site':site?site.name:(unit.siteId||''),'vi_line':unit.lineName||'','vi_unit':unit.unitName||''}};
+    var equip=_touch({id:_viId(),siteId:unit.siteId||'',createdAt:_viToday(),updatedAt:_viToday(),
+      data:{'vi_site':site?site.name:(unit.siteId||''),'vi_line':unit.lineName||'','vi_unit':unit.unitName||''}});
     S.visionEquips.push(equip); added++;
   });
   saveData(); cm(); renderVisionTab();
@@ -2203,9 +2214,9 @@ function _doAddViCategory(){
   if(!name){alert('카테고리명을 입력해주세요.');return;}
   var cats=S.visionTemplate.categories||[];
   var maxOrder=cats.reduce(function(m,c){return Math.max(m,c.order||0);},-1);
-  var cat={id:'vc_'+Date.now(),name:name,order:maxOrder+1};
+  var cat={id:genId('vc_'),name:name,order:maxOrder+1};
   if(type==='groups')cat.groups=[];else cat.items=[];
-  cats.push(cat); saveData(); cm(); renderVisionMain();
+  cats.push(cat); _tplTouchSave(); cm(); renderVisionMain();
 }
 function openRenameViCategory(catId){
   var cat=_findCat(catId); if(!cat)return;
@@ -2215,7 +2226,7 @@ function openRenameViCategory(catId){
 }
 function _doRenameViCat(catId){
   var name=document.getElementById('vi_ren_cat').value.trim(); if(!name)return;
-  var cat=_findCat(catId); if(cat)cat.name=name; saveData(); cm(); renderVisionMain();
+  var cat=_findCat(catId); if(cat)cat.name=name; _tplTouchSave(); cm(); renderVisionMain();
 }
 function delViCategory(catId){
   var cat=_findCat(catId); if(!cat)return;
@@ -2224,12 +2235,12 @@ function delViCategory(catId){
   if(cnt)msg+='\n항목 '+cnt+'개 포함. 기존 설비 데이터는 보존됩니다.';
   if(!confirm(msg))return;
   S.visionTemplate.categories=S.visionTemplate.categories.filter(function(c){return c.id!==catId;});
-  saveData(); renderVisionMain();
+  _tplTouchSave(); renderVisionMain();
 }
 function moveViCategory(ci,dir){
   var cats=S.visionTemplate.categories; var ni=ci+dir;
   if(ni<0||ni>=cats.length)return;
-  var tmp=cats[ci];cats[ci]=cats[ni];cats[ni]=tmp; saveData(); renderVisionMain();
+  var tmp=cats[ci];cats[ci]=cats[ni];cats[ni]=tmp; _tplTouchSave(); renderVisionMain();
 }
 
 function openAddVisionGroup(catId){
@@ -2241,7 +2252,7 @@ function _doAddViGroup(catId){
   var name=document.getElementById('vi_new_grp_name').value.trim(); if(!name){alert('그룹명을 입력해주세요.');return;}
   var cat=_findCat(catId); if(!cat)return; if(!cat.groups)cat.groups=[];
   var maxOrder=cat.groups.reduce(function(m,g){return Math.max(m,g.order||0);},-1);
-  cat.groups.push({id:'vg_'+Date.now(),name:name,order:maxOrder+1,items:[]}); saveData(); cm(); renderVisionMain();
+  cat.groups.push({id:genId('vg_'),name:name,order:maxOrder+1,items:[]}); _tplTouchSave(); cm(); renderVisionMain();
 }
 function openRenameViGroup(catId,grpId){
   var grp=_findGrp(catId,grpId); if(!grp)return;
@@ -2251,7 +2262,7 @@ function openRenameViGroup(catId,grpId){
 }
 function _doRenameViGrp(catId,grpId){
   var name=document.getElementById('vi_ren_grp').value.trim(); if(!name)return;
-  var grp=_findGrp(catId,grpId); if(grp)grp.name=name; saveData(); cm(); renderVisionMain();
+  var grp=_findGrp(catId,grpId); if(grp)grp.name=name; _tplTouchSave(); cm(); renderVisionMain();
 }
 function delViGroup(catId,grpId){
   var cat=_findCat(catId); var grp=_findGrp(catId,grpId); if(!cat||!grp)return;
@@ -2259,12 +2270,12 @@ function delViGroup(catId,grpId){
   var msg='['+grp.name+'] 그룹을 삭제하시겠습니까?';
   if(cnt)msg+='\n항목 '+cnt+'개 포함. 기존 설비 데이터는 보존됩니다.';
   if(!confirm(msg))return;
-  cat.groups=cat.groups.filter(function(g){return g.id!==grpId;}); saveData(); renderVisionMain();
+  cat.groups=cat.groups.filter(function(g){return g.id!==grpId;}); _tplTouchSave(); renderVisionMain();
 }
 function moveViGroup(catId,gi,dir){
   var cat=_findCat(catId); if(!cat||!cat.groups)return;
   var grps=cat.groups; var ni=gi+dir; if(ni<0||ni>=grps.length)return;
-  var tmp=grps[gi];grps[gi]=grps[ni];grps[ni]=tmp; saveData(); renderVisionMain();
+  var tmp=grps[gi];grps[gi]=grps[ni];grps[ni]=tmp; _tplTouchSave(); renderVisionMain();
 }
 
 var _VI_TYPES=[
@@ -2293,9 +2304,9 @@ function _doAddViItem(catId,grpId){
   if(!name){alert('항목명을 입력해주세요.');return;}
   var list=_getItemsList(catId,grpId||''); if(!list)return;
   var maxOrder=list.reduce(function(m,i){return Math.max(m,i.order||0);},-1);
-  var newItem={id:'vi_'+Date.now(),name:name,type:type,order:maxOrder+1,showInGrid:false};
+  var newItem={id:genId('vi_'),name:name,type:type,order:maxOrder+1,showInGrid:false};
   if(type==='multiselect'||type==='select')newItem.options=[];
-  list.push(newItem); saveData(); cm(); renderVisionMain();
+  list.push(newItem); _tplTouchSave(); cm(); renderVisionMain();
 }
 function openEditViItem(catId,grpId,itemId){
   var item=_findItem(catId,grpId,itemId); if(!item)return;
@@ -2312,7 +2323,7 @@ function _doEditViItem(catId,grpId,itemId){
   var item=_findItem(catId,grpId,itemId); if(!item)return;
   item.name=name;
   if(item.type!==type){item.type=type; if((type==='multiselect'||type==='select')&&!item.options)item.options=[];}
-  saveData(); cm(); renderVisionMain();
+  _tplTouchSave(); cm(); renderVisionMain();
 }
 function delViItem(catId,grpId,itemId){
   var item=_findItem(catId,grpId,itemId); if(!item)return;
@@ -2322,13 +2333,13 @@ function delViItem(catId,grpId,itemId){
   if(!confirm(msg))return;
   var list=_getItemsList(catId,grpId); if(!list)return;
   var idx=-1; for(var i=0;i<list.length;i++)if(list[i].id===itemId){idx=i;break;}
-  if(idx>=0)list.splice(idx,1); saveData(); renderVisionMain();
+  if(idx>=0)list.splice(idx,1); _tplTouchSave(); renderVisionMain();
 }
 function moveViItem(catId,grpId,itemId,dir){
   var list=_getItemsList(catId,grpId); if(!list)return;
   var idx=-1; for(var i=0;i<list.length;i++)if(list[i].id===itemId){idx=i;break;}
   if(idx<0)return; var ni=idx+dir; if(ni<0||ni>=list.length)return;
-  var tmp=list[idx];list[idx]=list[ni];list[ni]=tmp; saveData(); renderVisionMain();
+  var tmp=list[idx];list[idx]=list[ni];list[ni]=tmp; _tplTouchSave(); renderVisionMain();
 }
 
 function openAddSelectOption(itemId){
@@ -2341,11 +2352,11 @@ function _doAddSelectOption(itemId){
   var item=_findItemById(itemId); if(!item)return;
   if(!item.options)item.options=[];
   if(item.options.indexOf(val)>=0){alert('이미 존재하는 옵션입니다.');return;}
-  item.options.push(val); saveData(); cm(); renderVisionMain();
+  item.options.push(val); _tplTouchSave(); cm(); renderVisionMain();
 }
 function delSelectOption(itemId,optVal){
   var item=_findItemById(itemId); if(!item||!item.options)return;
-  item.options=item.options.filter(function(o){return o!==optVal;}); saveData(); renderVisionMain();
+  item.options=item.options.filter(function(o){return o!==optVal;}); _tplTouchSave(); renderVisionMain();
 }
 
 /* ══════════════════════════════════════════
@@ -2818,6 +2829,7 @@ function _parseAndImportVisionCSV(text){
       }
     });
     equip.updatedAt=_viToday();
+    _touch(equip);
     if(existing)updated++;
     else{S.visionEquips.push(equip);imported++;}
   }
