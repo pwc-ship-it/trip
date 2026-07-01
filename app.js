@@ -94,9 +94,8 @@ function _deletedScIds(){return Object.keys(_tombMap.schedules||{});}
 
 function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 /* ── 레코드 수정시각 마킹 (mt: epoch ms 숫자 — 동기화 충돌 시 최신 판정용) ──
-   단조 증가: 기존 mt가 미래(잘못된 PC 시계로 오염된 값 등)여도 항상 그보다 크게 찍어
-   수정본이 병합에서 확실히 이기도록 함. 정상 상황(now > 기존 mt)에선 Date.now()와 동일. */
-function _touch(r){if(r)r.mt=Math.max(Date.now(),(Number(r.mt)||0)+1);return r;}
+   항상 현재시각으로 찍음. 미래 오염값 방어는 _mergeArr 비교단에서 처리(미래 mt 강등). */
+function _touch(r){if(r)r.mt=Date.now();return r;}
 /* ── ID 생성 (timestamp base36 + 난수 — 다중 PC 동시 생성 충돌 방지) ── */
 function genId(prefix,arr){
   var id;
@@ -121,6 +120,7 @@ function _esc(s){
 function _mergeArr(type,localArr,sheetArr,opts){
   opts=opts||{};
   localArr=localArr||[];sheetArr=sheetArr||[];
+  var _futMt=Date.now()+864e5; // now+24h 초과 mt는 시계오염으로 간주 (정상 수정은 미래일 수 없음)
   var localMap={};
   localArr.forEach(function(r){if(r&&r.id)localMap[r.id]=r;});
   var out=[];var usedIds={};
@@ -132,7 +132,8 @@ function _mergeArr(type,localArr,sheetArr,opts){
     var lr=localMap[sr.id];
     var winner=sr,loser=lr;
     if(lr){
-      var smt=Number(sr.mt||0),lmt=Number(lr.mt||0);
+      var smt=Number(sr.mt)||0,lmt=Number(lr.mt)||0;
+      if(smt>_futMt)smt=0;if(lmt>_futMt)lmt=0; // 미래(오염) mt 강등 → 정상 수정이 병합에서 이김
       if(lmt>smt||(lmt===smt&&opts.preferLocalOnTie)){winner=lr;loser=sr;}
     }
     // protectField: 승자의 cells/data가 비어있으면 패자 것 보존 (mt 없는 레거시 레코드 안전망)
@@ -553,7 +554,7 @@ function restoreFromBackupFile(){
             _touch(r);
           });
         });
-        if(S.visionTemplate)S.visionTemplate.mt=Math.max(Date.now(),(Number(S.visionTemplate.mt)||0)+1);
+        if(S.visionTemplate)S.visionTemplate.mt=Date.now();
         saveData(); renderAll();
         alert('복원 완료되었습니다.');
       }catch(err){alert('복원 실패: '+err.message);}

@@ -53,7 +53,7 @@ function _viToday(){
 var _viFormDirty=false;
 /* 템플릿 수정 공통: visionTemplate.mt 갱신 후 저장 (Sheets 병합 시 최신 판정용) */
 function _tplTouchSave(){
-  if(S.visionTemplate)S.visionTemplate.mt=Math.max(Date.now(),(Number(S.visionTemplate.mt)||0)+1);
+  if(S.visionTemplate)S.visionTemplate.mt=Date.now();
   saveData();
 }
 function _viEquipLabel(e){
