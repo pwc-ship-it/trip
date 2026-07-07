@@ -139,7 +139,7 @@ function calcKoreaDays12M(trips, rolling12){
 // 롤링 12개월 창 안에서 모든 지역 합산 해외 체류일
 function calcTotalOverseas12M(trips, rolling12){
   var set={};
-  trips.forEach(function(t){
+  trips.filter(function(t){return t.region!=='korea';}).forEach(function(t){
     var s=new Date(Math.max(pd(t.start),rolling12.start));
     var e=new Date(Math.min(pd(t.end),rolling12.end));
     if(s>e) return;
