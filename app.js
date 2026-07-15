@@ -1023,6 +1023,18 @@ function toggleTheme(){
   if(btn) btn.textContent=next==='dark'?'🌙':'☀️';
 }
 
+/* ── 바로가기 드롭다운 ── */
+function toggleShortcut(e){
+  e.stopPropagation();
+  document.getElementById('shortcutMenu').classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  var wrap=document.getElementById('shortcutWrap');
+  if(wrap && !wrap.contains(e.target)){
+    document.getElementById('shortcutMenu').classList.remove('open');
+  }
+});
+
 /* ── 모바일 사이드바 토글 ── */
 function openSidebar(view){
   var sb=view==='gantt'?document.getElementById('ganttSidebar')

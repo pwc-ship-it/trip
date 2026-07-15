@@ -74,6 +74,40 @@
         <button class="btn" onclick="downloadExcel()">⬇ 엑셀</button>
         <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
         <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
+        <div class="shortcut-wrap" id="shortcutWrap">
+          <button class="btn shortcut-trigger" onclick="toggleShortcut(event)">🔗 바로가기</button>
+          <div class="shortcut-menu" id="shortcutMenu">
+            <div class="shortcut-menu-header">CX-BU3 전용 대시보드</div>
+            <a class="shortcut-item" href="http://10.0.1.19:8001" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#e0f2fe;">💬</div>
+              <div class="si-info"><div class="si-name">CXM 서버</div><div class="si-meta">10.0.1.19:8001 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.1.19:8000" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#ede9fe;">🔧</div>
+              <div class="si-info"><div class="si-name">CWM 서버</div><div class="si-meta">10.0.1.19:8000 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.1.19:8002" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#dcfce7;">📋</div>
+              <div class="si-info"><div class="si-name">PMS 서버</div><div class="si-meta">10.0.1.19:8002 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.6.210:3000/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fef9c3;">📊</div>
+              <div class="si-info"><div class="si-name">SQR 대시보드</div><div class="si-meta">10.0.6.210:3000</div></div>
+            </a>
+            <a class="shortcut-item" href="https://intek-purchase-v2.vercel.app/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fee2e2;">🛒</div>
+              <div class="si-info"><div class="si-name">구매관리</div><div class="si-meta">intek-purchase-v2.vercel.app</div></div>
+            </a>
+            <a class="shortcut-item" href="https://pwc-ship-it.github.io/trip/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fce7f3;">✈️</div>
+              <div class="si-info"><div class="si-name">출장일정 관리</div><div class="si-meta">pwc-ship-it.github.io/trip</div></div>
+            </a>
+            <a class="shortcut-item" href="https://calm-sea-0c34b3500.6.azurestaticapps.net" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#ffedd5;">🔔</div>
+              <div class="si-info"><div class="si-name">Vision Alarm Manager</div><div class="si-meta">Azure · 개인 계정 필요</div></div>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
     <div class="tab-bar">
