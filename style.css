@@ -392,6 +392,14 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .pm-person-table tr:hover td{background:var(--bg-sel)}
 .pm-person-table tr:last-child td{border-bottom:none}
 .pm-person-row{cursor:pointer}
+/* 인원 탭 — 사이트별 Total 출장일수 요약 */
+.pm-site-days{margin-bottom:16px;background:var(--bg-alt);border:1px solid var(--bd-light);border-radius:7px;overflow:hidden}
+.pm-site-days-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bd-light)}
+.pm-site-days-title{font-size:12px;font-weight:700;color:var(--tx-primary);user-select:none}
+.pm-site-days-table th{position:static}
+.pm-site-chip{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.pm-site-group-row td{font-size:10px;font-weight:700;color:var(--tx-muted);background:var(--bg-hover);padding:5px 10px;text-transform:uppercase;letter-spacing:.04em}
+.pm-site-total-row td{font-weight:700;color:var(--tx-primary);border-top:2px solid var(--bd-main);background:var(--bg-hover)}
 /* 펼침 행 */
 .pm-expand-row td{background:var(--bg-deep);padding:6px 16px}
 .pm-timeline{display:flex;flex-direction:column;gap:3px;padding:4px 0}

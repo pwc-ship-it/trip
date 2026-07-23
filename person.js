@@ -196,6 +196,66 @@ function aggregatePersonTrips(){
   return persons;
 }
 
+// 사이트별 Total 출장일수 집계 (전체/본사/외주, 기간별)
+// period: 'all'(전체 기간) | 'year'(올해) | 'r12'(최근 12개월)
+function aggregateSiteDays(period){
+  var rangeStart=null, rangeEnd=null;
+  if(period==='year'){
+    rangeStart=new Date(TODAY.getFullYear(),0,1);
+    rangeEnd=new Date(TODAY.getFullYear(),11,31);
+  }else if(period==='r12'){
+    var r12=getRolling12();
+    rangeStart=r12.start; rangeEnd=r12.end;
+  }
+
+  var siteMap={}; // siteId -> {siteId,name,color,groupId,total,hq,out,names:{}}
+  S.schedules.forEach(function(sc){
+    var proj=S.projects.find(function(p){return p.id===sc.projectId;});
+    if(!proj) return;
+    var site=S.sites.find(function(s){return s.id===proj.siteId;});
+    if(!site) return;
+    var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
+    if(days<=0) return;
+    var siteId=site.id;
+    if(!siteMap[siteId]) siteMap[siteId]={siteId:siteId,name:site.name,color:site.color,groupId:site.groupId,total:0,hq:0,out:0,names:{}};
+    var entry=siteMap[siteId];
+    entry.total+=days;
+    if(sc.type==='outsource') entry.out+=days; else entry.hq+=days;
+    entry.names[sc.name]=true;
+  });
+
+  var groupOrder=S.groups.map(function(g){return g.id;});
+  var siteList=Object.keys(siteMap).map(function(id){
+    var e=siteMap[id];
+    return {siteId:e.siteId,name:e.name,color:e.color,groupId:e.groupId,
+      total:e.total,hq:e.hq,out:e.out,personCount:Object.keys(e.names).length};
+  });
+  siteList.sort(function(a,b){
+    var gi=groupOrder.indexOf(a.groupId)-groupOrder.indexOf(b.groupId);
+    if(gi!==0) return gi;
+    return b.total-a.total;
+  });
+
+  var groups=[];
+  siteList.forEach(function(s){
+    var g=groups[groups.length-1];
+    if(!g||g.groupId!==s.groupId){
+      var gInfo=S.groups.find(function(x){return x.id===s.groupId;});
+      g={groupId:s.groupId,groupName:gInfo?gInfo.name:(s.groupId||'미분류'),sites:[]};
+      groups.push(g);
+    }
+    g.sites.push(s);
+  });
+
+  var grand={total:0,hq:0,out:0,names:{}};
+  Object.keys(siteMap).forEach(function(id){
+    grand.total+=siteMap[id].total; grand.hq+=siteMap[id].hq; grand.out+=siteMap[id].out;
+    Object.keys(siteMap[id].names).forEach(function(n){grand.names[n]=true;});
+  });
+
+  return {groups:groups,grandTotal:grand.total,grandHq:grand.hq,grandOut:grand.out,grandPersons:Object.keys(grand.names).length};
+}
+
 // rolling 12M 기준 지역별 출장일 (중복 날짜 제거)
 function calcRegionDays12M(trips, region, rolling12){
   var set={};
@@ -433,6 +493,8 @@ var _pmSortKey='name';        // 정렬 기준: name | americas | europe | total
 var _pmSortAsc=true;          // 정렬 방향
 var _pmTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true}; // 인원유형 체크
 var _pmExpanded={};           // 행 펼침 상태: { '이름': true }
+var _pmSitePeriod='all';      // 사이트별 출장일 집계 기간: all | year | r12
+var _pmSiteCollapsed=false;   // 사이트별 출장일 요약 접기 상태
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
 function setPmSearch(v){
@@ -451,6 +513,16 @@ function togglePersonExpand(name){
 function togglePmType(type){
   _pmTypeFilter[type]=!_pmTypeFilter[type];
   renderPersonBody();
+}
+function setPmSitePeriod(p){
+  _pmSitePeriod=p;
+  var el=document.getElementById('pmSiteDaysWrap');
+  if(el) el.outerHTML=renderSiteDaysSummary();
+}
+function togglePmSiteCollapse(){
+  _pmSiteCollapsed=!_pmSiteCollapsed;
+  var el=document.getElementById('pmSiteDaysWrap');
+  if(el) el.outerHTML=renderSiteDaysSummary();
 }
 
 function pfRegionChange(val){
@@ -682,6 +754,49 @@ function runFeasibilityCheck(){
   resultEl.innerHTML=html;
 }
 
+// 사이트별 Total 출장일수 요약 섹션 (전체/본사/외주)
+function renderSiteDaysSummary(){
+  var agg=aggregateSiteDays(_pmSitePeriod);
+  var periods=[['all','전체'],['year','올해'],['r12','최근12개월']];
+  var html='<div class="pm-site-days" id="pmSiteDaysWrap">';
+  html+='<div class="pm-site-days-head">';
+  html+='<span class="pm-site-days-title" onclick="togglePmSiteCollapse()" style="cursor:pointer">'
+      +(_pmSiteCollapsed?'▶':'▼')+' 📍 사이트별 Total 출장일수</span>';
+  html+='<div class="pm-ctrl-group" style="margin-left:auto">';
+  periods.forEach(function(p){
+    html+='<button class="pm-filter-btn'+(_pmSitePeriod===p[0]?' on':'')+'" onclick="setPmSitePeriod(\''+p[0]+'\')">'+p[1]+'</button>';
+  });
+  html+='</div></div>';
+
+  if(!_pmSiteCollapsed){
+    if(!agg.groups.length){
+      html+='<div style="padding:12px;color:var(--tx-muted);font-size:12px">해당 기간에 등록된 출장 일정이 없습니다.</div>';
+    }else{
+      html+='<table class="pm-person-table pm-site-days-table"><thead><tr>'
+          +'<th>사이트</th><th>전체 출장일</th><th>본사</th><th>외주</th><th>출장 인원수</th>'
+          +'</tr></thead><tbody>';
+      agg.groups.forEach(function(g){
+        html+='<tr class="pm-site-group-row"><td colspan="5">'+_esc(g.groupName)+'</td></tr>';
+        g.sites.forEach(function(s){
+          html+='<tr>'
+              +'<td><span class="pm-site-chip" style="background:'+s.color+'"></span>'+_esc(s.name)+'</td>'
+              +'<td>'+s.total+'일</td>'
+              +'<td>'+s.hq+'일</td>'
+              +'<td>'+s.out+'일</td>'
+              +'<td>'+s.personCount+'명</td>'
+              +'</tr>';
+        });
+      });
+      html+='<tr class="pm-site-total-row">'
+          +'<td>합계</td><td>'+agg.grandTotal+'일</td><td>'+agg.grandHq+'일</td><td>'+agg.grandOut+'일</td><td>'+agg.grandPersons+'명</td>'
+          +'</tr>';
+      html+='</tbody></table>';
+    }
+  }
+  html+='</div>';
+  return html;
+}
+
 // renderPersonTab : 전체 렌더 (탭 첫 진입, 지역필터 변경 시)
 // renderPersonBody: 결과 테이블만 갱신 (검색·정렬·타입필터 변경 시 → 검색창 IME 유지)
 function renderPersonTab(){
@@ -730,6 +845,9 @@ function renderPersonTab(){
     html+='<div class="pm-stat-card"><div class="pm-stat-val" style="color:#e07030">'+vietnamPersons+'</div><div class="pm-stat-lbl">베트남 출장 인원</div><div class="pm-stat-sub">세금거주자 기준</div></div>';
   }
   html+='</div>';
+
+  // ── 사이트별 Total 출장일수 요약
+  html+=renderSiteDaysSummary();
 
   // ── 출장 예정 체류 가능 여부 확인 폼
   html+='<div class="pm-feasible-form" id="pmFeasibleForm">';
