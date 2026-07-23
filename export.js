@@ -65,7 +65,7 @@ function _buildGanttSheet(wb){
   });
   hRow.height=20;
 
-  var typeLabel={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:'호스트'};
+  var typeLabel={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:'호스트',localOutsource:'현지외주'};
   var rows=[];
   S.schedules.forEach(function(sc){
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
@@ -142,7 +142,7 @@ function _buildPersonSheet(wb){
   });
   hRow.height=20;
 
-  var typeLabel={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:'호스트'};
+  var typeLabel={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:'호스트',localOutsource:'현지외주'};
   var rIdx=2;
   names.forEach(function(name){
     var p=allPersons[name];

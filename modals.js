@@ -155,7 +155,7 @@ function showSM(ex){
   var po='<option value="">사이트를 먼저 선택하세요</option>';
   if(ie){var pr=S.projects.find(function(p){return p.id===ex.projectId;});if(pr)po=S.projects.filter(function(p){return p.siteId===pr.siteId;}).map(function(p){return '<option value="'+p.id+'"'+(p.id===ex.projectId?' selected':'')+'>'+p.name+'</option>';}).join('');}
   var curType=ie?(ex.type||'hq'):'hq';
-  var typeOpts=[['hq','본사'],['outsource','외주'],['tech','기술'],['vision','비전'],['host','호스트']].map(function(t){return '<option value="'+t[0]+'"'+(curType===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('');
+  var typeOpts=[['hq','본사'],['outsource','외주'],['localOutsource','현지외주'],['tech','기술'],['vision','비전'],['host','호스트']].map(function(t){return '<option value="'+t[0]+'"'+(curType===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('');
   var days=ie?dd(ex.start,ex.end)+' 일':'-';
   var dateInfo=ie?(fmtFull(ex.start)+' → '+fmtFull(ex.end)):'';
   var isHidden=ie&&ex.hidden?true:false;

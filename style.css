@@ -346,6 +346,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .eq-chip{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:#1a2a3a;color:#7aafee;border:1px solid #2a4a6a;margin:1px;white-space:nowrap}
 .eq-chip.hq{background:#1a2a4a;color:#7aafee;border-color:#2a4a8a}
 .eq-chip.outsource{background:#2a1a0a;color:#cc8010;border-color:#5a3a00}
+.eq-chip.localOutsource{background:#0a2a30;color:#4ac0d4;border-color:#1a5a64}
 /* 수정 모드 */
 .btn.edit-on{background:#534AB7;color:#fff;border-color:#3C3489}
 .eq-act-btn{padding:2px 7px;font-size:10px;border:1px solid var(--bd-main);border-radius:3px;cursor:pointer;background:transparent;color:var(--tx-dim);transition:background .12s;white-space:nowrap;margin:0 1px}
@@ -752,6 +753,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 [data-theme="light"] .eq-chip{background:#d4e8ff;color:#1a4a8a;border-color:#90b8e8}
 [data-theme="light"] .eq-chip.hq{background:#d4e8ff;color:#1a4a8a;border-color:#90b8e8}
 [data-theme="light"] .eq-chip.outsource{background:#fff0d4;color:#8a4a00;border-color:#dda060}
+[data-theme="light"] .eq-chip.localOutsource{background:#d4f0f4;color:#0a6a78;border-color:#80c8d4}
 [data-theme="light"] .eq-act-btn.del{border-color:#cc7070;color:#aa2020}
 [data-theme="light"] .eq-act-btn.del:hover{background:#ffe8e8}
 [data-theme="light"] .eq-act-btn.copy{border-color:#7090cc;color:#2050aa}
