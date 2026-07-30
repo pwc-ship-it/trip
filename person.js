@@ -230,8 +230,10 @@ function aggregateSiteDays(period){
   var groupOrder=S.groups.map(function(g){return g.id;});
   var siteList=Object.keys(siteMap).map(function(id){
     var e=siteMap[id];
+    var siteObj=S.sites.find(function(s){return s.id===id;});
     return {siteId:e.siteId,name:e.name,color:e.color,groupId:e.groupId,
-      total:e.total,hq:e.hq,out:e.out,local:e.local,personCount:Object.keys(e.names).length};
+      total:e.total,hq:e.hq,out:e.out,local:e.local,personCount:Object.keys(e.names).length,
+      estMd:(siteObj&&siteObj.estMd)||0};
   });
   siteList.sort(function(a,b){
     var gi=groupOrder.indexOf(a.groupId)-groupOrder.indexOf(b.groupId);
@@ -533,6 +535,16 @@ function toggleSiteTypeFilter(type){
   var el=document.getElementById('pmSiteDaysWrap');
   if(el) el.outerHTML=renderSiteDaysSummary();
 }
+function updSiteEstMd(siteId,val){
+  var site=S.sites.find(function(s){return s.id===siteId;});
+  if(!site) return;
+  var num=parseFloat(val);
+  site.estMd=(isNaN(num)||num<0)?undefined:num;
+  _touch(site);
+  saveData();
+  var el=document.getElementById('pmSiteDaysWrap');
+  if(el) el.outerHTML=renderSiteDaysSummary();
+}
 
 function pfRegionChange(val){
   var wrap=document.getElementById('pfCanadaWrap');
@@ -763,9 +775,24 @@ function runFeasibilityCheck(){
   resultEl.innerHTML=html;
 }
 
+// 견적 M/D 대비 잔여/초과 표시 (estMd 미입력 시 '-')
+function _fmtEstMdDiff(estMd,allTotal){
+  if(!estMd) return '<span style="color:var(--tx-muted)">-</span>';
+  var diff=estMd-allTotal; // 양수: 잔여, 음수: 초과
+  if(diff>=0) return '<span style="color:#4aaa70">잔여 '+diff+'일</span>';
+  return '<span style="color:#ff4444">초과 '+(-diff)+'일</span>';
+}
+
 // 사이트별 Total 출장일수 요약 섹션 (전체/본사/외주)
 function renderSiteDaysSummary(){
   var agg=aggregateSiteDays(_pmSitePeriod);
+  // 견적 대비 차이는 기간 탭과 무관하게 항상 전체 기간 실제 출장일과 비교
+  var allTotalMap=null;
+  if(_pmSitePeriod!=='all'){
+    var allAgg=aggregateSiteDays('all');
+    allTotalMap={};
+    allAgg.groups.forEach(function(g){g.sites.forEach(function(s){allTotalMap[s.siteId]=s.total;});});
+  }
   var periods=[['all','전체'],['year','올해'],['r12','최근12개월']];
   var html='<div class="pm-site-days" id="pmSiteDaysWrap">';
   html+='<div class="pm-site-days-head">';
@@ -791,12 +818,15 @@ function renderSiteDaysSummary(){
       html+='<div style="padding:12px;color:var(--tx-muted);font-size:12px">해당 조건에 등록된 출장 일정이 없습니다.</div>';
     }else{
       html+='<table class="pm-person-table pm-site-days-table"><thead><tr>'
-          +'<th>사이트</th><th>전체 출장일</th><th>본사</th><th>외주</th><th>현지외주</th><th>출장 인원수</th>'
+          +'<th>사이트</th><th>전체 출장일</th><th>본사</th><th>외주</th><th>현지외주</th><th>출장 인원수</th><th>견적 M/D</th><th>차이</th>'
           +'</tr></thead><tbody>';
+      var grandEstMd=0, grandAllTotal=0;
       agg.groups.forEach(function(g){
-        html+='<tr class="pm-site-group-row"><td colspan="6">'+_esc(g.groupName)+'</td></tr>';
+        html+='<tr class="pm-site-group-row"><td colspan="8">'+_esc(g.groupName)+'</td></tr>';
         g.sites.forEach(function(s){
           var sidAttr=s.siteId.replace(/'/g,"\\'");
+          var allTotal=allTotalMap?(allTotalMap[s.siteId]||0):s.total;
+          grandEstMd+=s.estMd; grandAllTotal+=allTotal;
           html+='<tr>'
               +'<td onclick="openSiteRosterModal(\''+sidAttr+'\')" style="cursor:pointer"><span class="pm-site-chip" style="background:'+s.color+'"></span>'+_esc(s.name)+'</td>'
               +'<td>'+s.total+'일</td>'
@@ -804,11 +834,14 @@ function renderSiteDaysSummary(){
               +'<td>'+s.out+'일</td>'
               +'<td>'+s.local+'일</td>'
               +'<td>'+s.personCount+'명</td>'
+              +'<td><input type="number" min="0" class="pm-estmd-inp" value="'+(s.estMd||'')+'" placeholder="-" onchange="updSiteEstMd(\''+sidAttr+'\',this.value)"></td>'
+              +'<td>'+_fmtEstMdDiff(s.estMd,allTotal)+'</td>'
               +'</tr>';
         });
       });
       html+='<tr class="pm-site-total-row">'
           +'<td>합계</td><td>'+agg.grandTotal+'일</td><td>'+agg.grandHq+'일</td><td>'+agg.grandOut+'일</td><td>'+agg.grandLocal+'일</td><td>'+agg.grandPersons+'명</td>'
+          +'<td>'+(grandEstMd?grandEstMd+'일':'-')+'</td><td>'+_fmtEstMdDiff(grandEstMd,grandAllTotal)+'</td>'
           +'</tr>';
       html+='</tbody></table>';
     }

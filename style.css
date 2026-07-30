@@ -419,6 +419,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .pm-feasible-title{font-size:11px;font-weight:600;color:var(--tx-muted);white-space:nowrap;flex-shrink:0}
 .pm-fsel{padding:3px 6px;font-size:11px;background:var(--bg-input);border:1px solid var(--bd-main);border-radius:4px;color:var(--tx-primary)}
 .pm-finp{padding:3px 6px;font-size:11px;background:var(--bg-input);border:1px solid var(--bd-main);border-radius:4px;color:var(--tx-primary)}
+.pm-estmd-inp{width:56px;padding:3px 6px;font-size:11px;text-align:center;background:var(--bg-input);border:1px solid var(--bd-main);border-radius:4px;color:var(--tx-primary)}
 .pm-feasible-result{display:inline-flex;align-items:center;gap:6px;margin-left:4px}
 .pm-feasible-badge{font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;white-space:nowrap}
 .pm-feasible-ok{background:#0a2a18;color:#4aaa70;border:1px solid #1a5a30}
