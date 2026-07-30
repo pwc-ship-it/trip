@@ -2,14 +2,18 @@
    엑셀 다운로드
 ════════════════════════════════════════════ */
 function downloadExcel(){
+  _ensureExcelJS(_doDownloadExcel);
+}
+
+function _ensureExcelJS(cb){
   if(!window.ExcelJS){
     var s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
-    s.onload=function(){_doDownloadExcel();};
+    s.onload=cb;
     document.head.appendChild(s);
     return;
   }
-  _doDownloadExcel();
+  cb();
 }
 
 function _doDownloadExcel(){
@@ -47,6 +51,75 @@ function _xStyle(cell,opts){
   cell.alignment={vertical:'middle',horizontal:opts.align||'center',wrapText:!!opts.wrap};
   var bc={argb:'FF3A3A44'};
   cell.border={top:{style:'thin',color:bc},bottom:{style:'thin',color:bc},left:{style:'thin',color:bc},right:{style:'thin',color:bc}};
+}
+
+/* ── 사이트별 출장 로스터 엑셀 다운로드 (인원구분 전체 포함, 전체 기간) ── */
+function exportSiteRosterExcel(siteId){
+  _ensureExcelJS(function(){_doExportSiteRosterExcel(siteId);});
+}
+
+function _doExportSiteRosterExcel(siteId){
+  var site=S.sites.find(function(s){return s.id===siteId;});
+  var siteName=site?site.name:siteId;
+
+  var rows=[];
+  S.schedules.forEach(function(sc){
+    var proj=S.projects.find(function(p){return p.id===sc.projectId;});
+    if(!proj||proj.siteId!==siteId) return;
+    var days=dd(sc.start,sc.end);
+    if(days<=0) return;
+    rows.push({name:sc.name,type:sc.type,task:sc.task||'',start:sc.start,end:sc.end,days:days});
+  });
+  rows.sort(function(a,b){return a.start>b.start?1:(a.start<b.start?-1:a.name.localeCompare(b.name,'ko'));});
+
+  var wb=new ExcelJS.Workbook();
+  wb.creator='BU3 출장 일정 관리';
+  wb.created=new Date();
+  var ws=wb.addWorksheet((siteName+' 출장이력').slice(0,31));
+  ws.columns=[20,10,20,14,14,10].map(function(w){return {width:w};});
+  ws.views=[{state:'frozen',ySplit:1}];
+
+  var hdr=['이름','인원구분','업무','출발일','복귀일','일수'];
+  var hRow=ws.getRow(1);
+  hdr.forEach(function(h,i){
+    var cell=hRow.getCell(i+1);
+    cell.value=h;
+    _xStyle(cell,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true});
+  });
+  hRow.height=20;
+
+  var rIdx=2;
+  rows.forEach(function(r){
+    var bg=rIdx%2===0?'#1c1c24':'#181820';
+    var row=ws.getRow(rIdx);
+    [r.name,TYPE_LBL[r.type]||r.type,r.task,r.start,r.end,r.days].forEach(function(v,i){
+      var cell=row.getCell(i+1);
+      cell.value=v;
+      _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:i>=3?'center':'left'});
+    });
+    row.height=17;
+    rIdx++;
+  });
+
+  var total=rows.reduce(function(sum,r){return sum+r.days;},0);
+  ws.mergeCells(rIdx,1,rIdx,5);
+  var totCell=ws.getRow(rIdx).getCell(1);
+  totCell.value='합계';
+  _xStyle(totCell,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true,align:'right'});
+  var totDaysCell=ws.getRow(rIdx).getCell(6);
+  totDaysCell.value=total;
+  _xStyle(totDaysCell,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true,align:'center'});
+
+  wb.xlsx.writeBuffer().then(function(buf){
+    var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    var d=new Date();
+    a.download=siteName+'_출장이력_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx';
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  });
 }
 
 /* ── Sheet 1: 간트차트 ── */

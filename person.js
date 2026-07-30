@@ -838,7 +838,11 @@ function openSiteRosterModal(siteId){
   rows.sort(function(a,b){return a.start>b.start?1:(a.start<b.start?-1:a.name.localeCompare(b.name,'ko'));});
 
   var total=rows.reduce(function(sum,r){return sum+r.days;},0);
-  var body='<div class="mtit">'+_esc(site.name)+' — 인원 출장 로스터</div>';
+  var sidAttr2=siteId.replace(/'/g,"\\'");
+  var body='<div class="mtit" style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<span>'+_esc(site.name)+' — 인원 출장 로스터</span>'
+      +'<button class="btn sm" onclick="exportSiteRosterExcel(\''+sidAttr2+'\')">📥 전체 이력 엑셀 다운로드</button>'
+      +'</div>';
   if(!rows.length){
     body+='<div style="padding:10px;color:var(--tx-muted);font-size:12px">해당 조건에 표시할 출장 기록이 없습니다.</div>';
   }else{
