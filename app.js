@@ -790,7 +790,11 @@ function _showDataIssueBanner(){
 function showDataIssueDetail(){
   var issues=_getDataIssues();
   if(!issues.length){var b=document.getElementById('dataIssueBanner');if(b)b.style.display='none';cm();return;}
-  var rowsHtml=issues.map(function(iss,idx){
+  var blockedCnt=issues.filter(function(i){return i.kind==='blocked-stale-push';}).length;
+  var conflictCnt=issues.length-blockedCnt;
+  // 200건+ 개별 렌더는 무겁고 실익도 적음 — 목록은 최근 30건만 미리보기로 보여주고 일괄 처리 버튼 우선 제공
+  var PREVIEW_MAX=30;
+  var rowsHtml=issues.slice(0,PREVIEW_MAX).map(function(iss,idx){
     var label=_entityLabel(iss.type,iss.id);
     var kindLbl=iss.kind==='blocked-stale-push'?'저장 안 됨(서버가 더 최신값 보유 — 화면에 보이는 값이 서버 최신값)':'동시 수정 충돌(다른 기기와 동시 저장)';
     return '<div style="padding:8px 10px;border-bottom:1px solid var(--bd-main);font-size:12px">'
@@ -801,14 +805,30 @@ function showDataIssueDetail(){
       +'<button class="btn sm" onclick="dismissSyncIssue('+idx+')">무시</button>'
       +'</div></div>';
   }).join('');
-  mw('<div class="mtit">⚠ 저장되지 않은 변경사항</div>'
-    +'<div style="font-size:11px;color:#888;margin-bottom:10px">아래 항목은 저장 시점에 서버가 이미 다른(더 최신) 값을 갖고 있어 내 변경사항이 반영되지 않았습니다.<br>'
-    +'서버 값이 맞으면 그냥 무시하고, 그래도 내 값으로 덮어써야 하면 [다시 저장]을 누르세요.</div>'
+  if(issues.length>PREVIEW_MAX){
+    rowsHtml+='<div style="padding:8px 10px;font-size:11px;color:#888">외 '+(issues.length-PREVIEW_MAX)+'건 더 있음 — 개별 확인 대신 아래 일괄 버튼을 사용하세요.</div>';
+  }
+  mw('<div class="mtit">⚠ 저장되지 않은 변경사항 (총 '+issues.length+'건 — 충돌 '+conflictCnt+' / 저장안됨 '+blockedCnt+')</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">"동시 수정 충돌"은 대개 예전 레코드의 타임스탬프가 없어 생긴 오탐이라 안전하게 일괄 무시해도 됩니다.<br>'
+    +'"저장 안 됨"은 서버가 더 최신값을 갖고 있어 내 변경이 반영 안 된 경우라 — 최근에 직접 고친 항목이 있으면 개별로 확인하세요.</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +(conflictCnt?'<button class="btn sm warn" onclick="dismissAllSyncIssues(\'conflict\')">"동시 수정 충돌" 전체 무시 ('+conflictCnt+'건)</button>':'')
+    +'<button class="btn sm" onclick="dismissAllSyncIssues()">전체 무시 ('+issues.length+'건)</button>'
+    +'</div>'
     +'<div style="max-height:320px;overflow-y:auto;border:1px solid var(--bd-main);border-radius:5px">'+rowsHtml+'</div>'
     +'<div class="mfoot"><button class="btn sm" onclick="cm()">닫기</button></div>');
 }
 function dismissSyncIssue(idx){
   var issues=_getDataIssues();issues.splice(idx,1);_setDataIssues(issues);
+  showDataIssueDetail();
+}
+function dismissAllSyncIssues(onlyKind){
+  var issues=_getDataIssues();
+  var target=onlyKind?issues.filter(function(i){return i.kind===onlyKind;}):issues;
+  if(!target.length){alert('무시할 항목이 없습니다.');return;}
+  if(!confirm((onlyKind?'"동시 수정 충돌" ':'전체 ')+target.length+'건을 한번에 무시하시겠습니까?'))return;
+  var remaining=onlyKind?issues.filter(function(i){return i.kind!==onlyKind;}):[];
+  _setDataIssues(remaining);
   showDataIssueDetail();
 }
 function retrySyncIssue(idx){
