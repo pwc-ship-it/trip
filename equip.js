@@ -600,6 +600,8 @@ function saveEquipCell(unitId,itemId){
   }
   if(!unit.cells) unit.cells={};
   unit.cells[itemId]={type:type,value:value};
+  unit.cellsMt=Date.now();
+  _touch(unit);
   saveData();cm();renderEquipGrid();
 }
 
@@ -626,6 +628,7 @@ function saveUnitMemo(unitId,clear){
   var unit=S.equipUnits.find(function(u){return u.id===unitId;});
   if(!unit) return;
   unit.memo=clear?'':(document.getElementById('eq_memo_text').value.trim());
+  _touch(unit);
   saveData();cm();renderEquipGrid();
 }
 
@@ -659,7 +662,7 @@ function saveAddEquipProject(){
   var name=document.getElementById('eq_proj_name').value.trim();
   var projType=document.getElementById('eq_proj_type').value||'납품셋업';
   if(!name){alert('프로젝트명을 입력해주세요.');return;}
-  S.equipProjects.push({id:'ep'+Date.now(),siteId:siteId,name:name,projType:projType});
+  S.equipProjects.push(_touch({id:genId('ep',S.equipProjects),siteId:siteId,name:name,projType:projType}));
   saveData();cm();renderEquipGrid();
 }
 function openEditEquipProject(projectId){
@@ -685,14 +688,16 @@ function saveEditEquipProject(projectId){
   if(!name){alert('프로젝트명을 입력해주세요.');return;}
   proj.name=name;
   proj.projType=projType;
+  _touch(proj);
   saveData();cm();renderEquipGrid();
 }
 function delEquipProject(projectId){
   var proj=S.equipProjects.find(function(p){return p.id===projectId;});
   if(!proj) return;
   if(!confirm('"'+proj.name+'" 프로젝트를 삭제하시겠습니까?\n소속 호기는 미지정으로 이동됩니다.')) return;
-  S.equipUnits.forEach(function(u){if(u.equipProjectId===projectId)u.equipProjectId=null;});
+  S.equipUnits.forEach(function(u){if(u.equipProjectId===projectId){u.equipProjectId=null;_touch(u);}});
   S.equipProjects=S.equipProjects.filter(function(p){return p.id!==projectId;});
+  _markDeleted('equipProjects',projectId);
   saveData();renderEquipGrid();
 }
 
@@ -772,7 +777,7 @@ function saveAddEquipUnit(){
     var s=item.siteIds;
     if(!s||s.length===0||s.indexOf(siteId)>=0) initCells[item.id]={type:'na',value:null};
   });
-  S.equipUnits.push({id:'eu'+Date.now(),siteId:siteId,equipProjectId:equipProjectId,lineName:lineName,unitName:unitName,memo:'',cells:initCells});
+  S.equipUnits.push(_touch({id:genId('eu',S.equipUnits),siteId:siteId,equipProjectId:equipProjectId,lineName:lineName,unitName:unitName,memo:'',cells:initCells,cellsMt:Date.now()}));
   saveData();
   renderEquipGrid();
   // 모달 유지 — 필드 초기화 후 포커스
@@ -867,12 +872,12 @@ function saveAddEquipItem(){
   var siteIds=_collectSiteIds();
   var maxOrder=0;
   S.equipItems.forEach(function(i){if(i.order>maxOrder)maxOrder=i.order;});
-  var newItem={id:'ei'+Date.now(),name:name,groupName:group,order:maxOrder+1,siteIds:siteIds};
+  var newItem=_touch({id:genId('ei',S.equipItems),name:name,groupName:group,order:maxOrder+1,siteIds:siteIds});
   S.equipItems.push(newItem);
   S.equipUnits.forEach(function(u){
     if(!u.cells) u.cells={};
     var applicable=siteIds.length===0||siteIds.indexOf(u.siteId)>=0;
-    if(applicable) u.cells[newItem.id]={type:'na',value:null};
+    if(applicable){u.cells[newItem.id]={type:'na',value:null};_touch(u);}
   });
   saveData();cm();renderEquipTab();
 }
@@ -912,10 +917,12 @@ function saveEditEquipItem(itemId){
     if(!u.cells) u.cells={};
     var wasApplicable=!item.siteIds||item.siteIds.length===0||item.siteIds.indexOf(u.siteId)>=0;
     var nowApplicable=newSiteIds.length===0||newSiteIds.indexOf(u.siteId)>=0;
-    if(!wasApplicable&&nowApplicable&&!u.cells[itemId])
-      u.cells[itemId]={type:'na',value:null};
+    if(!wasApplicable&&nowApplicable&&!u.cells[itemId]){
+      u.cells[itemId]={type:'na',value:null};_touch(u);
+    }
   });
   item.name=name;item.groupName=group;item.siteIds=newSiteIds;
+  _touch(item);
   saveData();cm();renderEquipTab();
 }
 
@@ -935,7 +942,8 @@ function openDelEquipItem(itemId){
 
 function execDelEquipItem(itemId){
   S.equipItems=S.equipItems.filter(function(i){return i.id!==itemId;});
-  S.equipUnits.forEach(function(u){if(u.cells)delete u.cells[itemId];});
+  S.equipUnits.forEach(function(u){if(u.cells&&u.cells[itemId]){delete u.cells[itemId];_touch(u);}});
+  _markDeleted('equipItems',itemId);
   saveData();cm();renderEquipTab();
 }
 
@@ -950,7 +958,8 @@ function moveEquipItem(itemId,dir){
   sorted[swapIdx].order=tmp;
   S.equipItems.forEach(function(item){
     var s=sorted.find(function(i){return i.id===item.id;});
-    if(s) item.order=s.order;
+    if(s&&item.order!==s.order){item.order=s.order;_touch(item);}
+    else if(s)item.order=s.order;
   });
   saveData();renderEquipGrid();
 }
@@ -1002,6 +1011,7 @@ function saveEditEquipUnit(unitId){
   unit.equipProjectId=projEl?projEl.value||null:null;
   unit.lineName=ln;unit.unitName=un;
   if(typeEl) unit.unitType=typeEl.value||'납품셋업';
+  _touch(unit);
   saveData();cm();renderEquipTab();
 }
 
@@ -1011,6 +1021,7 @@ function delEquipUnit(unitId){
   if(!unit) return;
   if(!confirm('"'+unit.unitName+'" 호기를 삭제하시겠습니까?')) return;
   S.equipUnits=S.equipUnits.filter(function(u){return u.id!==unitId;});
+  _markDeleted('equipUnits',unitId);
   saveData();renderEquipTab();
 }
 
@@ -1042,7 +1053,7 @@ function execCopyEquipUnit(fromUnitId){
   if(!checked.length){alert('대상 호기를 선택해주세요.');return;}
   checked.forEach(function(el){
     var target=S.equipUnits.find(function(u){return u.id===el.value;});
-    if(target) target.cells=deepCopy(from.cells||{});
+    if(target){target.cells=deepCopy(from.cells||{});target.cellsMt=Date.now();_touch(target);}
   });
   saveData();cm();renderEquipGrid();
 }

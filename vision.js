@@ -1904,6 +1904,7 @@ function saveVisionEquipData(){
   });
   if(changedFields.length){ equip.changelog.push({date:today,fields:changedFields}); }
 
+  equip.dataMt=Date.now(); // cells와 동일한 원리 — data 필드 단위 충돌 판정용(메모만 고친 stale 저장이 진행율 데이터를 지우지 못하게)
   _touch(equip);          // 동기화 충돌 판정용 수정시각 (updatedAt은 표시용 날짜라 별도)
   _viFormDirty=false;     // 저장 완료 — 자동 새로고침 가드 해제
   saveData();
@@ -2112,7 +2113,7 @@ function copyVisionEquip(srcId){
   var src=S.visionEquips.find(function(e){return e.id===srcId;});
   if(!src)return;
   var newEquip=_touch({id:_viId(),siteId:src.siteId,createdAt:_viToday(),updatedAt:_viToday(),
-    data:deepCopy(src.data)});
+    data:deepCopy(src.data),dataMt:Date.now()});
   if(newEquip.data['vi_unit']) newEquip.data['vi_unit']+=' (복사)';
   S.visionEquips.push(newEquip);
   _visionSelId=newEquip.id; _visionView='detail';
@@ -2829,6 +2830,7 @@ function _parseAndImportVisionCSV(text){
       }
     });
     equip.updatedAt=_viToday();
+    equip.dataMt=Date.now();
     _touch(equip);
     if(existing)updated++;
     else{S.visionEquips.push(equip);imported++;}

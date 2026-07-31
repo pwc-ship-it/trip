@@ -114,8 +114,9 @@ function _esc(s){
          ③ 한쪽만 존재 → tombstone 아니면 포함
    순서: Sheets 행 순서 우선, 로컬 전용은 뒤에 append (기존 동작 보존)
    opts: { normFn: 레코드 정규화 함수(Sheets 행에 적용),
-           preferLocalOnTie: mt 동률/없음 시 로컬 우선(push 전 merge용; 기본은 Sheets 우선),
            protectField: 'cells'|'data' — 승자의 해당 필드가 비어있고 패자가 차 있으면 패자 것 유지(레거시 안전망) }
+   tie(동률/mt 없음)는 항상 Sheets 우선 — 진짜 충돌 판정은 서버 union-merge가 결정론적으로 하므로
+   여기서 로컬을 우선시키면 서버 판정과 어긋나는 flip-flop만 생김(preferLocalOnTie 폐기)
 ══════════════════════════════════════════ */
 function _mergeArr(type,localArr,sheetArr,opts){
   opts=opts||{};
@@ -134,7 +135,7 @@ function _mergeArr(type,localArr,sheetArr,opts){
     if(lr){
       var smt=Number(sr.mt)||0,lmt=Number(lr.mt)||0;
       if(smt>_futMt)smt=0;if(lmt>_futMt)lmt=0; // 미래(오염) mt 강등 → 정상 수정이 병합에서 이김
-      if(lmt>smt||(lmt===smt&&opts.preferLocalOnTie)){winner=lr;loser=sr;}
+      if(lmt>smt){winner=lr;loser=sr;}
     }
     // protectField: 승자의 cells/data가 비어있으면 패자 것 보존 (mt 없는 레거시 레코드 안전망)
     if(opts.protectField&&loser){
@@ -567,6 +568,7 @@ function restoreFromBackupFile(){
 var _saveDebounceTimer=null; // debounce 타이머
 var _saveInFlight=false;     // 현재 Sheets POST 진행 중
 var _savePending=false;      // 진행 중에 추가 저장 요청 있음
+var _saveRetryTimer=null;    // GET 실패로 이번 저장을 건너뛴 뒤 재시도 타이머
 
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침·오프라인 시 최신 상태 보장)
@@ -606,28 +608,29 @@ function _flushToSheets(){
       });
     }
     _purgeTombstoned();
-    // ── 레코드 단위 병합 (mt 동률/없음 시 로컬 우선 — push 경로이므로 현행 동작 보존)
-    var T={preferLocalOnTie:true};
+    // ── 레코드 단위 병합 — 서버가 이제 union-merge 권위(진짜 충돌 판정은 서버가 함).
+    //    여기는 POST 페이로드 조립용 로컬 미러링일 뿐이라 tie는 그냥 Sheets 기준(preferLocalOnTie 폐기 —
+    //    로컬이 tie를 항상 이기게 하면 서버 판정과 어긋나는 flip-flop이 생김)
     if(sheetsData.schedules&&sheetsData.schedules.length)
-      S.schedules=_mergeArr('schedules',S.schedules,sheetsData.schedules,{preferLocalOnTie:true,normFn:_normSchedRec});
+      S.schedules=_mergeArr('schedules',S.schedules,sheetsData.schedules,{normFn:_normSchedRec});
     if(sheetsData.events&&sheetsData.events.length)
-      S.events=_mergeArr('events',S.events,sheetsData.events,T);
+      S.events=_mergeArr('events',S.events,sheetsData.events);
     if(sheetsData.workTasks&&sheetsData.workTasks.length)
-      S.workTasks=_mergeArr('workTasks',S.workTasks,sheetsData.workTasks,{preferLocalOnTie:true,normFn:_normWtRec});
+      S.workTasks=_mergeArr('workTasks',S.workTasks,sheetsData.workTasks,{normFn:_normWtRec});
     if(sheetsData.sites&&sheetsData.sites.length)
-      S.sites=_mergeArr('sites',S.sites,sheetsData.sites,T);
+      S.sites=_mergeArr('sites',S.sites,sheetsData.sites);
     if(sheetsData.groups&&sheetsData.groups.length)
-      S.groups=_mergeArr('groups',S.groups,sheetsData.groups,T);
+      S.groups=_mergeArr('groups',S.groups,sheetsData.groups);
     if(sheetsData.projects&&sheetsData.projects.length)
-      S.projects=_mergeArr('projects',S.projects,sheetsData.projects,T);
+      S.projects=_mergeArr('projects',S.projects,sheetsData.projects);
     if(sheetsData.equipItems&&sheetsData.equipItems.length)
-      S.equipItems=_mergeArr('equipItems',S.equipItems,sheetsData.equipItems,T);
+      S.equipItems=_mergeArr('equipItems',S.equipItems,sheetsData.equipItems);
     if(sheetsData.equipUnits&&sheetsData.equipUnits.length)
-      S.equipUnits=_mergeArr('equipUnits',S.equipUnits,sheetsData.equipUnits,{preferLocalOnTie:true,protectField:'cells'});
+      S.equipUnits=_mergeArr('equipUnits',S.equipUnits,sheetsData.equipUnits,{protectField:'cells'});
     if(sheetsData.equipProjects&&sheetsData.equipProjects.length)
-      S.equipProjects=_mergeArr('equipProjects',S.equipProjects,sheetsData.equipProjects,T);
+      S.equipProjects=_mergeArr('equipProjects',S.equipProjects,sheetsData.equipProjects);
     if(sheetsData.visionEquips&&sheetsData.visionEquips.length)
-      S.visionEquips=_mergeArr('visionEquips',S.visionEquips,sheetsData.visionEquips,{preferLocalOnTie:true,protectField:'data',postMerge:_viPostMerge});
+      S.visionEquips=_mergeArr('visionEquips',S.visionEquips,sheetsData.visionEquips,{protectField:'data',postMerge:_viPostMerge});
     // ── visionTemplate: 단일 JSON 블롭 — Sheets가 더 최신(mt)일 때만 교체
     if(sheetsData.visionTemplate&&sheetsData.visionTemplate.categories&&sheetsData.visionTemplate.categories.length){
       if(Number(sheetsData.visionTemplate.mt||0)>Number((S.visionTemplate||{}).mt||0)){
@@ -667,9 +670,13 @@ function _flushToSheets(){
     ? Promise.resolve(S._schCache.data)
     : fetch(url+'?action=load').then(function(r){return r.json();}).then(function(d){S._schCache={data:d,ts:_now};return d;});
 
+  // GET 실패 시 병합 없이 맹목적으로 POST하지 않음(방어적 이중 안전망 — 서버가 이제 병합 권위지만
+  // 그래도 로컬이 방금 병합한 sheetsData 없이 쏘는 걸 피함) — dirty 유지하고 잠시 후 재시도
+  var _GET_FAILED={};
   fetchPromise
-    .catch(function(){return null;}) // GET 실패해도 POST는 진행
+    .catch(function(){return _GET_FAILED;})
     .then(function(sheetsData){
+      if(sheetsData===_GET_FAILED) throw _GET_FAILED;
       _mergeFromSheets(sheetsData);
       return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
@@ -678,12 +685,21 @@ function _flushToSheets(){
           visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
           deletedIds:_tombList(),
           clearDeletedIds:_tombClearQueue,
-          deletedScheduleIds:_deletedScIds()})
+          deletedScheduleIds:_deletedScIds(),
+          deviceTag:getDeviceTag()})
       });
     })
     .then(function(r){return r.json();})
-    .then(function(data){_onDone(!data.error);})
-    .catch(function(err){console.error('[saveData]',err.message);_onDone(false);});
+    .then(function(data){_onDone(!data.error);_handleSyncIssues(data);})
+    .catch(function(err){
+      if(err===_GET_FAILED){
+        _saveInFlight=false;
+        updateConnStatus('err');
+        if(!_saveRetryTimer) _saveRetryTimer=setTimeout(function(){_saveRetryTimer=null;_flushToSheets();},5000);
+        return;
+      }
+      console.error('[saveData]',err.message);_onDone(false);
+    });
 }
 function updateConnStatus(state){
   var led=document.getElementById('connLed');
@@ -719,11 +735,111 @@ function _showSaveFailBanner(){
   }, 8000);
 }
 
+/* ══════════════════════════════════════════
+   원복/미저장 감지 배너 (Part C) — 서버 union-merge가 이번 저장에서
+   blocked-stale-push(내 값이 서버보다 오래되어 반영 안 됨) 또는 conflict(동시수정)를
+   돌려주면 즉시 표시. 지연되는 별도 모니터링 없이 충돌 시점에 바로 알림.
+══════════════════════════════════════════ */
+var DATA_ISSUES_KEY='bu3_data_issues';
+function _getDataIssues(){try{return JSON.parse(localStorage.getItem(DATA_ISSUES_KEY)||'[]');}catch(e){return [];}}
+function _setDataIssues(arr){try{localStorage.setItem(DATA_ISSUES_KEY,JSON.stringify(arr));}catch(e){}}
+function _handleSyncIssues(data){
+  if(!data)return;
+  var blocked=data.blocked||[],conflicts=data.conflicts||[];
+  if(!blocked.length&&!conflicts.length)return;
+  var issues=_getDataIssues();
+  blocked.forEach(function(b){issues.push({ts:Date.now(),type:b.type,id:b.id,kind:'blocked-stale-push'});});
+  conflicts.forEach(function(c){issues.push({ts:Date.now(),type:c.type,id:c.id,kind:'conflict'});});
+  if(issues.length>200)issues=issues.slice(issues.length-200);
+  _setDataIssues(issues);
+  _showDataIssueBanner();
+}
+function _entityLabel(type,id){
+  var r=(S[type]||[]).find(function(x){return x.id===id;});
+  if(!r)return type+' / '+id+' (이미 삭제되었거나 로컬에 없음)';
+  switch(type){
+    case 'schedules': return '출장일정: '+(r.name||'')+' ('+(r.start||'')+'~'+(r.end||'')+')';
+    case 'events': return '이벤트: '+(r.title||id);
+    case 'workTasks': return '작업: '+(r.title||id);
+    case 'sites': return '사이트: '+(r.name||id);
+    case 'groups': return '그룹: '+(r.name||id);
+    case 'projects': return '프로젝트: '+(r.name||id);
+    case 'equipItems': return '설비 항목: '+(r.name||id);
+    case 'equipUnits': return '설비 호기: '+(r.lineName?r.lineName+' - ':'')+(r.unitName||id);
+    case 'equipProjects': return '설비 프로젝트: '+(r.name||id);
+    case 'visionEquips': return 'Vision 설비: '+((r.data&&r.data['vi_unit'])||id);
+    default: return type+' / '+id;
+  }
+}
+var _dataIssueBannerTimer=null;
+function _showDataIssueBanner(){
+  var banner=document.getElementById('dataIssueBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='dataIssueBanner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b8720a;color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;';
+    banner.onclick=function(){showDataIssueDetail();};
+    document.body.appendChild(banner);
+  }
+  var issues=_getDataIssues();
+  if(!issues.length){banner.style.display='none';return;}
+  banner.innerHTML='⚠ 일부 변경사항이 저장되지 않았을 수 있습니다 ('+issues.length+'건) — 클릭해서 확인'
+    +'<span style="text-decoration:underline;margin-left:8px" onclick="event.stopPropagation();document.getElementById(\'dataIssueBanner\').style.display=\'none\'">닫기</span>';
+  banner.style.display='block';
+}
+function showDataIssueDetail(){
+  var issues=_getDataIssues();
+  if(!issues.length){var b=document.getElementById('dataIssueBanner');if(b)b.style.display='none';cm();return;}
+  var rowsHtml=issues.map(function(iss,idx){
+    var label=_entityLabel(iss.type,iss.id);
+    var kindLbl=iss.kind==='blocked-stale-push'?'저장 안 됨(서버가 더 최신값 보유 — 화면에 보이는 값이 서버 최신값)':'동시 수정 충돌(다른 기기와 동시 저장)';
+    return '<div style="padding:8px 10px;border-bottom:1px solid var(--bd-main);font-size:12px">'
+      +'<div style="font-weight:600">'+_esc(label)+'</div>'
+      +'<div style="color:#cc8010;margin:2px 0">'+kindLbl+'</div>'
+      +'<div style="display:flex;gap:6px;margin-top:4px">'
+      +'<button class="btn sm pri" onclick="retrySyncIssue('+idx+')">다시 저장(내 값으로)</button>'
+      +'<button class="btn sm" onclick="dismissSyncIssue('+idx+')">무시</button>'
+      +'</div></div>';
+  }).join('');
+  mw('<div class="mtit">⚠ 저장되지 않은 변경사항</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">아래 항목은 저장 시점에 서버가 이미 다른(더 최신) 값을 갖고 있어 내 변경사항이 반영되지 않았습니다.<br>'
+    +'서버 값이 맞으면 그냥 무시하고, 그래도 내 값으로 덮어써야 하면 [다시 저장]을 누르세요.</div>'
+    +'<div style="max-height:320px;overflow-y:auto;border:1px solid var(--bd-main);border-radius:5px">'+rowsHtml+'</div>'
+    +'<div class="mfoot"><button class="btn sm" onclick="cm()">닫기</button></div>');
+}
+function dismissSyncIssue(idx){
+  var issues=_getDataIssues();issues.splice(idx,1);_setDataIssues(issues);
+  showDataIssueDetail();
+}
+function retrySyncIssue(idx){
+  var issues=_getDataIssues();
+  var iss=issues[idx];
+  if(iss){
+    var r=(S[iss.type]||[]).find(function(x){return x.id===iss.id;});
+    if(r){
+      _touch(r);
+      if(iss.type==='equipUnits')r.cellsMt=Date.now();
+      if(iss.type==='visionEquips')r.dataMt=Date.now();
+    }
+    issues.splice(idx,1);_setDataIssues(issues);
+  }
+  saveData();
+  showDataIssueDetail();
+}
 
 var SHEETS_LS_KEY='trip_sheets_url';
 var CACHE_KEY='trip_data_cache';  // 데이터 캐시용
 var CACHE_TS_KEY='trip_cache_ts'; // 캐시 타임스탬프
 var CACHE_DIRTY_KEY='trip_data_dirty'; // 로컬 변경이 Sheets에 미확인 저장된 경우 표시
+/* 진단용 기기 태그 — 로그인 없는 1인 다기기 환경에서 "어느 브라우저가 저장했는지"만 구분(개인식별 아님) */
+var DEVICE_TAG_KEY='bu3_device_tag';
+function getDeviceTag(){
+  try{
+    var t=localStorage.getItem(DEVICE_TAG_KEY);
+    if(!t){t=Math.random().toString(36).slice(2,10);localStorage.setItem(DEVICE_TAG_KEY,t);}
+    return t;
+  }catch(e){return 'unknown';}
+}
 var DEFAULT_SHEETS_URL='https://script.google.com/macros/s/AKfycbwzOXzciY5Rh6BEZn6kyjbogzoTwoD0SCCaCnTcZRVEYKJOPr-GcJF0CsOlxlhqYBX0vA/exec';
 // 최초 접속 시 기본 URL 자동 설정
 (function(){
@@ -851,9 +967,11 @@ function loadFromSheets(callback){
         visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
         deletedIds:_tombList(),
         clearDeletedIds:_tombClearQueue,
-        deletedScheduleIds:_deletedScIds()})
+        deletedScheduleIds:_deletedScIds(),
+        deviceTag:getDeviceTag()})
     }).then(function(r){return r.json();})
     .then(function(data){
+      _handleSyncIssues(data);
       if(!data.error){
         try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
         _tombClearFlushDone();
@@ -873,6 +991,15 @@ function loadFromSheets(callback){
               if(pulled.projects&&pulled.projects.length)S.projects=_mergeArr('projects',S.projects,pulled.projects);
               if(pulled.events&&pulled.events.length)S.events=_mergeArr('events',S.events,pulled.events);
               if(pulled.workTasks&&pulled.workTasks.length)S.workTasks=_mergeArr('workTasks',S.workTasks,pulled.workTasks,{normFn:_normWtRec});
+              if(pulled.equipItems&&pulled.equipItems.length)S.equipItems=_mergeArr('equipItems',S.equipItems,pulled.equipItems);
+              if(pulled.equipUnits&&pulled.equipUnits.length)S.equipUnits=_mergeArr('equipUnits',S.equipUnits,pulled.equipUnits,{protectField:'cells'});
+              if(pulled.equipProjects&&pulled.equipProjects.length)S.equipProjects=_mergeArr('equipProjects',S.equipProjects,pulled.equipProjects);
+              if(pulled.visionEquips&&pulled.visionEquips.length)S.visionEquips=_mergeArr('visionEquips',S.visionEquips,pulled.visionEquips,{protectField:'data',postMerge:_viPostMerge});
+              if(pulled.visionTemplate&&pulled.visionTemplate.categories&&pulled.visionTemplate.categories.length){
+                if(Number(pulled.visionTemplate.mt||0)>Number((S.visionTemplate||{}).mt||0)){
+                  S.visionTemplate=pulled.visionTemplate;_migrateVisionTemplate();
+                }
+              }
               saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
             }
             if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
