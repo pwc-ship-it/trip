@@ -118,15 +118,25 @@ function addBar(el,sched){
   bar.onclick=(function(id){return function(){openEditSc(id);};})(sched.id);
   var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
 }
+function wtLabelTxt(wt){
+  var days=dd(wt.start,wt.end),dr=fmt(wt.start)+'~'+fmt(wt.end);
+  return dr+' · '+wt.title+(wt.note?' ('+wt.note+')':'')+'  '+days+'일';
+}
+var WTLBL_FONT="500 10px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+var WTLBL_PAD=14; // .barlbl-wk padding:0 7px 양쪽
+function measureTextW(text,font){
+  var c=measureTextW._c||(measureTextW._c=document.createElement('canvas'));
+  var ctx=c.getContext('2d');ctx.font=font;
+  return ctx.measureText(text).width;
+}
 function addWtBar(el,wt){
   var sp=d2px(wt.start),ep=d2px(wt.end)+Math.round(WPX/7),wp=Math.max(ep-sp,8);
-  var days=dd(wt.start,wt.end),dr=fmt(wt.start)+'~'+fmt(wt.end);
   var col=EVC.find(function(c){return c.id===wt.colorId;})||EVC.find(function(c){return c.id==='blue';})||EVC[0];
   // 완료/진행/예정 색조 조정
   var isDone=TODAY>pd(wt.end),isGoing=TODAY>=pd(wt.start)&&TODAY<=pd(wt.end);
   var alpha=isDone?'99':isGoing?'dd':'ff';
   var barColor=col.bg+(alpha==='ff'?'':alpha);
-  var txt=dr+' · '+wt.title+(wt.note?' ('+wt.note+')':'')+'  '+days+'일';
+  var txt=wtLabelTxt(wt);
   var bar=document.createElement('div');
   bar.className='bar bar-wk';
   bar.style.cssText='left:'+sp+'px;width:'+wp+'px;background:'+barColor+';opacity:'+(isDone?'.55':'1');
@@ -136,10 +146,21 @@ function addWtBar(el,wt){
 }
 
 /* ── 간트 렌더 ── */
-/* 작업 레인 배정: 홀짝 2레인 고정 배분 (1번째·3번째·5번째→레인0, 2번째·4번째·6번째→레인1) */
+/* 작업 레인 배정: 막대+라벨 실제 텍스트 폭 기준으로 겹치지 않는 레인에 배치 (필요하면 3줄 이상도 사용) */
 function assignWtLanes(wts){
-  wts.forEach(function(wt,i){wt._lane=i%2;});
-  return Math.min(2,wts.length);
+  var GAP=8; // 레인 내 인접 작업 사이 최소 여백(px)
+  var laneEnd=[]; // 각 레인이 점유 중인 오른쪽 끝(px)
+  wts.forEach(function(wt){
+    var sp=d2px(wt.start),ep=d2px(wt.end)+Math.round(WPX/7);
+    var barW=Math.max(ep-sp,8);
+    var lblW=measureTextW(wtLabelTxt(wt),WTLBL_FONT)+WTLBL_PAD;
+    var occupiedEnd=sp+Math.max(barW,lblW);
+    var lane=laneEnd.findIndex(function(end){return sp>=end+GAP;});
+    if(lane===-1){lane=laneEnd.length;laneEnd.push(occupiedEnd);}
+    else laneEnd[lane]=occupiedEnd;
+    wt._lane=lane;
+  });
+  return laneEnd.length;
 }
 
 function renderGantt(){
