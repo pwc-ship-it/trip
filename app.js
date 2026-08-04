@@ -187,6 +187,8 @@ function _normSchedRec(sc){
 }
 /* workTasks 전용 정규화 */
 function _normWtRec(wt){wt.start=normDate(wt.start);wt.end=normDate(wt.end);return wt;}
+/* events 전용 정규화 — 레거시 Date.toString() 형식 등을 YYYY-MM-DD로 교정 */
+function _normEventRec(e){e.date=normDate(e.date);return e;}
 function normDate(s){
   // 어떤 형식이든 YYYY-MM-DD로 정규화
   if(!s)return '';
@@ -614,7 +616,7 @@ function _flushToSheets(){
     if(sheetsData.schedules&&sheetsData.schedules.length)
       S.schedules=_mergeArr('schedules',S.schedules,sheetsData.schedules,{normFn:_normSchedRec});
     if(sheetsData.events&&sheetsData.events.length)
-      S.events=_mergeArr('events',S.events,sheetsData.events);
+      S.events=_mergeArr('events',S.events,sheetsData.events,{normFn:_normEventRec});
     if(sheetsData.workTasks&&sheetsData.workTasks.length)
       S.workTasks=_mergeArr('workTasks',S.workTasks,sheetsData.workTasks,{normFn:_normWtRec});
     if(sheetsData.sites&&sheetsData.sites.length)
@@ -1009,7 +1011,7 @@ function loadFromSheets(callback){
               if(pulled.schedules&&pulled.schedules.length)S.schedules=_mergeArr('schedules',S.schedules,pulled.schedules,{normFn:_normSchedRec});
               if(pulled.sites&&pulled.sites.length)S.sites=_mergeArr('sites',S.sites,pulled.sites);
               if(pulled.projects&&pulled.projects.length)S.projects=_mergeArr('projects',S.projects,pulled.projects);
-              if(pulled.events&&pulled.events.length)S.events=_mergeArr('events',S.events,pulled.events);
+              if(pulled.events&&pulled.events.length)S.events=_mergeArr('events',S.events,pulled.events,{normFn:_normEventRec});
               if(pulled.workTasks&&pulled.workTasks.length)S.workTasks=_mergeArr('workTasks',S.workTasks,pulled.workTasks,{normFn:_normWtRec});
               if(pulled.equipItems&&pulled.equipItems.length)S.equipItems=_mergeArr('equipItems',S.equipItems,pulled.equipItems);
               if(pulled.equipUnits&&pulled.equipUnits.length)S.equipUnits=_mergeArr('equipUnits',S.equipUnits,pulled.equipUnits,{protectField:'cells'});
@@ -1077,7 +1079,7 @@ function loadFromSheets(callback){
       if(data.schedules&&data.schedules.length){
         S.schedules=_mergeArr('schedules',S.schedules,data.schedules,{normFn:_normSchedRec});
       }
-      if(data.events&&data.events.length)S.events=_mergeArr('events',S.events,data.events);
+      if(data.events&&data.events.length)S.events=_mergeArr('events',S.events,data.events,{normFn:_normEventRec});
       if(data.workTasks&&data.workTasks.length)S.workTasks=_mergeArr('workTasks',S.workTasks,data.workTasks,{normFn:_normWtRec});
 
       // ── equipItems: Sheets가 빈 배열이면 로컬 유지 — 항목 정의는 절대 사라지면 안 됨 ──
@@ -1326,7 +1328,7 @@ function refreshVisionFromSheets(silent){
         if(data.schedules&&data.schedules.length){
           S.schedules=_mergeArr('schedules',S.schedules,data.schedules,{normFn:_normSchedRec});
         }
-        if(data.events&&data.events.length) S.events=_mergeArr('events',S.events,data.events);
+        if(data.events&&data.events.length) S.events=_mergeArr('events',S.events,data.events,{normFn:_normEventRec});
         if(data.workTasks&&data.workTasks.length) S.workTasks=_mergeArr('workTasks',S.workTasks,data.workTasks,{normFn:_normWtRec});
         // localOnly equips가 있을 때만 Sheets에 push (그렇지 않으면 캐시만 갱신)
         // → 매 2분마다 불필요한 Sheets write + stale 데이터 push를 완전 차단
