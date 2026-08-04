@@ -41,7 +41,7 @@ function renderSidebar(){
   allDiv.className='sit-all'+(S.filterSite==='all'?' on':'');
   var totalCnt=S.schedules.filter(_sVisible).length;
   allDiv.innerHTML='<div class="sdot" style="background:#666"></div><span class="sname">전체 보기</span><span class="scnt">'+totalCnt+'</span>';
-  allDiv.onclick=function(){S.filterSite='all';renderAll();};
+  allDiv.onclick=function(){S.filterSite='all';S.filterSites=[];renderAll();};
   el.appendChild(allDiv);
 
   // 그룹별
@@ -59,13 +59,22 @@ function renderSidebar(){
     var lbl=document.createElement('div');
     lbl.className='grplbl'+(S.filterSite===grpKey?' on':'');
     lbl.innerHTML=_esc(grp.name)+'<span class="scnt grp-cnt">'+grpCnt+'</span>';
-    lbl.onclick=(function(gk){return function(){S.filterSite=gk;renderAll();};})(grpKey);
+    lbl.onclick=(function(gk){return function(){S.filterSite=gk;S.filterSites=[];renderAll();};})(grpKey);
     el.appendChild(lbl);
+    var isMulti=S.filterSites.length>0;
     grpSites.forEach(function(site){
       var cnt=S.schedules.filter(function(s){var p=S.projects.find(function(p){return p.id===s.projectId;});return p&&p.siteId===site.id&&_sVisible(s);}).length;
-      var d=document.createElement('div');d.className='sit'+(S.filterSite===site.id?' on':'');
-      d.innerHTML='<div class="sdot" style="background:'+site.color+'"></div><span class="sname">'+_esc(site.name)+'</span><span class="scnt">'+cnt+'</span>';
-      d.onclick=(function(sid){return function(){S.filterSite=sid;renderAll();};})(site.id);
+      var checked=S.filterSites.indexOf(site.id)>=0;
+      var on=isMulti?checked:S.filterSite===site.id;
+      var d=document.createElement('div');d.className='sit'+(on?' on':'');
+      d.innerHTML='<input type="checkbox" class="sit-cb"'+(checked?' checked':'')+'><div class="sdot" style="background:'+site.color+'"></div><span class="sname">'+_esc(site.name)+'</span><span class="scnt">'+cnt+'</span>';
+      d.onclick=(function(sid){return function(){S.filterSite=sid;S.filterSites=[];renderAll();};})(site.id);
+      d.querySelector('.sit-cb').onclick=(function(sid){return function(e){
+        e.stopPropagation();
+        var idx=S.filterSites.indexOf(sid);
+        if(idx>=0)S.filterSites.splice(idx,1);else S.filterSites.push(sid);
+        renderAll();
+      };})(site.id);
       el.appendChild(d);
     });
   });
@@ -179,8 +188,10 @@ function renderGantt(){
   });
   S.sites.forEach(function(s){if(siteOrder[s.id]===undefined)siteOrder[s.id]=_so++;});
   var projs=S.projects.filter(function(p){
-    // 사이트/그룹 필터
-    if(S.filterSite!=='all'){
+    // 사이트/그룹 필터 (다중 선택 체크박스가 우선)
+    if(S.filterSites&&S.filterSites.length){
+      if(S.filterSites.indexOf(p.siteId)<0)return false;
+    } else if(S.filterSite!=='all'){
       if(S.filterSite.slice(0,2)==='g:'){
         var gid=S.filterSite.slice(2);
         var pSite=S.sites.find(function(s){return s.id===p.siteId;});
