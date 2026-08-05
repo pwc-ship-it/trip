@@ -46,6 +46,11 @@
             <button class="btn" id="zoomBtn_biweek" onclick="setGanttZoom('biweek')">격주</button>
             <button class="btn" id="zoomBtn_month" onclick="setGanttZoom('month')">월</button>
           </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="chkrow"><input type="checkbox" id="tf_sched" checked onchange="toggleTypeShow('sched',this.checked)">출장일정</label>
+            <label class="chkrow"><input type="checkbox" id="tf_event" checked onchange="toggleTypeShow('event',this.checked)">이벤트</label>
+            <label class="chkrow"><input type="checkbox" id="tf_work" checked onchange="toggleTypeShow('work',this.checked)">작업</label>
+          </div>
           <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
           <button class="btn" onclick="openModal('site')">사이트 관리</button>
           <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
@@ -169,7 +174,7 @@
 
   <script src="data.js?v=20260723b"></script>
   <script src="app.js?v=20260804b"></script>
-  <script src="gantt.js?v=20260804a"></script>
+  <script src="gantt.js?v=20260805a"></script>
   <script src="modals.js?v=20260723b"></script>
   <script src="person.js?v=20260730a"></script>
   <script src="equip.js?v=20260731a"></script>

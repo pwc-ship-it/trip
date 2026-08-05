@@ -2,6 +2,8 @@
 var WPX=42,_months=[],_totPx=0,_sd=null;
 var _ganttZoom='week'; // 'week'|'biweek'|'month'
 var _ganttSearch='';   // 담당자명 검색
+var _typeShow={sched:true,event:true,work:true}; // 출장일정/이벤트/작업 표시 토글
+function toggleTypeShow(k,v){_typeShow[k]=v;renderGantt();}
 var WPX_MAP={'week':42,'biweek':22,'month':12};
 var GANTT_TODAY_OFFSET=400; // 오늘날짜 스크롤 오프셋(px). 값↑ → 오늘이 왼쪽, 값↓ → 오늘이 오른쪽
 function calcRange(){
@@ -198,8 +200,8 @@ function renderGantt(){
         if(!pSite||(pSite.groupId||'_none')!==gid)return false;
       } else if(p.siteId!==S.filterSite){return false;}
     }
-    // 과거 일정도 숨김 처리 (종료일 < 오늘)
-    var hasVisible=S.schedules.some(function(s){
+    // 과거 일정도 숨김 처리 (종료일 < 오늘) + 출장일정/이벤트/작업 표시 토글
+    var hasVisible=_typeShow.sched&&S.schedules.some(function(s){
       if(s.projectId!==p.id)return false;
       var isPast=s.end&&s.end<todayISO;
       if(!((!s.hidden&&!isPast)||S.showHidden))return false;
@@ -207,12 +209,12 @@ function renderGantt(){
       return true;
     });
     if(_ganttSearch) return hasVisible;
-    var hasEvent=S.events.some(function(e){
+    var hasEvent=_typeShow.event&&S.events.some(function(e){
       if(e.projectId!==p.id)return false;
       var isPast=e.date&&e.date<todayISO;
       return !isPast||S.showHidden;
     });
-    var hasWork=S.workTasks.some(function(w){return w.projectId===p.id;});
+    var hasWork=_typeShow.work&&S.workTasks.some(function(w){return w.projectId===p.id;});
     return hasVisible||hasEvent||hasWork;
   }).sort(function(a,b){return (siteOrder[a.siteId]||0)-(siteOrder[b.siteId]||0);});
 
@@ -220,19 +222,19 @@ function renderGantt(){
   var ri=0;
   projs.forEach(function(proj){
     var site=S.sites.find(function(s){return s.id===proj.siteId;});var sc=site?site.color:'#666';
-    var scheds=S.schedules.filter(function(s){
+    var scheds=!_typeShow.sched?[]:S.schedules.filter(function(s){
       if(s.projectId!==proj.id)return false;
       var isPast=s.end&&s.end<todayISO;
       if(!((!s.hidden&&!isPast)||S.showHidden))return false;
       if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
       return true;
     });
-    var evts=_ganttSearch?[]:S.events.filter(function(e){
+    var evts=(_ganttSearch||!_typeShow.event)?[]:S.events.filter(function(e){
       if(e.projectId!==proj.id)return false;
       var isPast=e.date&&e.date<todayISO;
       return !isPast||S.showHidden;
     });
-    var wts=_ganttSearch?[]:S.workTasks.filter(function(w){
+    var wts=(_ganttSearch||!_typeShow.work)?[]:S.workTasks.filter(function(w){
       if(w.projectId!==proj.id) return false;
       var isPast=w.end&&w.end<todayISO;
       return !isPast||S.showHidden;
