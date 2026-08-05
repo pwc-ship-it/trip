@@ -88,13 +88,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .shortcut-item .si-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shortcut-item .si-meta{font-size:10px;color:var(--tx-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 범례 */
-.leg{display:flex;align-items:center;border:1px solid var(--bd-main);border-radius:5px;overflow:hidden;flex-shrink:0}
+.leg{display:flex;flex-direction:column;border:1px solid var(--bd-main);border-radius:5px;overflow:hidden;flex-shrink:0}
 .legg{display:flex;align-items:center;flex-shrink:0}
-.legl{font-size:10px;color:var(--tx-faint);padding:0 6px;border-right:1px solid var(--bd-main);white-space:nowrap;line-height:26px}
-.legi{display:flex;align-items:center;gap:3px;padding:3px 7px;border-right:1px solid var(--bd-main);font-size:10px;color:var(--tx-second);white-space:nowrap}
+.legl{font-size:10px;color:var(--tx-faint);padding:0 6px;border-right:1px solid var(--bd-main);white-space:nowrap;line-height:20px}
+.legi{display:flex;align-items:center;gap:3px;padding:2px 7px;border-right:1px solid var(--bd-main);font-size:10px;color:var(--tx-second);white-space:nowrap}
 .legi:last-child{border-right:none}
 .legd{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-.legs{width:1.5px;background:var(--bd-strong);align-self:stretch}
+.legs{height:1.5px;background:var(--bd-strong);align-self:stretch}
 /* 레이아웃 */
 .content{display:flex;flex:1;min-height:0;overflow:hidden}
 .sidebar{width:185px;min-width:185px;flex-shrink:0;border-right:1.5px solid var(--bd-strong);background:var(--bg-input);overflow-y:auto;display:flex;flex-direction:column}
