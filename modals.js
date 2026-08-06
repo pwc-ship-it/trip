@@ -15,11 +15,10 @@ function showEM(ex, exWt){
   _evModalType = initType;
   _selCol = ex ? (ex.colorId||'purple') : 'purple';
 
-  var po=S.projects.map(function(p){
-    var si=S.sites.find(function(s){return s.id===p.siteId;});
-    var curId = ex ? ex.projectId : (exWt ? exWt.projectId : null);
-    return '<option value="'+p.id+'"'+(curId===p.id?' selected':'')+'>'+(si?si.name:'?')+' - '+p.name+'</option>';
-  }).join('');
+  var curProjId = ex ? ex.projectId : (exWt ? exWt.projectId : null);
+  var curSiteId=null;
+  if(curProjId){var _pr=S.projects.find(function(p){return p.id===curProjId;});if(_pr)curSiteId=_pr.siteId;}
+  var eso=_sitesWithProjects().map(function(s){return '<option value="'+s.id+'"'+(s.id===curSiteId?' selected':'')+'>'+s.name+'</option>';}).join('');
   var sw=EVC.map(function(c){return '<div class="csw'+(c.id===_selCol?' sel':'')+'" style="background:'+c.bg+'" data-cid="'+c.id+'" id="sw_'+c.id+'"></div>';}).join('');
 
   var todayStr=TODAY.getFullYear()+'-'+String(TODAY.getMonth()+1).padStart(2,'0')+'-'+String(TODAY.getDate()).padStart(2,'0');
@@ -30,7 +29,8 @@ function showEM(ex, exWt){
     +'<button class="ev-type-btn'+(initType==='event'?' on':'')+'" id="evtab_event" onclick="switchEvTab(\'event\')">★ 주요 이벤트</button>'
     +'<button class="ev-type-btn'+(initType==='work'?' on':'')+'" id="evtab_work" onclick="switchEvTab(\'work\')">▣ 작업</button>'
     +'</div>';
-  html+='<div class="fg"><label class="fl">사이트/프로젝트</label><select id="fe_proj">'+po+'</select></div>';
+  html+='<div class="fg"><label class="fl">사이트</label><select id="fe_site">'+eso+'</select></div>';
+  html+='<div class="fg"><label class="fl">프로젝트</label><select id="fe_proj"></select></div>';
 
   // ── 주요 이벤트 섹션
   html+='<div id="fe_event_sec" style="display:'+(initType==='event'?'block':'none')+'">';
@@ -45,6 +45,7 @@ function showEM(ex, exWt){
   var wtDateInfo=exWt?(fmtFull(wt.start)+' → '+fmtFull(wt.end)):'';
   html+='<div id="fe_work_sec" style="display:'+(initType==='work'?'block':'none')+'">';
   html+='<div class="fg"><label class="fl">작업 제목</label><input type="text" id="fw_title" value="'+(exWt?wt.title:'')+'" placeholder="예: 비전 파라미터 최적화, 알람 점검"></div>';
+  html+='<div class="fg"><label class="fl">그룹(라인)</label><input type="text" id="fw_group" value="'+(exWt?(wt.group||''):'')+'" placeholder="예: #5 — 같은 그룹은 같은 줄에 이어서 표시"></div>';
   html+='<div class="fr">'
     +'<div class="fg"><label class="fl">시작일 (YYYY-MM-DD)</label><input type="text" id="fw_start" value="'+(exWt?wt.start:todayStr)+'" maxlength="10" oninput="fmtDateInput(this);calcWD()" style="font-family:monospace;letter-spacing:1px"></div>'
     +'<div class="fg"><label class="fl">종료일 (YYYY-MM-DD)</label><input type="text" id="fw_end" value="'+(exWt?wt.end:todayStr)+'" maxlength="10" oninput="fmtDateInput(this);calcWD()" style="font-family:monospace;letter-spacing:1px"></div>'
@@ -62,6 +63,8 @@ function showEM(ex, exWt){
   html+='<button class="btn sm pri" id="fe_save">'+(ie?'수정 완료':'등록')+'</button>';
   html+='</div>';
   mw(html);
+  document.getElementById('fe_site').onchange=function(){_populateProjSelect('fe_site','fe_proj');};
+  _populateProjSelect('fe_site','fe_proj',curProjId);
 
   // 이벤트 탭 버튼
   document.querySelectorAll('.csw').forEach(function(btn){
@@ -129,6 +132,7 @@ function saveWt(exId){
   var start=document.getElementById('fw_start').value;
   var end=document.getElementById('fw_end').value;
   var note=document.getElementById('fw_note').value.trim();
+  var group=document.getElementById('fw_group').value.trim();
   var dateRe=/^\d{4}-\d{2}-\d{2}$/;
   // 색상: fw_colors 내 sel 찾기
   var selBtn=document.querySelector('#fw_colors .csw.sel');
@@ -138,9 +142,9 @@ function saveWt(exId){
   if(start>end){alert('종료일이 시작일보다 빠릅니다.');return;}
   if(exId){
     var i=S.workTasks.findIndex(function(w){return w.id===exId;});
-    S.workTasks[i]=_touch({id:exId,projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId});
+    S.workTasks[i]=_touch({id:exId,projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId,group:group});
   } else {
-    S.workTasks.push(_touch({id:genId('wt',S.workTasks),projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId}));
+    S.workTasks.push(_touch({id:genId('wt',S.workTasks),projectId:projId,title:title,start:start,end:end,note:note,colorId:colorId,group:group}));
   }
   saveData();cm();renderAll();
 }
@@ -151,7 +155,7 @@ function openEditWt(id){var w=S.workTasks.find(function(x){return x.id===id;});i
 /* 출장 모달 */
 function showSM(ex){
   var ie=!!ex;
-  var so=S.sites.filter(function(s){return S.projects.some(function(p){return p.siteId===s.id;});}).map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+  var so=_sitesWithProjects().map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
   var po='<option value="">사이트를 먼저 선택하세요</option>';
   if(ie){var pr=S.projects.find(function(p){return p.id===ex.projectId;});if(pr)po=S.projects.filter(function(p){return p.siteId===pr.siteId;}).map(function(p){return '<option value="'+p.id+'"'+(p.id===ex.projectId?' selected':'')+'>'+p.name+'</option>';}).join('');}
   var curType=ie?(ex.type||'hq'):'hq';
@@ -200,7 +204,15 @@ function showSM(ex){
     calcD(); // 신규 등록 모드 초기 날짜 표시
   }
 }
-function upP(){var sid=document.getElementById('f_site').value;var ps=S.projects.filter(function(p){return p.siteId===sid;});document.getElementById('f_proj').innerHTML=ps.length?ps.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join(''):'<option value="">해당 사이트에 프로젝트 없음</option>';}
+/* 사이트/프로젝트 select 공용 정렬(가나다순) + 프로젝트 목록 갱신 */
+function _sortedSites(){return S.sites.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});}
+function _sitesWithProjects(){return _sortedSites().filter(function(s){return S.projects.some(function(p){return p.siteId===s.id;});});}
+function _populateProjSelect(siteSelId,projSelId,curProjId){
+  var sid=document.getElementById(siteSelId).value;
+  var ps=S.projects.filter(function(p){return p.siteId===sid;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  document.getElementById(projSelId).innerHTML=ps.length?ps.map(function(p){return '<option value="'+p.id+'"'+(curProjId&&p.id===curProjId?' selected':'')+'>'+p.name+'</option>';}).join(''):'<option value="">해당 사이트에 프로젝트 없음</option>';
+}
+function upP(){_populateProjSelect('f_site','f_proj');}
 function fmtDateInput(el){
   // 숫자만 남기고 자동으로 - 삽입: 20260401 → 2026-04-01
   var v=el.value.replace(/[^0-9]/g,'');

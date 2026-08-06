@@ -157,18 +157,27 @@ function addWtBar(el,wt){
 }
 
 /* ── 간트 렌더 ── */
-/* 작업 레인 배정: 막대+라벨 실제 텍스트 폭 기준으로 겹치지 않는 레인에 배치 (필요하면 3줄 이상도 사용) */
+/* 작업 레인 배정: 막대+라벨 실제 텍스트 폭 기준으로 겹치지 않는 레인에 배치 (필요하면 3줄 이상도 사용)
+   같은 group(예: 라인명) 태그를 가진 작업들은 항상 같은 레인에 고정 배치 — 순차 단계를 한 줄로 이어붙여 보여줄 때 사용 */
 function assignWtLanes(wts){
   var GAP=8; // 레인 내 인접 작업 사이 최소 여백(px)
   var laneEnd=[]; // 각 레인이 점유 중인 오른쪽 끝(px)
+  var groupLane={}; // group명 -> 고정 레인 인덱스
   wts.forEach(function(wt){
     var sp=d2px(wt.start),ep=d2px(wt.end)+Math.round(WPX/7);
     var barW=Math.max(ep-sp,8);
     var lblW=measureTextW(wtLabelTxt(wt),WTLBL_FONT)+WTLBL_PAD;
     var occupiedEnd=sp+Math.max(barW,lblW);
-    var lane=laneEnd.findIndex(function(end){return sp>=end+GAP;});
-    if(lane===-1){lane=laneEnd.length;laneEnd.push(occupiedEnd);}
-    else laneEnd[lane]=occupiedEnd;
+    var lane;
+    if(wt.group&&groupLane.hasOwnProperty(wt.group)){
+      lane=groupLane[wt.group];
+      laneEnd[lane]=Math.max(laneEnd[lane],occupiedEnd);
+    } else {
+      lane=laneEnd.findIndex(function(end){return sp>=end+GAP;});
+      if(lane===-1){lane=laneEnd.length;laneEnd.push(occupiedEnd);}
+      else laneEnd[lane]=occupiedEnd;
+      if(wt.group)groupLane[wt.group]=lane;
+    }
     wt._lane=lane;
   });
   return laneEnd.length;
@@ -262,8 +271,9 @@ function renderGantt(){
         var laneTasks=wts.filter(function(w){return w._lane===li;});
         var wkr=document.createElement('div');wkr.className='wkrow';
         var wkf=document.createElement('div');wkf.className='wkfix';
-        // 레인 레이블: 첫 번째 작업 제목 표시 (여러 개면 숫자)
-        var laneLabel=laneTasks.length===1?laneTasks[0].title:(li+1)+'번 레인 ('+laneTasks.length+'건)';
+        // 레인 레이블: 그룹(라인) 태그가 전부 같으면 그걸로, 아니면 첫 작업 제목(1개) 또는 숫자(여러개)
+        var laneGroup=laneTasks.length&&laneTasks[0].group&&laneTasks.every(function(w){return w.group===laneTasks[0].group;})?laneTasks[0].group:null;
+        var laneLabel=laneGroup||(laneTasks.length===1?laneTasks[0].title:(li+1)+'번 레인 ('+laneTasks.length+'건)');
         wkf.innerHTML='<span class="wkfix-label">'+_esc(laneLabel)+'</span>';
         var wktl=makeTL(22,'wktl',null,false);
         // 각 작업 바 추가
