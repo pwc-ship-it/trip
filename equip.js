@@ -101,8 +101,9 @@ function renderEquipSidebar(){
   S.equipUnits.forEach(function(u){
     if(sidebarSiteIds.indexOf(u.siteId)<0) sidebarSiteIds.push(u.siteId);
   });
-  var html='<div class="sbhead"><span class="slbl">사이트 필터</span>';
-  if(_equipEditMode) html+='<div style="font-size:10px;color:#6a6a88;margin-top:2px">드래그로 순서 변경</div>';
+  var html='<div class="sbhead" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between"><span class="slbl">사이트 필터</span>'
+    +'<button class="mobile-only sidebar-toggle" onclick="closeSidebar(\'equip\')" title="닫기" style="font-size:11px;padding:2px 6px">✕</button>';
+  if(_equipEditMode) html+='<div style="width:100%;font-size:10px;color:#6a6a88;margin-top:2px">드래그로 순서 변경</div>';
   html+='</div><div class="sbody">';
   html+='<div class="sit-all'+(_equipFilterSite==='all'?' on':'')
     +'" onclick="setEquipFilter(\'all\')"><span class="sname">전체 보기</span></div>';

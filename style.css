@@ -898,6 +898,9 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
   .pm-stat-card{min-width:100px}
   .pm-ctrl-bar{padding:6px 8px}
   .pm-search{width:100px}
+  .pm-body-scroll{overflow-x:auto}
+  .pm-person-table th:first-child,.pm-person-table td:first-child{position:sticky;left:0;z-index:2;background:var(--bg-base)}
+  .pm-person-table th:first-child{z-index:11;background:var(--bg-alt)}
 
   /* Vision 그리드 */
   .vi-main-inner{padding:10px 12px}

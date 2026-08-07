@@ -5,7 +5,7 @@ var _ganttSearch='';   // 담당자명 검색
 var _typeShow={sched:true,event:true,work:true}; // 출장일정/이벤트/작업 표시 토글
 function toggleTypeShow(k,v){_typeShow[k]=v;renderGantt();}
 var WPX_MAP={'week':42,'biweek':22,'month':12};
-var GANTT_TODAY_OFFSET=400; // 오늘날짜 스크롤 오프셋(px). 값↑ → 오늘이 왼쪽, 값↓ → 오늘이 오른쪽
+function ganttFixedW(){var el=document.querySelector('.ghfixed');return (el&&el.offsetWidth)||300;} // 좌측 고정컬럼 실측 폭(반응형 CSS 추종)
 function calcRange(){
   var minD=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1),maxD=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,0);
   var all=[];S.schedules.forEach(function(s){all.push(s.start);all.push(s.end);});S.events.forEach(function(e){all.push(e.date);});
@@ -30,7 +30,7 @@ function renderHeader(){
   _months.forEach(function(mon){var mpx=mPx(mon);var div=document.createElement('div');div.className='ghmb';div.style.width=mpx+'px';var wkh='';for(var i=0;i<mon.weeks;i++){var p=wPx(mon,i);wkh+='<div class="ghwk" style="width:'+p+'px;min-width:'+p+'px">'+(i+1)+'주</div>';}div.innerHTML='<div class="ghmn">'+mon.label+'</div><div class="ghwks">'+wkh+'</div>';tl.appendChild(div);});
   var db=document.getElementById('ghDb');db.innerHTML='';addGrid(db);
   var tp=tpx();if(tp>=0&&tp<=_totPx){var ln=document.createElement('div');ln.className='tdln';ln.style.left=tp+'px';db.appendChild(ln);var lb=document.createElement('div');lb.className='tdlb';lb.style.left=(tp+3)+'px';lb.textContent=todayLbl();db.appendChild(lb);}
-  document.getElementById('gwrap').style.width=(300+_totPx)+'px';
+  document.getElementById('gwrap').style.width=(ganttFixedW()+_totPx)+'px';
 }
 
 /* ── 사이드바 (그룹별) ── */
@@ -303,7 +303,8 @@ function renderGantt(){
       });
     });
   });
-  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-GANTT_TODAY_OFFSET);
+  // ponytail: 400=300*4/3 이었던 기존 비율(고정컬럼+여유폭)을 보존한 상대식. 여백감이 안 맞으면 4/3 계수만 튜닝.
+  document.getElementById('gscroll').scrollLeft=Math.max(0,tpx()-Math.round(ganttFixedW()*4/3));
 }
 
 function renderAll(){initTL();renderSidebar();renderHeader();renderGantt();if(_activeTab==='person')renderPersonTab();if(_activeTab==='vision')renderVisionTab();}

@@ -192,7 +192,12 @@ function renderVisionSidebar(){
     '</button>'+
   '</div>';
 
+  var closeBar='<div style="display:flex;justify-content:flex-end;padding:4px 8px 0">'+
+    '<button class="mobile-only sidebar-toggle" onclick="closeSidebar(\'vision\')" title="닫기" style="font-size:11px;padding:2px 6px">✕</button>'+
+  '</div>';
+
   sb.innerHTML=
+    closeBar+
     (siteOrder.length?toggleAllBtn:'')+
     (_visionFilterSite?'<div class="vi-site-filter-bar">'+
       '<span style="font-size:10px;color:var(--tx-dim)">사이트 필터 적용 중</span>'+

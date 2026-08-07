@@ -9,7 +9,7 @@
   <script>
     (function(){var t=localStorage.getItem('trip_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="style.css?v=20260805b">
+  <link rel="stylesheet" href="style.css?v=20260807a">
 </head>
 <body>
   <div class="app">
@@ -57,6 +57,7 @@
           <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
         </div>
         <div id="visionTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('vision')" title="사이트 필터">☰</button>
           <button class="btn" id="btnVisionTplEdit" onclick="toggleVisionTemplateEdit()">템플릿 편집</button>
           <button class="btn" onclick="openVisionImport()">진행율 가져오기</button>
           <button class="btn" onclick="refreshVisionFromSheets(false)" title="Sheets에서 지금 바로 최신 이력관리 데이터를 가져옵니다">⟳ 동기화</button>
@@ -68,6 +69,7 @@
           <input type="file" id="viCsvFileInput" accept=".csv" style="display:none" onchange="handleVisionCsvFile(this)">
         </div>
         <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('equip')" title="사이트 필터">☰</button>
           <button class="btn" onclick="collapseAllEquip()">접기 전체</button>
           <button class="btn" onclick="expandAllEquip()">펼치기 전체</button>
           <button class="btn" id="btnEquipEdit" onclick="toggleEquipEdit()">수정 모드</button>
@@ -174,11 +176,11 @@
 
   <script src="data.js?v=20260723b"></script>
   <script src="app.js?v=20260804b"></script>
-  <script src="gantt.js?v=20260806a"></script>
+  <script src="gantt.js?v=20260807a"></script>
   <script src="modals.js?v=20260806a"></script>
   <script src="person.js?v=20260730a"></script>
-  <script src="equip.js?v=20260731a"></script>
-  <script src="vision.js?v=20260731a"></script>
+  <script src="equip.js?v=20260807a"></script>
+  <script src="vision.js?v=20260807a"></script>
   <script src="export.js?v=20260730a"></script>
 </body>
 </html>
