@@ -211,6 +211,7 @@ function aggregateSiteDays(period){
   var siteMap={}; // siteId -> {siteId,name,color,groupId,total,hq,out,local,names:{}}
   S.schedules.forEach(function(sc){
     if(!_pmSiteTypeFilter[sc.type]) return;
+    if(!_pmSiteIncludeDomestic && sc.domestic) return;
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj) return;
     var site=S.sites.find(function(s){return s.id===proj.siteId;});
@@ -502,6 +503,7 @@ var _pmExpanded={};           // 행 펼침 상태: { '이름': true }
 var _pmSitePeriod='all';      // 사이트별 출장일 집계 기간: all | year | r12
 var _pmSiteCollapsed=true;    // 사이트별 출장일 요약 접기 상태 (기본 접힘)
 var _pmSiteTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true,localOutsource:true}; // 사이트별 요약 인원유형 체크
+var _pmSiteIncludeDomestic=false; // 사이트별 요약에 국내(국내 출장) 일정 포함 여부, 기본 미포함
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
 function setPmSearch(v){
@@ -533,6 +535,11 @@ function togglePmSiteCollapse(){
 }
 function toggleSiteTypeFilter(type){
   _pmSiteTypeFilter[type]=!_pmSiteTypeFilter[type];
+  var el=document.getElementById('pmSiteDaysWrap');
+  if(el) el.outerHTML=renderSiteDaysSummary();
+}
+function toggleSiteDomesticFilter(){
+  _pmSiteIncludeDomestic=!_pmSiteIncludeDomestic;
   var el=document.getElementById('pmSiteDaysWrap');
   if(el) el.outerHTML=renderSiteDaysSummary();
 }
@@ -813,6 +820,8 @@ function renderSiteDaysSummary(){
       var isOn=_pmSiteTypeFilter[t[0]];
       html+='<label class="pm-type-ck'+(isOn?' on':'')+'" style="--tc:'+t[2]+';'+(isOn?'background:'+t[2]+'22;border-color:'+t[2]:'')+'"><input type="checkbox"'+(isOn?' checked':'')+' onchange="toggleSiteTypeFilter(\''+t[0]+'\')">'+t[1]+'</label>';
     });
+    html+='<span style="width:1px;height:16px;background:#3a3a44;margin:0 2px"></span>';
+    html+='<label class="pm-type-ck'+(_pmSiteIncludeDomestic?' on':'')+'" style="--tc:#666666;'+(_pmSiteIncludeDomestic?'background:#66666622;border-color:#666666':'')+'"><input type="checkbox"'+(_pmSiteIncludeDomestic?' checked':'')+' onchange="toggleSiteDomesticFilter()">국내 포함</label>';
     html+='</div>';
 
     if(!agg.groups.length){
@@ -863,6 +872,7 @@ function openSiteRosterModal(siteId){
   var rows=[];
   S.schedules.forEach(function(sc){
     if(!_pmSiteTypeFilter[sc.type]) return;
+    if(!_pmSiteIncludeDomestic && sc.domestic) return;
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj||proj.siteId!==siteId) return;
     if(TODAY<pd(sc.start)) return; // 출장예정(미출발) 제외 — 요약표와 동일 기준
