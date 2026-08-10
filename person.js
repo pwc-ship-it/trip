@@ -234,7 +234,7 @@ function aggregateSiteDays(period){
     var siteObj=S.sites.find(function(s){return s.id===id;});
     return {siteId:e.siteId,name:e.name,color:e.color,groupId:e.groupId,
       total:e.total,hq:e.hq,out:e.out,local:e.local,personCount:Object.keys(e.names).length,
-      estMd:(siteObj&&siteObj.estMd)||0};
+      estMd:(siteObj&&siteObj.estMd)?Number(siteObj.estMd):0};
   });
   siteList.sort(function(a,b){
     var gi=groupOrder.indexOf(a.groupId)-groupOrder.indexOf(b.groupId);
