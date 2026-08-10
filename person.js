@@ -215,6 +215,7 @@ function aggregateSiteDays(period){
     if(!proj) return;
     var site=S.sites.find(function(s){return s.id===proj.siteId;});
     if(!site) return;
+    if(TODAY<pd(sc.start)) return; // 출장예정(미출발) 제외 — 완료+출장중만 집계
     var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
     if(days<=0) return;
     var siteId=site.id;
@@ -864,6 +865,7 @@ function openSiteRosterModal(siteId){
     if(!_pmSiteTypeFilter[sc.type]) return;
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj||proj.siteId!==siteId) return;
+    if(TODAY<pd(sc.start)) return; // 출장예정(미출발) 제외 — 요약표와 동일 기준
     var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
     if(days<=0) return;
     rows.push({name:sc.name,type:sc.type,task:sc.task||'',start:sc.start,end:sc.end,days:days});
