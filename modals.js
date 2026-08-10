@@ -270,6 +270,16 @@ function showSiteM(){
     +'<div class="sitemgr">'
     +'<div class="sitemgr-l"><div class="smtit">그룹 & 사이트</div><div id="grpSiteRows"></div>'
     +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid #2a2a34">'
+    +'<div style="font-size:10px;color:#666;margin-bottom:5px">그룹 목록</div>'
+    +'<div id="grpListRows" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">'
+    +S.groups.map(function(g){
+      var gidAttr=g.id.replace(/'/g,"\\'");
+      return '<div style="display:flex;gap:5px;align-items:center">'
+        +'<input type="text" value="'+_esc(g.name)+'" style="flex:1;font-size:11px" onchange="updGN(\''+gidAttr+'\',this.value)">'
+        +'<button class="btn sm" onclick="delGroup(\''+gidAttr+'\')">삭제</button>'
+        +'</div>';
+    }).join('')
+    +'</div>'
     +'<div style="font-size:10px;color:#666;margin-bottom:5px">새 그룹 추가</div>'
     +'<div style="display:flex;gap:5px"><input type="text" id="ns_grp" placeholder="그룹명" style="flex:1"><button class="btn sm pri" onclick="addGroup()">추가</button></div>'
     +'<div style="font-size:10px;color:#666;margin:8px 0 5px">새 사이트 추가</div>'
@@ -374,7 +384,7 @@ function delGroup(id){
   _markDeleted('groups',id);
   saveData();showSiteM();renderAll();
 }
-function updGN(id,v){var g=S.groups.find(function(g){return g.id===id;});if(g){g.name=v.trim();_touch(g);saveData();renderSidebar();}}
+function updGN(id,v){var g=S.groups.find(function(g){return g.id===id;});if(g){g.name=v.trim();_touch(g);saveData();renderSidebar();buildGrpSiteRows();}}
 function moveSiteGroup(sid,gid){var s=S.sites.find(function(s){return s.id===sid;});if(s){s.groupId=gid;_touch(s);saveData();buildGrpSiteRows();renderSidebar();renderGantt();}}
 
 /* 사이트 CRUD */
