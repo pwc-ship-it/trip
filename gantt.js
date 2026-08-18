@@ -7,9 +7,17 @@ function toggleTypeShow(k,v){_typeShow[k]=v;renderGantt();}
 var WPX_MAP={'week':42,'biweek':22,'month':12};
 function ganttFixedW(){var el=document.querySelector('.ghfixed');return (el&&el.offsetWidth)||300;} // 좌측 고정컬럼 실측 폭(반응형 CSS 추종)
 function calcRange(){
-  var minD=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1),maxD=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,0);
-  var all=[];S.schedules.forEach(function(s){all.push(s.start);all.push(s.end);});S.events.forEach(function(e){all.push(e.date);});
-  if(all.length){var sorted=all.map(function(d){return pd(d);}).sort(function(a,b){return a-b;});if(sorted[0]<minD)minD=new Date(sorted[0].getFullYear(),sorted[0].getMonth(),1);var mx=sorted[sorted.length-1];var mxE=new Date(mx.getFullYear(),mx.getMonth()+2,0);if(mxE>maxD)maxD=mxE;}
+  var minD=new Date(TODAY.getFullYear(),TODAY.getMonth()-2,1),maxD=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,0);
+  var allMin=[],allMax=[];
+  function collect(startVal,endVal){
+    allMax.push(startVal);if(endVal)allMax.push(endVal);
+    if(pd(endVal||startVal)>=TODAY)allMin.push(startVal);
+  }
+  S.schedules.forEach(function(s){collect(s.start,s.end);});
+  S.events.forEach(function(e){collect(e.date,e.date);});
+  S.workTasks.forEach(function(w){collect(w.start,w.end);});
+  if(allMin.length){var sm=allMin.map(function(d){return pd(d);}).sort(function(a,b){return a-b;})[0];var smS=new Date(sm.getFullYear(),sm.getMonth()-2,1);if(smS<minD)minD=smS;}
+  if(allMax.length){var mx=allMax.map(function(d){return pd(d);}).sort(function(a,b){return a-b;});mx=mx[mx.length-1];var mxE=new Date(mx.getFullYear(),mx.getMonth()+2,0);if(mxE>maxD)maxD=mxE;}
   return{start:minD,end:maxD};
 }
 function initTL(){
