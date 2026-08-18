@@ -267,7 +267,19 @@ function renderGantt(){
       var wsf=document.createElement('div');wsf.className='wksecfix';wsf.innerHTML='<span class="wksecfix-lbl">▣ 작업</span>';
       var wst=makeTL(18,'wksectrl',null,false);
       wsec.appendChild(wsf);wsec.appendChild(wst);body.appendChild(wsec);
-      for(var li=0;li<wtLanes;li++){
+      var laneOrder=[];for(var _li=0;_li<wtLanes;_li++)laneOrder.push(_li);
+      // 레인 순서: group명에 숫자(호수 등)가 있으면 오름차순으로 정렬, 없으면 기존 순서 유지
+      laneOrder.sort(function(a,b){
+        var ta=wts.filter(function(w){return w._lane===a;}),tb=wts.filter(function(w){return w._lane===b;});
+        var ga=ta.length&&ta[0].group&&ta.every(function(w){return w.group===ta[0].group;})?ta[0].group:null;
+        var gb=tb.length&&tb[0].group&&tb.every(function(w){return w.group===tb[0].group;})?tb[0].group:null;
+        var ma=ga&&ga.match(/\d+/),mb=gb&&gb.match(/\d+/);
+        if(ma&&mb)return parseInt(ma[0],10)-parseInt(mb[0],10);
+        if(ma&&!mb)return -1;
+        if(!ma&&mb)return 1;
+        return a-b;
+      });
+      laneOrder.forEach(function(li){
         var laneTasks=wts.filter(function(w){return w._lane===li;});
         var wkr=document.createElement('div');wkr.className='wkrow';
         var wkf=document.createElement('div');wkf.className='wkfix';
@@ -281,7 +293,7 @@ function renderGantt(){
           addWtBar(wktl,wt);
         });
         wkr.appendChild(wkf);wkr.appendChild(wktl);body.appendChild(wkr);
-      }
+      });
     }
     // 출장 행
     var tasks=[];scheds.forEach(function(s){if(tasks.indexOf(s.task)<0)tasks.push(s.task);});
