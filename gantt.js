@@ -169,14 +169,14 @@ function assignWtLanes(wts){
     var lblW=measureTextW(wtLabelTxt(wt),WTLBL_FONT)+WTLBL_PAD;
     var occupiedEnd=sp+Math.max(barW,lblW);
     var lane;
-    if(wt.group&&groupLane.hasOwnProperty(wt.group)){
+    if(wt.group&&groupLane.hasOwnProperty(wt.group)&&sp>=laneEnd[groupLane[wt.group]]+GAP){
       lane=groupLane[wt.group];
       laneEnd[lane]=Math.max(laneEnd[lane],occupiedEnd);
     } else {
       lane=laneEnd.findIndex(function(end){return sp>=end+GAP;});
       if(lane===-1){lane=laneEnd.length;laneEnd.push(occupiedEnd);}
       else laneEnd[lane]=occupiedEnd;
-      if(wt.group)groupLane[wt.group]=lane;
+      if(wt.group&&!groupLane.hasOwnProperty(wt.group))groupLane[wt.group]=lane;
     }
     wt._lane=lane;
   });
