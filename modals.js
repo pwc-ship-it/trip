@@ -155,6 +155,7 @@ function openEditWt(id){var w=S.workTasks.find(function(x){return x.id===id;});i
 /* 출장 모달 */
 function showSM(ex){
   var ie=!!ex;
+  var isEdit=!!(ex&&ex.id);
   var so=_sitesWithProjects().map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
   var po='<option value="">사이트를 먼저 선택하세요</option>';
   if(ie){var pr=S.projects.find(function(p){return p.id===ex.projectId;});if(pr)po=S.projects.filter(function(p){return p.siteId===pr.siteId;}).map(function(p){return '<option value="'+p.id+'"'+(p.id===ex.projectId?' selected':'')+'>'+p.name+'</option>';}).join('');}
@@ -164,7 +165,7 @@ function showSM(ex){
   var dateInfo=ie?(fmtFull(ex.start)+' → '+fmtFull(ex.end)):'';
   var isHidden=ie&&ex.hidden?true:false;
   var isDomestic=ie&&ex.domestic?true:false;
-  var html='<div class="mtit">'+(ie?'출장 일정 수정':'출장 일정 등록')+'</div>';
+  var html='<div class="mtit">'+(isEdit?'출장 일정 수정':'출장 일정 등록')+'</div>';
   html+='<div class="fg"><label class="fl">사이트</label><select id="f_site">'+so+'</select></div>';
   html+='<div class="fg"><label class="fl">국내 여부</label><label class="chkrow" style="margin:0"><input type="checkbox" id="f_domestic"'+(isDomestic?' checked':'')+'>국내 출장 (현장이 아닌 국내에서 진행)</label><span id="f_dom_warn" style="display:none;font-size:10px;color:#d08020;margin-left:6px">⚠ 해외 사이트 — 출장일이 국내로 집계됩니다</span></div>';
   html+='<div class="fg"><label class="fl">프로젝트</label><select id="f_proj">'+po+'</select></div>';
@@ -176,9 +177,10 @@ function showSM(ex){
   html+='<div class="fg"><label class="fl">메모 / 비고</label><input type="text" id="f_note" value="'+(ie?ex.note:'')+'" placeholder="주의사항 등"></div>';
   html+='<label class="chkrow"><input type="checkbox" id="f_hidden"'+(isHidden?' checked':'')+'>간트차트에서 숨기기</label>';
   html+='<div class="mfoot">';
-  if(ie) html+='<button class="btn red sm" id="f_del">삭제</button>';
+  if(isEdit) html+='<button class="btn red sm" id="f_del">삭제</button>';
+  if(isEdit) html+='<button class="btn sm" id="f_copy">복사</button>';
   html+='<button class="btn sm" id="f_cancel">취소</button>';
-  html+='<button class="btn sm pri" id="f_save">'+(ie?'수정 완료':'등록')+'</button>';
+  html+='<button class="btn sm pri" id="f_save">'+(isEdit?'수정 완료':'등록')+'</button>';
   html+='</div>';
   mw(html);
   // 이벤트 등록
@@ -188,9 +190,12 @@ function showSM(ex){
   document.getElementById('f_start').onchange=function(){calcD();};
   document.getElementById('f_end').onchange=function(){calcD();};
   document.getElementById('f_cancel').onclick=function(){cm();};
-  document.getElementById('f_save').onclick=function(){saveSc(ie?ex.id:null);};
-  if(ie){
+  document.getElementById('f_save').onclick=function(){saveSc(isEdit?ex.id:null);};
+  if(isEdit){
     document.getElementById('f_del').onclick=function(){delSc(ex.id);};
+    document.getElementById('f_copy').onclick=function(){openCopySc(ex.id);};
+  }
+  if(ie){
     var pr2=S.projects.find(function(p){return p.id===ex.projectId;});
     if(pr2) document.getElementById('f_site').value=pr2.siteId;
     upP();
@@ -261,6 +266,14 @@ function saveSc(exId){
     S.schedules.push(_touch({id:genId('s',S.schedules),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic}));
   }
   saveData();cm();renderAll();
+}
+function openCopySc(id){
+  var s=S.schedules.find(function(x){return x.id===id;});
+  if(!s)return;
+  var c=Object.assign({},s);
+  delete c.id; delete c.mt;
+  c.name='';
+  showSM(c);
 }
 function delSc(id){if(!confirm('이 출장 일정을 삭제할까요?'))return;S.schedules=S.schedules.filter(function(s){return s.id!==id;});_markDeletedSc(id);saveData();cm();renderAll();}
 
