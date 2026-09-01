@@ -1137,7 +1137,7 @@ function toggleShowHidden(){
   try{localStorage.setItem('bu3_showHidden',S.showHidden?'1':'0');}catch(e){}
   document.getElementById('btnHidden').textContent=S.showHidden?'숨김 숨기기':'숨김 보기';
   document.getElementById('btnHidden').className='btn'+(S.showHidden?' warn':'');
-  renderGantt();
+  renderAll();
 }
 
 /* ── 날짜 유틸 ── */
