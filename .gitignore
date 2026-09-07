@@ -1,0 +1,19 @@
+# env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# dependencies / logs
+node_modules/
+*.log
+
+# 실 출장/인원 데이터 및 백업 (민감정보)
+/Data/
+/Image/
+/scratch_load.json
+/Backup/*.json
+/Backup/*.xlsx
+/Backup/*.zip
+/Backup/구글시트*
+/Backup/Apps Script*

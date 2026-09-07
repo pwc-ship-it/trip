@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>출장 일정 관리</title>
+  <meta name="description" content="Vision 현장 출장 일정 & 인원 출장일 관리">
+  <meta name="format-detection" content="date=no,telephone=no,address=no">
+  <script>
+    (function(){var t=localStorage.getItem('trip_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <link rel="stylesheet" href="style.css?v=20260807a">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="ttl">출장 일정 관리</span>
+        <div class="conn-dot" id="connStatus" onclick="checkConn()" title="클릭하면 연결 상태 확인">
+          <div class="conn-led" id="connLed"></div>
+          <span id="connTxt">연결 확인</span>
+        </div>
+        <button class="sidebar-toggle" id="themeToggle" onclick="toggleTheme()" title="다크/라이트 모드 전환">🌙</button>
+      </div>
+      <div class="tright" id="topbarRight">
+        <div id="ganttTools" style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('gantt')" title="사이트 필터">☰</button>
+          <div class="leg">
+            <div class="legg">
+              <span class="legl">본사계열</span>
+              <div class="legi"><div class="legd" style="background:#4a4a6a"></div>완료</div>
+              <div class="legi"><div class="legd" style="background:#2176cc"></div>출장중</div>
+              <div class="legi"><div class="legd" style="background:#0f9e6e"></div>예정</div>
+            </div>
+            <div class="legs"></div>
+            <div class="legg">
+              <span class="legl">외주계열</span>
+              <div class="legi"><div class="legd" style="background:#5a4a2a"></div>완료</div>
+              <div class="legi"><div class="legd" style="background:#cc8010"></div>출장중</div>
+              <div class="legi" style="border-right:none"><div class="legd" style="background:#8a6e00"></div>예정</div>
+            </div>
+          </div>
+          <input type="text" id="ganttSearchInput" class="gantt-search" placeholder="검색" oninput="ganttSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div style="display:flex;gap:2px">
+            <button class="btn active" id="zoomBtn_week" onclick="setGanttZoom('week')">주</button>
+            <button class="btn" id="zoomBtn_biweek" onclick="setGanttZoom('biweek')">격주</button>
+            <button class="btn" id="zoomBtn_month" onclick="setGanttZoom('month')">월</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="chkrow"><input type="checkbox" id="tf_sched" checked onchange="toggleTypeShow('sched',this.checked)">출장일정</label>
+            <label class="chkrow"><input type="checkbox" id="tf_event" checked onchange="toggleTypeShow('event',this.checked)">이벤트</label>
+            <label class="chkrow"><input type="checkbox" id="tf_work" checked onchange="toggleTypeShow('work',this.checked)">작업</label>
+          </div>
+          <button class="btn" id="btnHidden" onclick="toggleShowHidden()">숨김 보기</button>
+          <button class="btn" onclick="openModal('site')">사이트 관리</button>
+          <button class="btn ev" onclick="openModal('event')">★ 이벤트 등록</button>
+          <button class="btn pri" onclick="openModal('schedule')">+ 출장 등록</button>
+        </div>
+        <div id="visionTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('vision')" title="사이트 필터">☰</button>
+          <button class="btn" id="btnVisionTplEdit" onclick="toggleVisionTemplateEdit()">템플릿 편집</button>
+          <button class="btn" onclick="openVisionImport()">진행율 가져오기</button>
+          <button class="btn" onclick="refreshVisionFromSheets(false)" title="Sheets에서 지금 바로 최신 이력관리 데이터를 가져옵니다">⟳ 동기화</button>
+          <span style="display:inline-block;width:1px;height:16px;background:#3a3a44;flex-shrink:0"></span>
+          <button class="btn" onclick="openViColumnSettings()">열 설정</button>
+          <button class="btn" onclick="openVisionCsvTemplate()" title="빈 양식 CSV 다운로드 (일괄 입력용)">CSV 양식</button>
+          <button class="btn" onclick="exportVisionCSV()">CSV 내보내기</button>
+          <button class="btn" onclick="openVisionCsvImport()">CSV 가져오기</button>
+          <input type="file" id="viCsvFileInput" accept=".csv" style="display:none" onchange="handleVisionCsvFile(this)">
+        </div>
+        <div id="equipTools" style="display:none;gap:5px;align-items:center;flex-wrap:wrap">
+          <button class="mobile-only sidebar-toggle" onclick="openSidebar('equip')" title="사이트 필터">☰</button>
+          <button class="btn" onclick="collapseAllEquip()">접기 전체</button>
+          <button class="btn" onclick="expandAllEquip()">펼치기 전체</button>
+          <button class="btn" id="btnEquipEdit" onclick="toggleEquipEdit()">수정 모드</button>
+          <button class="btn" id="btnAddEquipSite" onclick="openAddEquipSite()" style="display:none">+ 사이트</button>
+          <button class="btn" id="btnAddEquipProject" onclick="openAddEquipProject()" style="display:none">+ 프로젝트</button>
+          <button class="btn" id="btnAddEquipUnit" onclick="openAddEquipUnit()" style="display:none">+ 호기</button>
+          <button class="btn warn" id="btnAddEquipItem" onclick="openAddEquipItem()" style="display:none">+ 항목</button>
+        </div>
+        <button class="btn" onclick="downloadExcel()">⬇ 엑셀</button>
+        <button class="btn" onclick="openSheetsSettings()">⚙ Sheets 설정</button>
+        <button class="btn" onclick="showQR()" title="이 페이지 QR 코드">QR</button>
+        <div class="shortcut-wrap" id="shortcutWrap">
+          <button class="btn shortcut-trigger" onclick="toggleShortcut(event)">🔗 바로가기</button>
+          <div class="shortcut-menu" id="shortcutMenu">
+            <div class="shortcut-menu-header">CX-BU3 전용 대시보드</div>
+            <a class="shortcut-item" href="http://10.0.1.19:8001" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#e0f2fe;">💬</div>
+              <div class="si-info"><div class="si-name">CXM 서버</div><div class="si-meta">10.0.1.19:8001 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.1.19:8000" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#ede9fe;">🔧</div>
+              <div class="si-info"><div class="si-name">CWM 서버</div><div class="si-meta">10.0.1.19:8000 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.1.19:8002" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#dcfce7;">📋</div>
+              <div class="si-info"><div class="si-name">PMS 서버</div><div class="si-meta">10.0.1.19:8002 · admin</div></div>
+            </a>
+            <a class="shortcut-item" href="http://10.0.1.19:3000/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fef9c3;">📊</div>
+              <div class="si-info"><div class="si-name">SQR 대시보드</div><div class="si-meta">10.0.1.19:3000</div></div>
+            </a>
+            <a class="shortcut-item" href="https://intek-purchase-v2.vercel.app/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fee2e2;">🛒</div>
+              <div class="si-info"><div class="si-name">구매관리</div><div class="si-meta">intek-purchase-v2.vercel.app</div></div>
+            </a>
+            <a class="shortcut-item" href="https://pwc-ship-it.github.io/trip/" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#fce7f3;">✈️</div>
+              <div class="si-info"><div class="si-name">출장일정 관리</div><div class="si-meta">pwc-ship-it.github.io/trip</div></div>
+            </a>
+            <a class="shortcut-item" href="https://calm-sea-0c34b3500.6.azurestaticapps.net" target="_blank" rel="noopener">
+              <div class="shortcut-icon" style="background:#ffedd5;">🔔</div>
+              <div class="si-info"><div class="si-name">Vision Alarm Manager</div><div class="si-meta">Azure · 개인 계정 필요</div></div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-nav">
+        <button class="tab-btn on" id="tab_gantt" onclick="switchTab('gantt')">📅 간트 차트</button>
+        <button class="tab-btn" id="tab_person" onclick="switchTab('person')">👤 인원 출장일</button>
+        <button class="tab-btn" id="tab_equip" onclick="switchTab('equip')">🏭 설비 진행율</button>
+        <button class="tab-btn" id="tab_vision" onclick="switchTab('vision')">📋 이력관리</button>
+      </div>
+    </div>
+    <div class="content" id="view_gantt">
+      <div class="sidebar" id="ganttSidebar">
+        <div class="sbhead" style="display:flex;align-items:center;justify-content:space-between">
+          <span class="slbl">사이트 필터</span>
+          <button class="mobile-only sidebar-toggle" onclick="closeSidebar('gantt')" title="닫기" style="font-size:11px;padding:2px 6px">✕</button>
+        </div>
+        <div class="sbody" id="siteList"></div>
+      </div>
+      <div class="main">
+        <div class="gscroll" id="gscroll">
+          <div class="gwrap" id="gwrap">
+            <div class="ghrow">
+              <div class="ghinner">
+                <div class="ghfixed">
+                  <div class="ghc" style="width:68px;min-width:68px;max-width:68px">업무</div>
+                  <div class="ghc">출장자</div>
+                </div>
+                <div class="ghtl" id="ghTl"></div>
+              </div>
+              <div class="ghdb">
+                <div class="ghdbf"></div>
+                <div class="ghdbt" id="ghDb"></div>
+              </div>
+            </div>
+            <div id="gbody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="content" id="view_person" style="display:none">
+      <div class="pm-wrap" id="pmWrap">
+        </div>
+    </div>
+    <div class="content" id="view_equip" style="display:none">
+      <div class="sidebar" id="equipSidebar"></div>
+      <div class="main" style="overflow:hidden;display:flex;flex-direction:column">
+        <div id="eqSummary"></div>
+        <div class="eq-scroll" id="eqScroll">
+          <div id="eqGrid"></div>
+        </div>
+      </div>
+    </div>
+    <div class="content" id="view_vision" style="display:none">
+      <div class="sidebar vi-sidebar" id="visionSidebar"></div>
+      <div class="main" id="visionMain" style="overflow:hidden;display:flex;flex-direction:column"></div>
+    </div>
+  </div>
+  <div id="mc"></div>
+
+  <script src="data.js?v=20260723b"></script>
+  <script src="app.js?v=20260901a"></script>
+  <script src="gantt.js?v=20260827a"></script>
+  <script src="modals.js?v=20260810a"></script>
+  <script src="person.js?v=20260810b"></script>
+  <script src="equip.js?v=20260807a"></script>
+  <script src="vision.js?v=20260807a"></script>
+  <script src="export.js?v=20260730a"></script>
+</body>
+</html>
