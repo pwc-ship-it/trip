@@ -133,6 +133,7 @@ function addBar(el,sched){
   var sp=d2px(sched.start),ep=d2px(sched.end)+Math.round(WPX/7),wp=Math.max(ep-sp,8);
   var days=dd(sched.start,sched.end),dr=fmt(sched.start)+'~'+fmt(sched.end);
   var tl=TYPE_LBL[sched.type]||sched.type;
+  if(sched.type==='outsource'||sched.type==='localOutsource'){tl+=sched.paid?'·유상':'·무상';}
   var domesticTag=sched.domestic?' [국내]':'';
   var txt=dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'');
   var bar=document.createElement('div');bar.className='bar '+barCls(sched);bar.style.cssText='left:'+sp+'px;width:'+wp+'px';bar.title=txt;
@@ -315,6 +316,7 @@ function renderGantt(){
         row.className='grow '+(isEven?'even':'odd')+(isDone?' done':'')+(sched.hidden?' hidden-row':'');
         var gf2=document.createElement('div');gf2.className='gfix';
         var tc=TYPE_COLOR[sched.type]||'#555';var tl=TYPE_LBL[sched.type]||sched.type;
+        if(sched.type==='outsource'||sched.type==='localOutsource'){tl+=sched.paid?'·유상':'·무상';}
         gf2.innerHTML='<div class="gtask">'+(idx===0?_esc(task):'')+'</div>'
           +'<div class="gperson">'+_esc(sched.name)
           +'<span class="type-badge" style="background:'+tc+'">'+_esc(tl)+'</span>'
