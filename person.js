@@ -800,6 +800,10 @@ function runFeasibilityCheck(){
   resultEl.innerHTML=html;
 }
 
+// "유상 포함" 체크 여부에 따른 합계 — 미체크 시 무상만, 체크 시 무상+유상
+function _paidAdj(unpaid,paid){
+  return unpaid+(_pmSiteIncludePaid?paid:0);
+}
 // 무상/유상 일수 셀 포맷 — "유상 포함" 미체크 시 유상 숫자를 흐리게+취소선 처리(견적M/D 계산에서 빠진다는 시각적 표시)
 function _fmtPaidSplit(unpaid,paid){
   var paidHtml=_pmSiteIncludePaid?String(paid):('<span style="color:var(--tx-muted);text-decoration:line-through">'+paid+'</span>');
@@ -862,10 +866,10 @@ function renderSiteDaysSummary(){
           grandEstMd+=s.estMd; grandAllTotal+=allTotal;
           html+='<tr>'
               +'<td onclick="openSiteRosterModal(\''+sidAttr+'\')" style="cursor:pointer"><span class="pm-site-chip" style="background:'+s.color+'"></span>'+_esc(s.name)+'</td>'
-              +'<td>'+s.total+'일 ('+_fmtPaidSplit(s.totalUnpaid,s.totalPaid)+')</td>'
-              +'<td>'+s.hq+'일 ('+_fmtPaidSplit(s.hqUnpaid,s.hqPaid)+')</td>'
-              +'<td>'+s.out+'일 ('+_fmtPaidSplit(s.outUnpaid,s.outPaid)+')</td>'
-              +'<td>'+s.local+'일 ('+_fmtPaidSplit(s.localUnpaid,s.localPaid)+')</td>'
+              +'<td>'+s.mdTotal+'일 ('+_fmtPaidSplit(s.totalUnpaid,s.totalPaid)+')</td>'
+              +'<td>'+_paidAdj(s.hqUnpaid,s.hqPaid)+'일 ('+_fmtPaidSplit(s.hqUnpaid,s.hqPaid)+')</td>'
+              +'<td>'+_paidAdj(s.outUnpaid,s.outPaid)+'일 ('+_fmtPaidSplit(s.outUnpaid,s.outPaid)+')</td>'
+              +'<td>'+_paidAdj(s.localUnpaid,s.localPaid)+'일 ('+_fmtPaidSplit(s.localUnpaid,s.localPaid)+')</td>'
               +'<td>'+s.personCount+'명</td>'
               +'<td><input type="number" min="0" class="pm-estmd-inp" value="'+(s.estMd||'')+'" placeholder="-" onchange="updSiteEstMd(\''+sidAttr+'\',this.value)"></td>'
               +'<td>'+_fmtEstMdDiff(s.estMd,allTotal)+'</td>'
@@ -873,10 +877,10 @@ function renderSiteDaysSummary(){
         });
       });
       html+='<tr class="pm-site-total-row">'
-          +'<td>합계</td><td>'+agg.grandTotal+'일 ('+_fmtPaidSplit(agg.grandTotalUnpaid,agg.grandTotalPaid)+')</td>'
-          +'<td>'+agg.grandHq+'일 ('+_fmtPaidSplit(agg.grandHqUnpaid,agg.grandHqPaid)+')</td>'
-          +'<td>'+agg.grandOut+'일 ('+_fmtPaidSplit(agg.grandOutUnpaid,agg.grandOutPaid)+')</td>'
-          +'<td>'+agg.grandLocal+'일 ('+_fmtPaidSplit(agg.grandLocalUnpaid,agg.grandLocalPaid)+')</td>'
+          +'<td>합계</td><td>'+agg.grandMdTotal+'일 ('+_fmtPaidSplit(agg.grandTotalUnpaid,agg.grandTotalPaid)+')</td>'
+          +'<td>'+_paidAdj(agg.grandHqUnpaid,agg.grandHqPaid)+'일 ('+_fmtPaidSplit(agg.grandHqUnpaid,agg.grandHqPaid)+')</td>'
+          +'<td>'+_paidAdj(agg.grandOutUnpaid,agg.grandOutPaid)+'일 ('+_fmtPaidSplit(agg.grandOutUnpaid,agg.grandOutPaid)+')</td>'
+          +'<td>'+_paidAdj(agg.grandLocalUnpaid,agg.grandLocalPaid)+'일 ('+_fmtPaidSplit(agg.grandLocalUnpaid,agg.grandLocalPaid)+')</td>'
           +'<td>'+agg.grandPersons+'명</td>'
           +'<td>'+(grandEstMd?grandEstMd+'일':'-')+'</td><td>'+_fmtEstMdDiff(grandEstMd,grandAllTotal)+'</td>'
           +'</tr>';
