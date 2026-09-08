@@ -173,7 +173,7 @@ function showSM(ex){
   html+='<div class="fg"><label class="fl">업무 유형</label><input type="text" id="f_task" value="'+(ie?ex.task:'')+'" placeholder="예: 셋업, 대응, 개조"></div>';
   html+='<div class="fg"><label class="fl">출장자 이름</label><input type="text" id="f_name" value="'+(ie?ex.name:'')+'" placeholder="이름 입력"></div>';
   html+='<div class="fg"><label class="fl">인원 구분</label><select id="f_type">'+typeOpts+'</select></div>';
-  html+='<div class="fg" id="f_paid_row" style="display:none"><label class="chkrow" style="margin:0"><input type="checkbox" id="f_paid"'+(isPaid?' checked':'')+'>유상 (외주비 청구 대상)</label></div>';
+  html+='<div class="fg"><label class="chkrow" style="margin:0"><input type="checkbox" id="f_paid"'+(isPaid?' checked':'')+'>유상 (별도 계약 건 — 견적 M/D 소모에서 제외)</label></div>';
   html+='<div class="fr"><div class="fg"><label class="fl">출발일 (YYYY-MM-DD)</label><input type="text" id="f_start" value="'+(ie?ex.start:'2026-03-01')+'" placeholder="2026-04-01" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div><div class="fg"><label class="fl">복귀일 (YYYY-MM-DD)</label><input type="text" id="f_end" value="'+(ie?ex.end:'2026-03-30')+'" placeholder="2026-06-30" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div></div>';
   html+='<div class="dbox"><span id="f_datebox" style="color:#ccc">'+dateInfo+'</span>'+(dateInfo?' &nbsp; ':'')+'체류: <span id="f_days" style="font-weight:500">'+days+'</span></div>';
   html+='<div class="fg"><label class="fl">메모 / 비고</label><input type="text" id="f_note" value="'+(ie?ex.note:'')+'" placeholder="주의사항 등"></div>';
@@ -187,10 +187,8 @@ function showSM(ex){
   mw(html);
   // 이벤트 등록
   function _updDomWarn(){var sid=document.getElementById('f_site').value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');var warn=document.getElementById('f_dom_warn');if(warn)warn.style.display=(domCb&&domCb.checked&&reg!=='korea'&&reg!=='other')?'inline':'none';}
-  function _updPaidVis(){var t=document.getElementById('f_type').value;var row=document.getElementById('f_paid_row');if(row)row.style.display=(t==='outsource'||t==='localOutsource')?'':'none';}
   document.getElementById('f_site').onchange=function(){upP();var sid=this.value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');if(domCb&&reg!=='korea'&&reg!=='other'){domCb.checked=false;}_updDomWarn();};
   document.getElementById('f_domestic').onchange=function(){_updDomWarn();};
-  document.getElementById('f_type').onchange=function(){_updPaidVis();};
   document.getElementById('f_start').onchange=function(){calcD();};
   document.getElementById('f_end').onchange=function(){calcD();};
   document.getElementById('f_cancel').onclick=function(){cm();};
@@ -207,12 +205,10 @@ function showSM(ex){
       document.getElementById('f_proj').value=ex.projectId;
       calcD(); // 수정 모드에서 초기 날짜 표시
       _updDomWarn(); // 해외 사이트 + 국내 체크 시 경고 표시
-      _updPaidVis(); // 외주/현지외주일 때만 유상 체크박스 표시
     },0);
   } else {
     upP();
     calcD(); // 신규 등록 모드 초기 날짜 표시
-    _updPaidVis();
   }
 }
 /* 사이트/프로젝트 select 공용 정렬(가나다순) + 프로젝트 목록 갱신 */
@@ -261,8 +257,7 @@ function saveSc(exId){
   var note=document.getElementById('f_note').value.trim();
   var hidden=document.getElementById('f_hidden').checked;
   var domestic=document.getElementById('f_domestic').checked;
-  var paidCk=document.getElementById('f_paid');
-  var paid=(type==='outsource'||type==='localOutsource')&&!!(paidCk&&paidCk.checked);
+  var paid=document.getElementById('f_paid').checked;
   var dateRe=/^\d{4}-\d{2}-\d{2}$/;
   if(!projId||!task||!name||!start||!end){alert('필수 항목을 모두 입력하세요.');return;}
   if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}

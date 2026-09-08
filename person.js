@@ -220,14 +220,12 @@ function aggregateSiteDays(period){
     var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
     if(days<=0) return;
     var siteId=site.id;
-    if(!siteMap[siteId]) siteMap[siteId]={siteId:siteId,name:site.name,color:site.color,groupId:site.groupId,total:0,hq:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
+    if(!siteMap[siteId]) siteMap[siteId]={siteId:siteId,name:site.name,color:site.color,groupId:site.groupId,total:0,hq:0,hqUnpaid:0,hqPaid:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
     var entry=siteMap[siteId];
-    var isOutType=sc.type==='outsource'||sc.type==='localOutsource';
-    var isPaidExcluded=isOutType&&sc.paid&&!_pmSiteIncludeOutsourcePaid;
-    if(!isPaidExcluded) entry.total+=days;
+    entry.total+=days; // 전체 출장일은 항상 무상+유상 전체 실적 (표시용)
     if(sc.type==='outsource'){entry.out+=days; if(sc.paid) entry.outPaid+=days; else entry.outUnpaid+=days;}
     else if(sc.type==='localOutsource'){entry.local+=days; if(sc.paid) entry.localPaid+=days; else entry.localUnpaid+=days;}
-    else entry.hq+=days;
+    else {entry.hq+=days; if(sc.paid) entry.hqPaid+=days; else entry.hqUnpaid+=days;}
     entry.names[sc.name]=true;
   });
 
@@ -235,8 +233,12 @@ function aggregateSiteDays(period){
   var siteList=Object.keys(siteMap).map(function(id){
     var e=siteMap[id];
     var siteObj=S.sites.find(function(s){return s.id===id;});
+    var totalUnpaid=e.hqUnpaid+e.outUnpaid+e.localUnpaid;
+    var totalPaid=e.hqPaid+e.outPaid+e.localPaid;
     return {siteId:e.siteId,name:e.name,color:e.color,groupId:e.groupId,
-      total:e.total,hq:e.hq,out:e.out,outUnpaid:e.outUnpaid,outPaid:e.outPaid,local:e.local,localUnpaid:e.localUnpaid,localPaid:e.localPaid,personCount:Object.keys(e.names).length,
+      total:e.total,totalUnpaid:totalUnpaid,totalPaid:totalPaid,
+      mdTotal:totalUnpaid+(_pmSiteIncludePaid?totalPaid:0), // 견적M/D 차이 계산용(유상 제외 기본)
+      hq:e.hq,hqUnpaid:e.hqUnpaid,hqPaid:e.hqPaid,out:e.out,outUnpaid:e.outUnpaid,outPaid:e.outPaid,local:e.local,localUnpaid:e.localUnpaid,localPaid:e.localPaid,personCount:Object.keys(e.names).length,
       estMd:(siteObj&&siteObj.estMd)?Number(siteObj.estMd):0};
   });
   siteList.sort(function(a,b){
@@ -256,15 +258,20 @@ function aggregateSiteDays(period){
     g.sites.push(s);
   });
 
-  var grand={total:0,hq:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
+  var grand={total:0,hq:0,hqUnpaid:0,hqPaid:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
   Object.keys(siteMap).forEach(function(id){
     grand.total+=siteMap[id].total; grand.hq+=siteMap[id].hq; grand.out+=siteMap[id].out; grand.local+=siteMap[id].local;
+    grand.hqUnpaid+=siteMap[id].hqUnpaid; grand.hqPaid+=siteMap[id].hqPaid;
     grand.outUnpaid+=siteMap[id].outUnpaid; grand.outPaid+=siteMap[id].outPaid;
     grand.localUnpaid+=siteMap[id].localUnpaid; grand.localPaid+=siteMap[id].localPaid;
     Object.keys(siteMap[id].names).forEach(function(n){grand.names[n]=true;});
   });
+  var grandTotalUnpaid=grand.hqUnpaid+grand.outUnpaid+grand.localUnpaid;
+  var grandTotalPaid=grand.hqPaid+grand.outPaid+grand.localPaid;
 
-  return {groups:groups,grandTotal:grand.total,grandHq:grand.hq,grandOut:grand.out,grandOutUnpaid:grand.outUnpaid,grandOutPaid:grand.outPaid,grandLocal:grand.local,grandLocalUnpaid:grand.localUnpaid,grandLocalPaid:grand.localPaid,grandPersons:Object.keys(grand.names).length};
+  return {groups:groups,grandTotal:grand.total,grandTotalUnpaid:grandTotalUnpaid,grandTotalPaid:grandTotalPaid,
+    grandMdTotal:grandTotalUnpaid+(_pmSiteIncludePaid?grandTotalPaid:0),
+    grandHq:grand.hq,grandHqUnpaid:grand.hqUnpaid,grandHqPaid:grand.hqPaid,grandOut:grand.out,grandOutUnpaid:grand.outUnpaid,grandOutPaid:grand.outPaid,grandLocal:grand.local,grandLocalUnpaid:grand.localUnpaid,grandLocalPaid:grand.localPaid,grandPersons:Object.keys(grand.names).length};
 }
 
 // rolling 12M 기준 지역별 출장일 (중복 날짜 제거)
@@ -508,7 +515,7 @@ var _pmSitePeriod='all';      // 사이트별 출장일 집계 기간: all | yea
 var _pmSiteCollapsed=true;    // 사이트별 출장일 요약 접기 상태 (기본 접힘)
 var _pmSiteTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true,localOutsource:false}; // 사이트별 요약 인원유형 체크
 var _pmSiteIncludeDomestic=false; // 사이트별 요약에 국내(국내 출장) 일정 포함 여부, 기본 미포함
-var _pmSiteIncludeOutsourcePaid=false; // 사이트별 요약/견적M/D 계산에 유상 외주(외주+현지외주) 포함 여부, 기본 미포함(무상만)
+var _pmSiteIncludePaid=false; // 사이트별 요약/견적M/D 계산에 유상(별도 계약 건) 출장 포함 여부 — 유상은 견적 M/D를 소모하지 않으므로 기본 미포함(무상만 집계)
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
 function setPmSearch(v){
@@ -548,8 +555,8 @@ function toggleSiteDomesticFilter(){
   var el=document.getElementById('pmSiteDaysWrap');
   if(el) el.outerHTML=renderSiteDaysSummary();
 }
-function toggleSiteIncludeOutsourcePaid(){
-  _pmSiteIncludeOutsourcePaid=!_pmSiteIncludeOutsourcePaid;
+function toggleSiteIncludePaid(){
+  _pmSiteIncludePaid=!_pmSiteIncludePaid;
   var el=document.getElementById('pmSiteDaysWrap');
   if(el) el.outerHTML=renderSiteDaysSummary();
 }
@@ -793,6 +800,11 @@ function runFeasibilityCheck(){
   resultEl.innerHTML=html;
 }
 
+// 무상/유상 일수 셀 포맷 — "유상 포함" 미체크 시 유상 숫자를 흐리게+취소선 처리(견적M/D 계산에서 빠진다는 시각적 표시)
+function _fmtPaidSplit(unpaid,paid){
+  var paidHtml=_pmSiteIncludePaid?String(paid):('<span style="color:var(--tx-muted);text-decoration:line-through">'+paid+'</span>');
+  return unpaid+'/'+paidHtml;
+}
 // 견적 M/D 대비 잔여/초과 표시 (estMd 미입력 시 '-')
 function _fmtEstMdDiff(estMd,allTotal){
   if(!estMd) return '<span style="color:var(--tx-muted)">-</span>';
@@ -809,7 +821,7 @@ function renderSiteDaysSummary(){
   if(_pmSitePeriod!=='all'){
     var allAgg=aggregateSiteDays('all');
     allTotalMap={};
-    allAgg.groups.forEach(function(g){g.sites.forEach(function(s){allTotalMap[s.siteId]=s.total;});});
+    allAgg.groups.forEach(function(g){g.sites.forEach(function(s){allTotalMap[s.siteId]=s.mdTotal;});});
   }
   var periods=[['all','전체'],['year','올해'],['r12','최근12개월']];
   var html='<div class="pm-site-days" id="pmSiteDaysWrap">';
@@ -832,28 +844,28 @@ function renderSiteDaysSummary(){
     });
     html+='<span style="width:1px;height:16px;background:#3a3a44;margin:0 2px"></span>';
     html+='<label class="pm-type-ck'+(_pmSiteIncludeDomestic?' on':'')+'" style="--tc:#666666;'+(_pmSiteIncludeDomestic?'background:#66666622;border-color:#666666':'')+'"><input type="checkbox"'+(_pmSiteIncludeDomestic?' checked':'')+' onchange="toggleSiteDomesticFilter()">국내 포함</label>';
-    html+='<label class="pm-type-ck'+(_pmSiteIncludeOutsourcePaid?' on':'')+'" style="--tc:'+TYPE_COLOR.outsource+';'+(_pmSiteIncludeOutsourcePaid?'background:'+TYPE_COLOR.outsource+'22;border-color:'+TYPE_COLOR.outsource:'')+'"><input type="checkbox"'+(_pmSiteIncludeOutsourcePaid?' checked':'')+' onchange="toggleSiteIncludeOutsourcePaid()">외주 유상 포함</label>';
+    html+='<label class="pm-type-ck'+(_pmSiteIncludePaid?' on':'')+'" style="--tc:#b58500;'+(_pmSiteIncludePaid?'background:#b5850022;border-color:#b58500':'')+'"><input type="checkbox"'+(_pmSiteIncludePaid?' checked':'')+' onchange="toggleSiteIncludePaid()">유상 포함</label>';
     html+='</div>';
 
     if(!agg.groups.length){
       html+='<div style="padding:12px;color:var(--tx-muted);font-size:12px">해당 조건에 등록된 출장 일정이 없습니다.</div>';
     }else{
       html+='<table class="pm-person-table pm-site-days-table"><thead><tr>'
-          +'<th>사이트</th><th>전체 출장일</th><th>본사</th><th>외주(무상/유상)</th><th>현지외주(무상/유상)</th><th>출장 인원수</th><th>견적 M/D</th><th>차이</th>'
+          +'<th>사이트</th><th>전체 출장일(무상/유상)</th><th>본사(무상/유상)</th><th>외주(무상/유상)</th><th>현지외주(무상/유상)</th><th>출장 인원수</th><th>견적 M/D</th><th>차이</th>'
           +'</tr></thead><tbody>';
       var grandEstMd=0, grandAllTotal=0;
       agg.groups.forEach(function(g){
         html+='<tr class="pm-site-group-row"><td colspan="8">'+_esc(g.groupName)+'</td></tr>';
         g.sites.forEach(function(s){
           var sidAttr=s.siteId.replace(/'/g,"\\'");
-          var allTotal=allTotalMap?(allTotalMap[s.siteId]||0):s.total;
+          var allTotal=allTotalMap?(allTotalMap[s.siteId]||0):s.mdTotal;
           grandEstMd+=s.estMd; grandAllTotal+=allTotal;
           html+='<tr>'
               +'<td onclick="openSiteRosterModal(\''+sidAttr+'\')" style="cursor:pointer"><span class="pm-site-chip" style="background:'+s.color+'"></span>'+_esc(s.name)+'</td>'
-              +'<td>'+s.total+'일</td>'
-              +'<td>'+s.hq+'일</td>'
-              +'<td>'+s.out+'일 ('+s.outUnpaid+'/'+s.outPaid+')</td>'
-              +'<td>'+s.local+'일 ('+s.localUnpaid+'/'+s.localPaid+')</td>'
+              +'<td>'+s.total+'일 ('+_fmtPaidSplit(s.totalUnpaid,s.totalPaid)+')</td>'
+              +'<td>'+s.hq+'일 ('+_fmtPaidSplit(s.hqUnpaid,s.hqPaid)+')</td>'
+              +'<td>'+s.out+'일 ('+_fmtPaidSplit(s.outUnpaid,s.outPaid)+')</td>'
+              +'<td>'+s.local+'일 ('+_fmtPaidSplit(s.localUnpaid,s.localPaid)+')</td>'
               +'<td>'+s.personCount+'명</td>'
               +'<td><input type="number" min="0" class="pm-estmd-inp" value="'+(s.estMd||'')+'" placeholder="-" onchange="updSiteEstMd(\''+sidAttr+'\',this.value)"></td>'
               +'<td>'+_fmtEstMdDiff(s.estMd,allTotal)+'</td>'
@@ -861,9 +873,10 @@ function renderSiteDaysSummary(){
         });
       });
       html+='<tr class="pm-site-total-row">'
-          +'<td>합계</td><td>'+agg.grandTotal+'일</td><td>'+agg.grandHq+'일</td>'
-          +'<td>'+agg.grandOut+'일 ('+agg.grandOutUnpaid+'/'+agg.grandOutPaid+')</td>'
-          +'<td>'+agg.grandLocal+'일 ('+agg.grandLocalUnpaid+'/'+agg.grandLocalPaid+')</td>'
+          +'<td>합계</td><td>'+agg.grandTotal+'일 ('+_fmtPaidSplit(agg.grandTotalUnpaid,agg.grandTotalPaid)+')</td>'
+          +'<td>'+agg.grandHq+'일 ('+_fmtPaidSplit(agg.grandHqUnpaid,agg.grandHqPaid)+')</td>'
+          +'<td>'+agg.grandOut+'일 ('+_fmtPaidSplit(agg.grandOutUnpaid,agg.grandOutPaid)+')</td>'
+          +'<td>'+agg.grandLocal+'일 ('+_fmtPaidSplit(agg.grandLocalUnpaid,agg.grandLocalPaid)+')</td>'
           +'<td>'+agg.grandPersons+'명</td>'
           +'<td>'+(grandEstMd?grandEstMd+'일':'-')+'</td><td>'+_fmtEstMdDiff(grandEstMd,grandAllTotal)+'</td>'
           +'</tr>';
@@ -897,8 +910,7 @@ function openSiteRosterModal(siteId){
   rows.sort(function(a,b){return a.start>b.start?1:(a.start<b.start?-1:a.name.localeCompare(b.name,'ko'));});
 
   var total=rows.reduce(function(sum,r){
-    var isOutType=r.type==='outsource'||r.type==='localOutsource';
-    if(isOutType&&r.paid&&!_pmSiteIncludeOutsourcePaid) return sum;
+    if(r.paid&&!_pmSiteIncludePaid) return sum;
     return sum+r.days;
   },0);
   var sidAttr2=siteId.replace(/'/g,"\\'");
@@ -915,7 +927,7 @@ function openSiteRosterModal(siteId){
     rows.forEach(function(r){
       body+='<tr>'
           +'<td>'+_esc(r.name)+'</td>'
-          +'<td>'+_esc(TYPE_LBL[r.type]||r.type)+(((r.type==='outsource'||r.type==='localOutsource')&&r.paid)?' (유상)':'')+'</td>'
+          +'<td>'+_esc(TYPE_LBL[r.type]||r.type)+(r.paid?' (유상)':'')+'</td>'
           +'<td>'+_esc(r.task)+'</td>'
           +'<td>'+r.start+'</td>'
           +'<td>'+r.end+'</td>'
