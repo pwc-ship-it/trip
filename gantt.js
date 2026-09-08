@@ -201,6 +201,9 @@ function renderGantt(){
   if(_btn){_btn.textContent=S.showHidden?'숨김 숨기기':'숨김 보기';_btn.className='btn'+(S.showHidden?' warn':'');}
   // 오늘 날짜 문자열 (과거 일정 판별용)
   var _td=TODAY;var todayISO=_td.getFullYear()+'-'+String(_td.getMonth()+1).padStart(2,'0')+'-'+String(_td.getDate()).padStart(2,'0');
+  // 이벤트는 종료일이 없어 "날짜+숨김기준일" 경과 여부로 과거 판정 (설정 가능, 기본 30일)
+  var _evCutoff=new Date(_td);_evCutoff.setDate(_evCutoff.getDate()-getEventHideDays());
+  var evCutoffISO=_evCutoff.getFullYear()+'-'+String(_evCutoff.getMonth()+1).padStart(2,'0')+'-'+String(_evCutoff.getDate()).padStart(2,'0');
   // 사이드바와 동일한 그룹→사이트 순서 기준으로 프로젝트 정렬
   var siteOrder={};
   var _so=0;
@@ -231,7 +234,7 @@ function renderGantt(){
     if(_ganttSearch) return hasVisible;
     var hasEvent=_typeShow.event&&S.events.some(function(e){
       if(e.projectId!==p.id)return false;
-      var isPast=e.date&&e.date<todayISO;
+      var isPast=e.date&&e.date<evCutoffISO;
       return !isPast||S.showHidden;
     });
     var hasWork=_typeShow.work&&S.workTasks.some(function(w){return w.projectId===p.id;});
@@ -251,7 +254,7 @@ function renderGantt(){
     });
     var evts=(_ganttSearch||!_typeShow.event)?[]:S.events.filter(function(e){
       if(e.projectId!==proj.id)return false;
-      var isPast=e.date&&e.date<todayISO;
+      var isPast=e.date&&e.date<evCutoffISO;
       return !isPast||S.showHidden;
     });
     var wts=(_ganttSearch||!_typeShow.work)?[]:S.workTasks.filter(function(w){

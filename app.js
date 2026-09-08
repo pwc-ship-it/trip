@@ -869,6 +869,12 @@ var DEFAULT_SHEETS_URL='https://script.google.com/macros/s/AKfycbwzOXzciY5Rh6BEZ
 })();
 function getSheetsUrl(){try{return localStorage.getItem(SHEETS_LS_KEY)||'';}catch(e){return '';}}
 function setSheetsUrl(u){try{localStorage.setItem(SHEETS_LS_KEY,u);}catch(e){}}
+
+/* 이벤트(단일 날짜) 자동 숨김 기준일 — 출장일정/작업은 종료일 경과 시 바로 숨겨지지만,
+   이벤트는 종료일이 없어 날짜로부터 며칠 뒤에 숨길지 별도 설정 필요 (기본 30일) */
+var EVENT_HIDE_DAYS_LS_KEY='bu3_eventHideDays';
+function getEventHideDays(){try{var v=parseInt(localStorage.getItem(EVENT_HIDE_DAYS_LS_KEY),10);return (isFinite(v)&&v>=0)?v:30;}catch(e){return 30;}}
+function setEventHideDays(v){try{localStorage.setItem(EVENT_HIDE_DAYS_LS_KEY,String(v));}catch(e){}}
 function openSheetsSettings(){
   var cur=getSheetsUrl();
   var displayUrl=cur||DEFAULT_SHEETS_URL;
@@ -893,6 +899,14 @@ function openSheetsSettings(){
     +'<div style="font-size:11px;color:var(--tx-faint);margin-bottom:8px">다른 PC에서 삭제된 일정이 계속 보이거나 데이터가 다르게 표시될 때 사용합니다.<br>Sheets 데이터로 완전히 교체됩니다.</div>'
     +'<button class="btn sm warn" onclick="cm();forceLoadFromSheets()">⟳ Sheets에서 강제 초기화</button>'
     +'</div>'
+    +'<div style="border-top:1px solid var(--bd-main);padding-top:12px;margin-bottom:8px">'
+    +'<div style="font-size:11px;font-weight:600;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">간트 자동 숨김</div>'
+    +'<div style="font-size:11px;color:var(--tx-faint);margin-bottom:8px">출장일정/작업은 종료일이 지나면 바로 숨겨집니다. 이벤트는 종료일이 없어 날짜로부터 며칠 뒤에 숨길지 아래에서 정할 수 있습니다.</div>'
+    +'<div class="fg" style="display:flex;align-items:center;gap:8px"><label class="fl" style="margin:0">이벤트 숨김 기준</label>'
+    +'<input type="number" min="0" id="ev_hide_days" value="'+getEventHideDays()+'" style="width:70px">'
+    +'<span style="font-size:12px;color:var(--tx-faint)">일 경과 후 숨김</span>'
+    +'<button class="btn sm pri" onclick="saveEventHideDays()">저장</button></div>'
+    +'</div>'
     +'<div class="mfoot">'
     +'<button class="btn sm" onclick="cm()">닫기</button>'
     +'</div>');
@@ -902,6 +916,11 @@ function saveSheetsUrl(){
   if(!u){alert('URL을 입력해주세요.');return;}
   setSheetsUrl(u);cm();
   checkConn();
+}
+function saveEventHideDays(){
+  var v=parseInt(document.getElementById('ev_hide_days').value,10);
+  if(!isFinite(v)||v<0){alert('0 이상의 숫자를 입력해주세요.');return;}
+  setEventHideDays(v);cm();renderAll();
 }
 function forceLoadFromSheets(){
   if(!confirm('Sheets 데이터로 완전히 교체합니다.\n로컬에만 있는 미동기화 변경사항은 유실됩니다.\n계속하시겠습니까?')) return;
