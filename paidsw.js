@@ -6,8 +6,8 @@
      siteStatus에 키가 없는 사이트 = 대상 아님(N/A)
 ══════════════════════════════════════════ */
 
-/* ── 그룹별 사이트 목록 (gantt.js renderSidebar와 동일한 그룹핑 로직) ── */
-function _pfSiteGroups(){
+/* ── 그룹별 사이트 목록 (gantt.js renderSidebar와 동일한 그룹핑 로직) — 전체 사이트, 모달 선택용 ── */
+function _pfAllSiteGroups(){
   var out=[];
   var groups=S.groups&&S.groups.length?S.groups:[{id:'_none',name:'사이트'}];
   groups.forEach(function(grp){
@@ -16,6 +16,30 @@ function _pfSiteGroups(){
     out.push({group:grp,sites:sites});
   });
   return out;
+}
+
+/* ── 매트릭스 기본 표시 사이트: LGES(해외) 그룹 전체 + 국내 ESOC ──
+   그 외 사이트는 기능 추가/수정 모달에서 실제로 선택된 경우에만 열로 나타남 (표 폭 관리) */
+function _pfDefaultVisibleIds(){
+  var ids={};
+  S.sites.forEach(function(s){if((s.groupId||'_none')==='lges')ids[s.id]=true;});
+  var esoc=S.sites.find(function(s){return s.id==='ESOC';});
+  if(esoc)ids[esoc.id]=true;
+  return ids;
+}
+function _pfVisibleSiteIds(){
+  var ids=_pfDefaultVisibleIds();
+  (S.paidFeatures||[]).forEach(function(f){
+    Object.keys(f.siteStatus||{}).forEach(function(sid){ids[sid]=true;});
+  });
+  return ids;
+}
+/* 매트릭스 렌더용 — 기본 사이트 + 실제 사용중인 사이트만 */
+function _pfSiteGroups(){
+  var visible=_pfVisibleSiteIds();
+  return _pfAllSiteGroups().map(function(g){
+    return {group:g.group,sites:g.sites.filter(function(s){return visible[s.id];})};
+  }).filter(function(g){return g.sites.length;});
 }
 
 /* ── 기능건 완료 상태: 'none'(등록만) | 'rep'(대상사이트 대표호기 전체 적용) | 'full'(대표+전호기 전체 적용) ──
@@ -215,7 +239,7 @@ function _pfModalHtml(ex){
   return h;
 }
 function _pfPickerHtml(){
-  var sg=_pfSiteGroups();
+  var sg=_pfAllSiteGroups();
   var h='';
   sg.forEach(function(g){
     var allOn=g.sites.length>0&&g.sites.every(function(s){return _pfSel[s.id];});
@@ -228,7 +252,7 @@ function _pfPickerHtml(){
   return h||'<div class="pf-empty">등록된 사이트가 없습니다.</div>';
 }
 function _pfSelectedHtml(){
-  var sg=_pfSiteGroups();
+  var sg=_pfAllSiteGroups();
   var chips='';
   sg.forEach(function(g){g.sites.forEach(function(s){
     if(_pfSel[s.id])chips+='<span class="pf-chip"><span class="sdot" style="background:'+s.color+'"></span>'+_esc(s.name)+'<span class="pf-chip-x" onclick="_pfToggleSite(\''+s.id+'\')">×</span></span>';
