@@ -189,6 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .mover{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--overlay);backdrop-filter:blur(3px)}
 .modal{background:var(--bg-panel);border-radius:10px;border:1.5px solid var(--bd-strong);padding:20px 22px;width:460px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 .modal.wide{width:700px}
+.modal.xwide{width:960px}
 .mtit{font-size:14px;font-weight:500;margin-bottom:16px;color:var(--tx-primary)}
 .fg{margin-bottom:12px}
 .fl{font-size:11px;color:var(--tx-second);margin-bottom:4px;display:block;font-weight:500}
@@ -197,6 +198,39 @@ input[type=text],input[type=date],select{width:100%;padding:6px 9px;border:1px s
 input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
 .chkrow{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx-primary);padding:4px 0;cursor:pointer}
 #ganttTools .chkrow{white-space:nowrap;flex-shrink:0}
+
+/* 유상 S/W 탭 */
+.pf-table{border-collapse:collapse;font-size:12px}
+.pf-table th,.pf-table td{border:1px solid var(--bd-main);padding:5px 8px;text-align:center;white-space:nowrap}
+.pf-th-grp{background:var(--bg-hover);font-weight:600;font-size:11px}
+.pf-th-site{font-size:11px;font-weight:500}
+.pf-th-sub{font-size:10px;color:var(--tx-second);font-weight:500}
+.pf-title{cursor:pointer;text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.pf-title:hover{text-decoration:underline}
+.pf-title-rep{background:rgba(250,178,25,.24)}
+.pf-title-full{background:rgba(12,163,12,.22)}
+.pf-accent-po{border-left:3px solid #2a78d6}
+.pf-accent-rep{border-left:3px solid #fab219}
+.pf-accent-full{border-left:3px solid #0ca30c}
+.pf-na{color:var(--tx-faint);font-size:11px}
+.pf-cell{cursor:pointer}
+.pf-cell:hover{background:var(--bg-hover)}
+.pf-applied{color:#0f9e6e;font-size:11px;line-height:1.3}
+.pf-all{font-size:13px}
+.pf-podate{width:88px;font-size:11px;margin-left:4px;padding:2px 4px}
+.pf-empty{padding:24px;color:var(--tx-faint);text-align:center}
+.pf-popover{position:fixed;z-index:300;background:var(--bg-panel);border:1.5px solid var(--bd-strong);border-radius:8px;padding:12px;width:220px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.pf-pop-tit{font-size:12px;font-weight:600;margin-bottom:8px;color:var(--tx-primary)}
+.pf-3col{display:flex;gap:14px}
+.pf-col{flex:1;min-width:0}
+.pf-colB{max-height:400px;overflow-y:auto}
+.pf-colC{display:flex;flex-direction:column}
+.pf-grp{margin-bottom:8px}
+.pf-grplbl{font-size:12px}
+.pf-sitelbl{padding-left:16px;font-size:12px}
+.pf-chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg-hover);border-radius:12px;padding:3px 8px;margin:2px;font-size:11px}
+.pf-chip-x{cursor:pointer;color:var(--tx-faint);font-weight:700;margin-left:2px}
+.pf-chip-x:hover{color:#b52020}
 .chkrow input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#534AB7}
 .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd-main)}
 .dbox{padding:6px 10px;background:var(--bg-input);border-radius:5px;font-size:12px;color:var(--tx-second);margin-bottom:12px;border:1px solid var(--bd-main)}
@@ -881,12 +915,15 @@ input[type=text]:focus,input[type=date]:focus,select:focus{border-color:#1a6bbf}
   .leg{display:none}
 
   /* 툴바 줄바꿈 */
-  #ganttTools,#equipTools,#visionTools{flex-wrap:wrap;gap:4px}
+  #ganttTools,#equipTools,#visionTools,#paidswTools{flex-wrap:wrap;gap:4px}
 
   /* 모달 전체화면 */
   .mover{align-items:flex-end}
   .modal{width:100vw!important;max-width:100vw!important;border-radius:12px 12px 0 0!important;max-height:88dvh;margin:0}
   .modal.wide{width:100vw!important}
+  .modal.xwide{width:100vw!important}
+  .pf-3col{flex-direction:column}
+  .pf-colB{max-height:200px}
   .sitemgr{grid-template-columns:1fr;height:auto;max-height:60vh}
   .sitemgr-l{border-right:none;border-bottom:1px solid var(--bd-main);padding-right:0;padding-bottom:10px;margin-bottom:10px;max-height:200px}
 

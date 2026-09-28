@@ -3,7 +3,7 @@ var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a',localOutsource:'#1a8ca0'};
 
 /* ── 상태 ── */
-var S={filterSite:'all',filterSites:[],showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[]};
+var S={filterSite:'all',filterSites:[],showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[],paidFeatures:[]};
 /* ══════════════════════════════════════════
    통합 Tombstone(삭제 기록) 모듈 — 모든 엔티티 타입의 삭제 ID 추적
    - merge/pull 시 삭제 레코드 재복원(부활) 방지
@@ -160,7 +160,7 @@ function _mergeArr(type,localArr,sheetArr,opts){
 }
 /* 모든 엔티티 배열에서 tombstone 레코드 일괄 제거 — deletedIds 흡수 직후 호출 */
 function _purgeTombstoned(){
-  ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips'].forEach(function(type){
+  ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips','paidFeatures'].forEach(function(type){
     if(!S[type]||!S[type].length||!_tombMap[type])return;
     S[type]=S[type].filter(function(r){return !r||!r.id||!_isDeleted(type,r.id);});
   });
@@ -452,6 +452,7 @@ function loadData(){
         S.equipProjects=d.equipProjects||[];
         S.visionTemplate=(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)?d.visionTemplate:deepCopy(DEF.visionTemplate);
         S.visionEquips=d.visionEquips||[];
+        S.paidFeatures=d.paidFeatures||[];
         _migrateVisionTemplate();
         _migrateVisionEquips();
         try{var cv=JSON.parse(localStorage.getItem('viColVis')||'{}');S.visionColVis=cv;}catch(e){S.visionColVis={};}
@@ -492,7 +493,8 @@ function _saveLocalBackup(){
       equipProjects:S.equipProjects, equipSiteOrder:S.equipSiteOrder,
       visionTemplate:S.visionTemplate, visionEquips:S.visionEquips,
       schedules:S.schedules, events:S.events, workTasks:S.workTasks,
-      sites:S.sites, groups:S.groups, projects:S.projects};
+      sites:S.sites, groups:S.groups, projects:S.projects,
+      paidFeatures:S.paidFeatures};
     localStorage.setItem(BACKUP_KEY, JSON.stringify(snap));
   }catch(e){}
 }
@@ -510,7 +512,8 @@ function downloadDataBackup(){
       schedules:S.schedules,events:S.events,workTasks:S.workTasks,
       equipItems:S.equipItems,equipUnits:S.equipUnits,
       equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-      visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
+      visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
+      paidFeatures:S.paidFeatures};
     var json=JSON.stringify(data,null,2);
     var blob=new Blob([json],{type:'application/json'});
     var url=URL.createObjectURL(blob);
@@ -547,10 +550,11 @@ function restoreFromBackupFile(){
         if(d.equipProjects)S.equipProjects=d.equipProjects;
         if(d.visionTemplate&&d.visionTemplate.categories&&d.visionTemplate.categories.length)S.visionTemplate=d.visionTemplate;
         if(d.visionEquips)S.visionEquips=d.visionEquips;
+        if(d.paidFeatures)S.paidFeatures=d.paidFeatures;
         // 복원 데이터가 병합에서 항상 이기도록 처리:
         // ① 복원된 레코드의 tombstone 해제 (삭제됐던 레코드도 복원 의도대로 살림)
         // ② 전 레코드 mt 갱신 (Sheets의 기존 버전이 복원본을 덮어쓰지 못하게)
-        ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips'].forEach(function(type){
+        ['schedules','events','workTasks','sites','groups','projects','equipItems','equipUnits','equipProjects','visionEquips','paidFeatures'].forEach(function(type){
           (S[type]||[]).forEach(function(r){
             if(!r||!r.id)return;
             if(_isDeleted(type,r.id))_unmarkDeleted(type,r.id);
@@ -574,7 +578,7 @@ var _saveRetryTimer=null;    // GET 실패로 이번 저장을 건너뛴 뒤 재
 
 function saveData(){
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침·오프라인 시 최신 상태 보장)
-  var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
+  var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures};
   saveCache(snapshot);
   try{localStorage.setItem(CACHE_DIRTY_KEY,'1');}catch(e){}
 
@@ -633,6 +637,8 @@ function _flushToSheets(){
       S.equipProjects=_mergeArr('equipProjects',S.equipProjects,sheetsData.equipProjects);
     if(sheetsData.visionEquips&&sheetsData.visionEquips.length)
       S.visionEquips=_mergeArr('visionEquips',S.visionEquips,sheetsData.visionEquips,{protectField:'data',postMerge:_viPostMerge});
+    if(sheetsData.paidFeatures&&sheetsData.paidFeatures.length)
+      S.paidFeatures=_mergeArr('paidFeatures',S.paidFeatures,sheetsData.paidFeatures);
     // ── visionTemplate: 단일 JSON 블롭 — Sheets가 더 최신(mt)일 때만 교체
     if(sheetsData.visionTemplate&&sheetsData.visionTemplate.categories&&sheetsData.visionTemplate.categories.length){
       if(Number(sheetsData.visionTemplate.mt||0)>Number((S.visionTemplate||{}).mt||0)){
@@ -640,7 +646,7 @@ function _flushToSheets(){
         _migrateVisionTemplate();
       }
     }
-    saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+    saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures});
   }
 
   // 5. 저장 완료 처리 (성공/실패 공통)
@@ -684,7 +690,7 @@ function _flushToSheets(){
         body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
           projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
           equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-          visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
+          visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures,
           deletedIds:_tombList(),
           clearDeletedIds:_tombClearQueue,
           deletedScheduleIds:_deletedScIds(),
@@ -770,6 +776,7 @@ function _entityLabel(type,id){
     case 'equipUnits': return '설비 호기: '+(r.lineName?r.lineName+' - ':'')+(r.unitName||id);
     case 'equipProjects': return '설비 프로젝트: '+(r.name||id);
     case 'visionEquips': return 'Vision 설비: '+((r.data&&r.data['vi_unit'])||id);
+    case 'paidFeatures': return '유상 S/W: '+(r.title||id);
     default: return type+' / '+id;
   }
 }
@@ -1005,7 +1012,7 @@ function loadFromSheets(callback){
       body:JSON.stringify({action:'save',groups:S.groups,sites:S.sites,
         projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,
         equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,
-        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,
+        visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures,
         deletedIds:_tombList(),
         clearDeletedIds:_tombClearQueue,
         deletedScheduleIds:_deletedScIds(),
@@ -1036,12 +1043,13 @@ function loadFromSheets(callback){
               if(pulled.equipUnits&&pulled.equipUnits.length)S.equipUnits=_mergeArr('equipUnits',S.equipUnits,pulled.equipUnits,{protectField:'cells'});
               if(pulled.equipProjects&&pulled.equipProjects.length)S.equipProjects=_mergeArr('equipProjects',S.equipProjects,pulled.equipProjects);
               if(pulled.visionEquips&&pulled.visionEquips.length)S.visionEquips=_mergeArr('visionEquips',S.visionEquips,pulled.visionEquips,{protectField:'data',postMerge:_viPostMerge});
+              if(pulled.paidFeatures&&pulled.paidFeatures.length)S.paidFeatures=_mergeArr('paidFeatures',S.paidFeatures,pulled.paidFeatures);
               if(pulled.visionTemplate&&pulled.visionTemplate.categories&&pulled.visionTemplate.categories.length){
                 if(Number(pulled.visionTemplate.mt||0)>Number((S.visionTemplate||{}).mt||0)){
                   S.visionTemplate=pulled.visionTemplate;_migrateVisionTemplate();
                 }
               }
-              saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips});
+              saveCache({groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures});
             }
             if(led){led.className='conn-led ok';txt.textContent='동기화 완료';}
             if(callback)callback();
@@ -1135,7 +1143,10 @@ function loadFromSheets(callback){
         });
       }
 
-      var _cacheSnap={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips};
+      // ── paidFeatures ──
+      if(data.paidFeatures&&data.paidFeatures.length)S.paidFeatures=_mergeArr('paidFeatures',S.paidFeatures,data.paidFeatures);
+
+      var _cacheSnap={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures};
       saveCache(_cacheSnap);
       // saveData()의 30초 merge 캐시도 갱신 (로드 직후 저장 시 추가 GET 방지)
       S._schCache={data:_cacheSnap,ts:Date.now()};
@@ -1263,15 +1274,19 @@ function switchTab(tab){
   document.getElementById('view_person').style.display=tab==='person'?'flex':'none';
   document.getElementById('view_equip').style.display=tab==='equip'?'flex':'none';
   document.getElementById('view_vision').style.display=tab==='vision'?'flex':'none';
+  document.getElementById('view_paidsw').style.display=tab==='paidsw'?'flex':'none';
   document.getElementById('tab_gantt').className='tab-btn'+(tab==='gantt'?' on':'');
   document.getElementById('tab_person').className='tab-btn'+(tab==='person'?' on':'');
   document.getElementById('tab_equip').className='tab-btn'+(tab==='equip'?' on':'');
   document.getElementById('tab_vision').className='tab-btn'+(tab==='vision'?' on':'');
+  document.getElementById('tab_paidsw').className='tab-btn'+(tab==='paidsw'?' on':'');
   document.getElementById('ganttTools').style.display=tab==='gantt'?'flex':'none';
   document.getElementById('equipTools').style.display=tab==='equip'?'flex':'none';
   document.getElementById('visionTools').style.display=tab==='vision'?'flex':'none';
+  document.getElementById('paidswTools').style.display=tab==='paidsw'?'flex':'none';
   if(tab==='person') renderPersonTab();
   if(tab==='equip') renderEquipTab();
+  if(tab==='paidsw') renderPaidSwTab();
   if(tab==='vision'){
     renderVisionTab();
     // 탭 진입 시 Sheets에서 최신 이력관리 데이터 자동 Pull
