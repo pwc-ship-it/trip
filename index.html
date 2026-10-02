@@ -9,7 +9,7 @@
   <script>
     (function(){var t=localStorage.getItem('trip_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="style.css?v=20260928c">
+  <link rel="stylesheet" href="style.css?v=20261002a">
 </head>
 <body>
   <div class="app">
@@ -21,6 +21,7 @@
           <span id="connTxt">연결 확인</span>
         </div>
         <button class="sidebar-toggle" id="themeToggle" onclick="toggleTheme()" title="다크/라이트 모드 전환">🌙</button>
+        <button class="btn" onclick="openStaffStatus()" title="BU3 인원 현황">👥 BU3 인원 현황</button>
       </div>
       <div class="tright" id="topbarRight">
         <div id="ganttTools" style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap">
@@ -187,13 +188,14 @@
   <div id="mc"></div>
 
   <script src="data.js?v=20260723b"></script>
-  <script src="app.js?v=20260928a"></script>
-  <script src="gantt.js?v=20260908a"></script>
-  <script src="modals.js?v=20260908a"></script>
+  <script src="app.js?v=20261002a"></script>
+  <script src="gantt.js?v=20261002a"></script>
+  <script src="modals.js?v=20261002a"></script>
   <script src="person.js?v=20260908a"></script>
   <script src="equip.js?v=20260807a"></script>
   <script src="vision.js?v=20260807a"></script>
   <script src="export.js?v=20260730a"></script>
   <script src="paidsw.js?v=20260928c"></script>
+  <script src="staff.js?v=20261002a"></script>
 </body>
 </html>

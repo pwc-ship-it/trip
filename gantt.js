@@ -135,10 +135,12 @@ function addBar(el,sched){
   var tl=TYPE_LBL[sched.type]||sched.type;
   if(sched.paid){tl+='·유상';}
   var domesticTag=sched.domestic?' [국내]':'';
-  var txt=dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'');
+  var txt=dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'')+(sched.hasConflict?' ⚠ '+sched.conflictNote:'');
   var bar=document.createElement('div');bar.className='bar '+barCls(sched);bar.style.cssText='left:'+sp+'px;width:'+wp+'px';bar.title=txt;
   bar.onclick=(function(id){return function(){openEditSc(id);};})(sched.id);
-  var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
+  var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);
+  if(sched.hasConflict){var warn=document.createElement('span');warn.className='bar-warn';warn.textContent='⚠';bar.appendChild(warn);}
+  el.appendChild(bar);
 }
 function wtLabelTxt(wt){
   var days=dd(wt.start,wt.end),dr=fmt(wt.start)+'~'+fmt(wt.end);

@@ -1,0 +1,657 @@
+/*
+  ════════════════════════════════════════════════════
+  BU3 출장 일정 관리 - Apps Script (원복 근본 수정: 서버 권위 union-merge + 유상 S/W + 인원 현황)
+  ════════════════════════════════════════════════════
+
+  ★★★ 적용 방법 (통째로 교체하는 파일입니다) ★★★
+  1. https://script.google.com 접속 → 기존 BU3 프로젝트의 Code.gs 열기
+  2. Code.gs 안의 내용을 전체 선택(Ctrl+A) → 삭제(Delete)
+  3. 이 파일 내용 전체를 복사해서 그 자리에 붙여넣기
+  4. 저장 (Ctrl+S)
+  5. 배포 → "배포 관리" → 기존 배포의 연필(수정) 아이콘 → 버전: "새 버전" → 배포
+     (※ 절대 "새 배포"를 만들지 마세요 — URL이 바뀌어 전 PC에서 재설정이 필요해집니다)
+
+  [이 파일의 정체]
+  기존 배포 코드(Code.gs_전체교체용_유상SW포함.txt, paidFeatures 포함)에
+  "BU3 인원 현황"의 휴가 데이터 저장을 위한 vacations 처리 3곳만 추가한 것입니다.
+
+  [인원 현황 관련 추가 내용]
+  - vacations 시트 신규 추가 (휴가 1건당 1행: id, name, start, end, note, mt)
+  - schedules/events처럼 평범한 "단순 레코드형"(SIMPLE_ROW_TYPES)이라 JSON 직렬화 불필요
+
+  [배포 전 필수: 백업 3종 — 이미 하셨다면 생략 가능]
+  a. 현재 스프레드시트 사본 만들기 (파일 → 사본 만들기)
+  b. BU3 앱에서 ⚙설정 → "💾 JSON 백업 다운로드" 1회 실행
+  c. 혹시 모를 롤백을 위해, 지금 Code.gs에 들어있는 내용(깨진 것이라도)을 메모장에 잠깐 복사해두기
+  ════════════════════════════════════════════════════
+*/
+
+var CACHE_EXPIRY = 300;
+var TOMB_TTL_DAYS = 365;      // deletedIds 보관 기간 (기존 90일 → 365일로 확장: 장기 오프라인 PC의 되살림 방지)
+var CHANGELOG_MAX_ROWS = 2000;
+var FUTURE_MT_GUARD_MS = 24 * 60 * 60 * 1000; // mt가 now+24h를 넘으면 시계오염으로 간주
+
+// ── 레코드 단위 union-merge 대상 (행=레코드) — 새 필드는 헤더 자동 확장으로 저장됨
+var SHEET_HEADERS = {
+  groups:         ['id', 'name'],
+  sites:          ['id', 'name', 'color', 'groupId'],
+  projects:       ['id', 'siteId', 'name'],
+  schedules:      ['id', 'projectId', 'task', 'name', 'type', 'start', 'end', 'note', 'hidden'],
+  events:         ['id', 'projectId', 'date', 'title', 'colorId'],
+  workTasks:      ['id', 'projectId', 'title', 'start', 'end', 'colorId'],
+  equipItems:     ['id', 'name', 'groupName', 'order'],
+  vacations:      ['id', 'name', 'start', 'end', 'note'],   // ★ 인원 현황 신규 — 휴가 레코드
+  equipSiteOrder: ['id']   // union-merge 대상 아님 — 순서 리스트 blob (아래 별도 처리)
+};
+var SIMPLE_ROW_TYPES = ['groups','sites','projects','schedules','events','workTasks','equipItems','vacations'];
+
+// ── JSON 직렬화 시트 (복잡한 중첩 구조)
+var SHEET_JSON_HEADERS = {
+  equipUnits:     ['id', 'siteId', 'equipProjectId', 'lineName', 'unitName', 'memo', 'unitType', 'cellsJson', 'mt', 'cellsMt'],
+  equipProjects:  ['id', 'siteId', 'name', 'projType', 'mt'],
+  visionEquips:   ['id', 'siteId', 'createdAt', 'updatedAt', 'dataJson', 'mt', 'dataMt', 'fieldUpdatedJson', 'changelogJson'],
+  visionTemplate: ['json'],   // 단일 행으로 전체 JSON 저장 (mt는 JSON 내부에 포함)
+  paidFeatures:   ['id', 'title', 'desc', 'poJson', 'statusJson', 'mt']   // ★ 유상 S/W 신규
+};
+
+// tombstone 대상 엔티티 (deletedIds.type 값과 동일)
+var TOMB_TYPES = ['schedules','events','workTasks','sites','groups','projects',
+                  'equipItems','equipUnits','equipProjects','visionEquips','paidFeatures','vacations'];   // ★ 유상 S/W + 인원 현황 신규
+
+function doGet(e) {
+  var action = e.parameter.action;
+  if (action === 'load') {
+    return ContentService
+      .createTextOutput(JSON.stringify(loadData()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (action === 'integrity') {
+    return ContentService
+      .createTextOutput(JSON.stringify(_getIntegrityReport()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput('ok');
+}
+
+function doPost(e) {
+  // 동시 저장 충돌 방지: 한 번에 하나의 save만 처리 (원자적 병합 보장)
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000); // 최대 15초 대기
+  } catch(ex) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: '저장 대기 시간 초과. 잠시 후 다시 시도하세요.'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var result = {ok: true};
+    if (payload.action === 'save') {
+      var mergeResult = saveData(payload);
+      invalidateCache();
+      result.blocked = mergeResult.blocked || [];
+      result.conflicts = mergeResult.conflicts || [];
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function loadData() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('trip_data');
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+  var data = readFromSheets();
+  try { cache.put('trip_data', JSON.stringify(data), CACHE_EXPIRY); } catch(e) {}
+  return data;
+}
+
+function toBool(v) {
+  if (v === true) return true;
+  if (v === false || v === '' || v === null || v === undefined) return false;
+  var s = String(v).trim().toLowerCase();
+  return (s === 'true' || s === '1' || s === 'yes');
+}
+
+/* ══════════════════════════════════════════
+   Tombstone (deletedIds) — 서버 영속화
+══════════════════════════════════════════ */
+
+function _readTombMap(ss) {
+  var map = {};
+  var sh = ss.getSheetByName('deletedIds');
+  if (!sh) return map;
+  var rows = sh.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var id = String(rows[i][0] || '');
+    var type = String(rows[i][1] || '');
+    var ts = Number(rows[i][2]) || 0;
+    if (id && type) map[type + '|' + id] = ts;
+  }
+  return map;
+}
+
+function _writeTombMap(ss, map) {
+  var sh = ss.getSheetByName('deletedIds');
+  if (!sh) sh = ss.insertSheet('deletedIds');
+  sh.clearContents();
+  var cutoff = Date.now() - TOMB_TTL_DAYS * 24 * 60 * 60 * 1000;
+  var rows = [['id', 'type', 'ts']];
+  Object.keys(map).forEach(function(key) {
+    var ts = map[key];
+    if (ts < cutoff) return;
+    var sep = key.indexOf('|');
+    rows.push([key.slice(sep + 1), key.slice(0, sep), ts]);
+  });
+  sh.getRange(1, 1, rows.length, 3).setValues(rows);
+}
+
+/* payload의 삭제 기록을 기존 맵과 union 병합 (서버 기록은 절대 축소되지 않음)
+   예외: clearDeletedIds — 백업 복원으로 살린 레코드의 tombstone을 명시적으로 해제 */
+function _mergeTombs(map, payload) {
+  var now = Date.now();
+  (payload.deletedIds || []).forEach(function(t) {
+    if (!t || !t.id || !t.type) return;
+    var key = t.type + '|' + t.id;
+    if (!map[key]) map[key] = Number(t.ts) || now;
+  });
+  (payload.deletedScheduleIds || []).forEach(function(id) {
+    if (!id) return;
+    var key = 'schedules|' + id;
+    if (!map[key]) map[key] = now;
+  });
+  (payload.clearDeletedIds || []).forEach(function(t) {
+    if (!t || !t.id || !t.type) return;
+    delete map[t.type + '|' + t.id];
+  });
+  return map;
+}
+
+function _tombMapToList(map) {
+  var out = [];
+  Object.keys(map).forEach(function(key) {
+    var sep = key.indexOf('|');
+    out.push({ id: key.slice(sep + 1), type: key.slice(0, sep), ts: map[key] });
+  });
+  return out;
+}
+
+/* ══════════════════════════════════════════
+   union-merge 코어 (INV1~5)
+══════════════════════════════════════════ */
+
+function _futSafeMt(v) {
+  var n = Number(v) || 0;
+  return (n > Date.now() + FUTURE_MT_GUARD_MS) ? 0 : n;
+}
+
+function _isEmptyVal(v) {
+  if (!v) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.keys(v).length === 0;
+  return false;
+}
+
+function _contentHash(obj) {
+  try {
+    var clone = {};
+    Object.keys(obj || {}).sort().forEach(function(k) {
+      if (k === 'mt' || k === 'cellsMt' || k === 'dataMt') return;
+      clone[k] = obj[k];
+    });
+    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(clone));
+    return bytes.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
+  } catch(e) { return ''; }
+}
+
+/* 크라운주얼 필드(cells/data) — 필드별 mt로 독립 판정, 없으면 비어있지 않은 쪽 우선 */
+function _resolveCrownField(ex, inc, crownField, crownMt) {
+  var exMt = Number(ex[crownMt]) || 0, incMt = Number(inc[crownMt]) || 0;
+  if (exMt || incMt) return (incMt >= exMt) ? inc[crownField] : ex[crownField];
+  var exEmpty = _isEmptyVal(ex[crownField]), incEmpty = _isEmptyVal(inc[crownField]);
+  if (exEmpty && !incEmpty) return inc[crownField];
+  if (!exEmpty && incEmpty) return ex[crownField];
+  return inc[crownField];
+}
+
+/* visionEquips 전용 postMerge — fieldUpdated/changelog는 항목 수 많은 쪽 유지(append-only 메타 보호) */
+function _viServerPostMerge(winner, loser) {
+  if (loser && loser.fieldUpdated && Object.keys(loser.fieldUpdated).length > Object.keys(winner.fieldUpdated || {}).length) {
+    winner.fieldUpdated = loser.fieldUpdated;
+  }
+  if (loser && loser.changelog && loser.changelog.length > (winner.changelog || []).length) {
+    winner.changelog = loser.changelog;
+  }
+}
+
+function _pickWinner(type, id, ex, inc, changeEvents, deviceTag, opts) {
+  var em = _futSafeMt(ex.mt), im = _futSafeMt(inc.mt);
+  var origWinner, origLoser, stampMt = false;
+  if (im > em) { origWinner = inc; origLoser = ex; }
+  else if (im < em) {
+    changeEvents.push({ts: Date.now(), type: type, id: id, kind: 'blocked-stale-push', deviceTag: deviceTag, incomingMt: inc.mt || 0, existingMt: ex.mt || 0});
+    origWinner = ex; origLoser = inc;
+  } else {
+    var hEx = _contentHash(ex), hInc = _contentHash(inc);
+    if (hEx === hInc) { origWinner = ex; origLoser = inc; }
+    else {
+      changeEvents.push({ts: Date.now(), type: type, id: id, kind: 'conflict', deviceTag: deviceTag, existingMt: ex.mt || 0, incomingMt: inc.mt || 0});
+      if (hInc > hEx) { origWinner = inc; origLoser = ex; } else { origWinner = ex; origLoser = inc; }
+      stampMt = true; // 동률+내용다름은 대개 mt=0 레거시 레코드의 표현형식 차이(진짜 편집 충돌 아님).
+                       // 해결된 값에 실제 mt를 찍어둬야 다음 저장에서 또 같은 tie가 반복돼 매번
+                       // conflict가 재발생(스팸)하는 걸 막음 — 한 번 확정되면 그걸로 끝.
+    }
+  }
+  var winner = Object.assign({}, origWinner);
+  if (stampMt) winner.mt = Date.now();
+  if (opts.crownField) winner[opts.crownField] = _resolveCrownField(ex, inc, opts.crownField, opts.crownMt);
+  if (opts.postMerge) opts.postMerge(winner, origLoser);
+  return winner;
+}
+
+/* id 기준 union-merge. existing 행 순서 우선 + incoming-only 뒤에 append(시각적 재정렬 방지) */
+function _unionMerge(type, existingArr, incomingArr, tombMap, changeEvents, deviceTag, opts) {
+  opts = opts || {};
+  var exMap = {}, order = [];
+  (existingArr || []).forEach(function(r) { if (r && r.id) { exMap[r.id] = r; order.push(r.id); } });
+  var incMap = {};
+  (incomingArr || []).forEach(function(r) { if (r && r.id) { incMap[r.id] = r; if (order.indexOf(r.id) < 0) order.push(r.id); } });
+  var out = [];
+  order.forEach(function(id) {
+    if (tombMap[type + '|' + id]) return;                 // INV2: 양쪽 다 tombstone 제외
+    var ex = exMap[id], inc = incMap[id];
+    if (ex && !inc) { out.push(ex); return; }              // INV3: 기존에만 있으면 유지
+    if (!ex && inc) { out.push(inc); return; }             // 신규에만 있으면 추가
+    out.push(_pickWinner(type, id, ex, inc, changeEvents, deviceTag, opts)); // INV4/5
+  });
+  return out;
+}
+
+/* ══════════════════════════════════════════
+   changeLog (Part C)
+══════════════════════════════════════════ */
+
+function _appendChangeLog(ss, events) {
+  if (!events || !events.length) return;
+  var sh = ss.getSheetByName('changeLog');
+  if (!sh) { sh = ss.insertSheet('changeLog'); sh.appendRow(['ts','type','id','kind','deviceTag','existingMt','incomingMt']); }
+  var rows = events.map(function(e) { return [e.ts, e.type, e.id, e.kind, e.deviceTag || '', e.existingMt || '', e.incomingMt || '']; });
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
+  var last = sh.getLastRow();
+  if (last - 1 > CHANGELOG_MAX_ROWS) {
+    sh.deleteRows(2, (last - 1) - CHANGELOG_MAX_ROWS);
+  }
+}
+
+function _getIntegrityReport() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('changeLog');
+  if (!sh) return {blocked: [], conflicts: []};
+  var rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return {blocked: [], conflicts: []};
+  var cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  var blocked = [], conflicts = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var ts = Number(r[0]) || 0;
+    if (ts < cutoff) continue;
+    var rec = {ts: ts, type: r[1], id: r[2], kind: r[3], deviceTag: r[4], existingMt: r[5], incomingMt: r[6]};
+    if (rec.kind === 'blocked-stale-push') blocked.push(rec);
+    else if (rec.kind === 'conflict') conflicts.push(rec);
+  }
+  return {blocked: blocked, conflicts: conflicts};
+}
+
+/* ══════════════════════════════════════════
+   읽기
+══════════════════════════════════════════ */
+
+function readFromSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = {};
+
+  Object.keys(SHEET_HEADERS).forEach(function(name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) { result[name] = []; return; }
+    var rows = sh.getDataRange().getValues();
+    if (rows.length < 2) { result[name] = []; return; }
+    var headers = rows[0].map(function(h){ return String(h).trim(); });
+    result[name] = rows.slice(1).filter(function(r) { return r[0] && r[0] !== ''; }).map(function(r) {
+      var obj = {};
+      headers.forEach(function(h, i) {
+        var val = r[i];
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        } else if (h === 'hidden' || h === 'domestic') {
+          val = toBool(val);
+        } else if (h === 'order') {
+          val = parseInt(val) || 0;
+        } else if (h === 'mt' || h === 'cellsMt' || h === 'dataMt') {
+          val = Number(val) || 0;
+        } else {
+          val = String(val === null || val === undefined ? '' : val);
+        }
+        obj[h] = val;
+      });
+      return obj;
+    });
+  });
+
+  result['equipUnits'] = _readJsonSheet(ss, 'equipUnits', function(row, headers) {
+    var obj = _rowToObj(row, headers);
+    if (obj.cellsJson && typeof obj.cellsJson === 'string' && obj.cellsJson.charAt(0) === '{') {
+      try { obj.cells = JSON.parse(obj.cellsJson); } catch(e) { obj.cells = {}; }
+      delete obj.cellsJson;
+    } else if (obj.cells && typeof obj.cells === 'string' && obj.cells.charAt(0) === '{') {
+      try { obj.cells = JSON.parse(obj.cells); } catch(e) { obj.cells = {}; }
+    } else {
+      obj.cells = {};
+    }
+    return obj;
+  });
+
+  result['equipProjects'] = _readJsonSheet(ss, 'equipProjects', function(row, headers) {
+    return _rowToObj(row, headers);
+  });
+
+  result['visionEquips'] = _readJsonSheet(ss, 'visionEquips', function(row, headers) {
+    var obj = _rowToObj(row, headers);
+    if (obj.dataJson) {
+      try { obj.data = JSON.parse(obj.dataJson); } catch(e) { obj.data = {}; }
+      delete obj.dataJson;
+    } else { obj.data = {}; }
+    if (obj.fieldUpdatedJson) {
+      try { obj.fieldUpdated = JSON.parse(obj.fieldUpdatedJson); } catch(e) { obj.fieldUpdated = {}; }
+      delete obj.fieldUpdatedJson;
+    } else { obj.fieldUpdated = {}; }
+    if (obj.changelogJson) {
+      try { obj.changelog = JSON.parse(obj.changelogJson); } catch(e) { obj.changelog = []; }
+      delete obj.changelogJson;
+    } else { obj.changelog = []; }
+    return obj;
+  });
+
+  // ★ 유상 S/W 신규
+  result['paidFeatures'] = _readJsonSheet(ss, 'paidFeatures', function(row, headers) {
+    var obj = _rowToObj(row, headers);
+    if (obj.poJson) { try { obj.po = JSON.parse(obj.poJson); } catch(e) { obj.po = {received:false,date:''}; } }
+    else obj.po = {received:false, date:''};
+    delete obj.poJson;
+    if (obj.statusJson) { try { obj.siteStatus = JSON.parse(obj.statusJson); } catch(e) { obj.siteStatus = {}; } }
+    else obj.siteStatus = {};
+    delete obj.statusJson;
+    return obj;
+  });
+
+  result['visionTemplate'] = {categories: []};
+  var vtSh = ss.getSheetByName('visionTemplate');
+  if (vtSh) {
+    var vtRows = vtSh.getDataRange().getValues();
+    if (vtRows.length >= 2 && vtRows[1][0]) {
+      try { result['visionTemplate'] = JSON.parse(vtRows[1][0]); } catch(e) {}
+    }
+  }
+
+  var tombMap = _readTombMap(ss);
+  result['deletedIds'] = _tombMapToList(tombMap);
+  result['deletedScheduleIds'] = result['deletedIds']
+    .filter(function(t){ return t.type === 'schedules'; })
+    .map(function(t){ return t.id; });
+
+  return result;
+}
+
+function _readJsonSheet(ss, name, mapFn) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) return [];
+  var rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  var headers = rows[0].map(function(h){ return String(h).trim(); });
+  return rows.slice(1).filter(function(r){ return r[0] && r[0] !== ''; })
+    .map(function(r){ return mapFn(r, headers); });
+}
+
+function _rowToObj(row, headers) {
+  var obj = {};
+  headers.forEach(function(h, i) {
+    var val = row[i];
+    if (val instanceof Date) {
+      val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    } else if (h === 'mt' || h === 'cellsMt' || h === 'dataMt') {
+      val = Number(val) || 0;
+    } else {
+      val = (val === null || val === undefined) ? '' : val;
+    }
+    obj[h] = val;
+  });
+  return obj;
+}
+
+/* ══════════════════════════════════════════
+   저장 — 서버 권위 union-merge (근본 수정)
+══════════════════════════════════════════ */
+
+function saveData(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var deviceTag = String(payload.deviceTag || 'unknown');
+  var changeEvents = [];
+
+  // ── ① tombstone: 기존 기록 + payload union 병합 (union-merge에서 곧바로 사용)
+  var tombMap = _mergeTombs(_readTombMap(ss), payload);
+
+  // ── ② 병합 기준 스냅샷 — 항상 fresh(캐시 우회) 1회 읽기 (INV6)
+  var existing = readFromSheets();
+
+  // ── ③ 레코드형 엔티티 union-merge (INV1: 키 자체가 없으면 시트 안 건드림)
+  SIMPLE_ROW_TYPES.forEach(function(type) {
+    if (payload[type] === undefined) return;
+    var merged = _unionMerge(type, existing[type] || [], payload[type], tombMap, changeEvents, deviceTag, {});
+    _writeSimpleSheet(ss, type, merged);
+  });
+
+  if (payload.equipUnits !== undefined) {
+    var mergedUnits = _unionMerge('equipUnits', existing.equipUnits || [], payload.equipUnits, tombMap, changeEvents, deviceTag,
+      {crownField: 'cells', crownMt: 'cellsMt'});
+    _saveEquipUnitsSheet(ss, mergedUnits);
+  }
+
+  if (payload.equipProjects !== undefined) {
+    var mergedProjs = _unionMerge('equipProjects', existing.equipProjects || [], payload.equipProjects, tombMap, changeEvents, deviceTag, {});
+    _saveJsonSheet(ss, 'equipProjects', mergedProjs, SHEET_JSON_HEADERS.equipProjects, function(obj) {
+      return {id: obj.id || '', siteId: obj.siteId || '', name: obj.name || '', projType: obj.projType || '', mt: obj.mt || ''};
+    });
+  }
+
+  if (payload.visionEquips !== undefined) {
+    var mergedVi = _unionMerge('visionEquips', existing.visionEquips || [], payload.visionEquips, tombMap, changeEvents, deviceTag,
+      {crownField: 'data', crownMt: 'dataMt', postMerge: _viServerPostMerge});
+    _saveVisionEquipsSheet(ss, mergedVi);
+  }
+
+  // ★ 유상 S/W 신규 — equipProjects와 동일한 단순 whole-record union-merge
+  if (payload.paidFeatures !== undefined) {
+    var mergedPf = _unionMerge('paidFeatures', existing.paidFeatures || [], payload.paidFeatures, tombMap, changeEvents, deviceTag, {});
+    _saveJsonSheet(ss, 'paidFeatures', mergedPf, SHEET_JSON_HEADERS.paidFeatures, function(obj) {
+      return {
+        id: obj.id || '', title: obj.title || '', desc: obj.desc || '',
+        poJson: obj.po ? JSON.stringify(obj.po) : '',
+        statusJson: obj.siteStatus ? JSON.stringify(obj.siteStatus) : '',
+        mt: obj.mt || ''
+      };
+    });
+  }
+
+  // ── equipSiteOrder: 순서 리스트 blob — union 대상 아님. 빈 배열이 기존을 지우지 못하게만 방어
+  if (payload.equipSiteOrder !== undefined && payload.equipSiteOrder.length) {
+    _writeSimpleSheet(ss, 'equipSiteOrder', payload.equipSiteOrder.map(function(id) { return {id: id}; }));
+  }
+
+  // ── visionTemplate: 단일 blob — mt 큰 쪽만 반영(부재/구버전이면 기존 유지)
+  if (payload.visionTemplate !== undefined) {
+    var incVt = payload.visionTemplate;
+    var exVt = existing.visionTemplate || {categories: []};
+    var exMt = Number(exVt.mt || 0), inMt = Number(incVt.mt || 0);
+    if (incVt.categories && incVt.categories.length && inMt >= exMt) {
+      var vtSh = ss.getSheetByName('visionTemplate');
+      if (!vtSh) vtSh = ss.insertSheet('visionTemplate');
+      vtSh.clearContents();
+      vtSh.getRange(1, 1).setValue('json');
+      vtSh.getRange(2, 1).setValue(JSON.stringify(incVt));
+    }
+  }
+
+  _writeTombMap(ss, tombMap);
+  _appendChangeLog(ss, changeEvents);
+
+  return {
+    blocked: changeEvents.filter(function(c){ return c.kind === 'blocked-stale-push'; }),
+    conflicts: changeEvents.filter(function(c){ return c.kind === 'conflict'; })
+  };
+}
+
+function _writeSimpleSheet(ss, name, arr) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  sh.clearContents();
+
+  var headers = (SHEET_HEADERS[name] || ['id']).slice();
+  arr.forEach(function(obj) {
+    Object.keys(obj).forEach(function(k) { if (headers.indexOf(k) < 0) headers.push(k); });
+  });
+
+  if (!arr.length) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
+  }
+
+  var rows = [headers].concat(arr.map(function(obj) {
+    return headers.map(function(h) {
+      var v = obj[h];
+      if (v === undefined || v === null) return '';
+      if (h === 'hidden') return toBool(v) ? 'TRUE' : 'FALSE';
+      return v;
+    });
+  }));
+  sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
+}
+
+function _saveJsonSheet(ss, name, arr, headers, mapFn) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  sh.clearContents();
+  if (!arr.length) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
+  }
+  var rows = [headers].concat(arr.map(function(obj) {
+    var mapped = mapFn(obj);
+    return headers.map(function(h) {
+      var v = mapped[h];
+      return (v === undefined || v === null) ? '' : v;
+    });
+  }));
+  sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
+}
+
+/* equipUnits 저장 — cells는 이미 union-merge에서 cellsMt 기준으로 확정된 값이 들어옴 */
+function _saveEquipUnitsSheet(ss, arr) {
+  var name = 'equipUnits';
+  var headers = SHEET_JSON_HEADERS.equipUnits;
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  sh.clearContents();
+
+  if (!arr.length) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
+  }
+
+  var rows = [headers].concat(arr.map(function(obj) {
+    return [
+      obj.id || '', obj.siteId || '', obj.equipProjectId || '',
+      obj.lineName || '', obj.unitName || '', obj.memo || '', obj.unitType || '',
+      obj.cells ? JSON.stringify(obj.cells) : '',
+      obj.mt || '',
+      obj.cellsMt || ''
+    ];
+  }));
+  sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
+}
+
+/* visionEquips 저장 — data는 dataMt 기준으로 확정된 값, fieldUpdated/changelog도 영속화 */
+function _saveVisionEquipsSheet(ss, arr) {
+  var name = 'visionEquips';
+  var headers = SHEET_JSON_HEADERS.visionEquips;
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  sh.clearContents();
+
+  if (!arr.length) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
+  }
+
+  var rows = [headers].concat(arr.map(function(obj) {
+    return [
+      obj.id || '', obj.siteId || '', obj.createdAt || '', obj.updatedAt || '',
+      obj.data ? JSON.stringify(obj.data) : '',
+      obj.mt || '', obj.dataMt || '',
+      (obj.fieldUpdated && Object.keys(obj.fieldUpdated).length) ? JSON.stringify(obj.fieldUpdated) : '',
+      (obj.changelog && obj.changelog.length) ? JSON.stringify(obj.changelog) : ''
+    ];
+  }));
+  sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
+}
+
+function invalidateCache() {
+  var cache = CacheService.getScriptCache();
+  cache.remove('trip_data');
+}
+
+/* ══════════════════════════════════════════
+   자동 백업 — 매일 스프레드시트 사본을 Drive에 생성
+   사용법: 편집기에서 setupBackupTrigger를 1회 실행 (권한 승인 필요)
+══════════════════════════════════════════ */
+
+var BACKUP_FOLDER_NAME = 'BU3_자동백업';
+var BACKUP_KEEP_DAYS = 14;
+
+function dailyBackup() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(BACKUP_FOLDER_NAME);
+  var dateStr = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm');
+  DriveApp.getFileById(ss.getId()).makeCopy('BU3_backup_' + dateStr, folder);
+  var cutoff = new Date(Date.now() - BACKUP_KEEP_DAYS * 24 * 60 * 60 * 1000);
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    var f = files.next();
+    if (f.getName().indexOf('BU3_backup_') === 0 && f.getDateCreated() < cutoff) {
+      f.setTrashed(true);
+    }
+  }
+}
+
+function setupBackupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'dailyBackup') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailyBackup').timeBased().everyDays(1).atHour(3).create();
+  Logger.log('자동 백업 트리거 등록 완료 — 매일 03시 실행');
+}
+
+function testLog() {
+  var data = readFromSheets();
+  Logger.log('schedules: ' + data.schedules.length);
+  Logger.log('equipUnits: ' + data.equipUnits.length);
+  Logger.log('visionEquips: ' + data.visionEquips.length);
+  Logger.log('paidFeatures: ' + data.paidFeatures.length);
+  Logger.log('vacations: ' + data.vacations.length);
+  Logger.log('visionTemplate categories: ' + (data.visionTemplate.categories||[]).length);
+  Logger.log('deletedIds: ' + data.deletedIds.length);
+}

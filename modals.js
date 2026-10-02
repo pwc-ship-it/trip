@@ -262,11 +262,21 @@ function saveSc(exId){
   if(!projId||!task||!name||!start||!end){alert('필수 항목을 모두 입력하세요.');return;}
   if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}
   if(start>end){alert('복귀일이 출발일보다 빠릅니다.');return;}
+  var conflict=typeof _staffConflicts==='function'?_staffConflicts(name,start,end,exId):null;
+  var hasConflict=false,conflictNote='';
+  if(conflict){
+    var msg=conflict.type==='vacation'
+      ? (conflict.name+' 휴가기간('+conflict.start+'~'+conflict.end+')이 포함되어 있습니다. 그래도 저장하시겠습니까?')
+      : (conflict.name+' 출장 기간('+conflict.start+'~'+conflict.end+')과 겹칩니다. 그래도 저장하시겠습니까?');
+    if(!confirm(msg)) return; // 저장취소 — 모달 그대로 두고 담당자 이름을 고치게 함
+    hasConflict=true;
+    conflictNote=(conflict.type==='vacation'?'휴가 겹침: ':'출장 겹침: ')+conflict.name+' ('+conflict.start+'~'+conflict.end+')';
+  }
   if(exId){
     var i=S.schedules.findIndex(function(s){return s.id===exId;});
-    S.schedules[i]=_touch({id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid});
+    S.schedules[i]=_touch({id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid,hasConflict:hasConflict,conflictNote:conflictNote});
   } else {
-    S.schedules.push(_touch({id:genId('s',S.schedules),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid}));
+    S.schedules.push(_touch({id:genId('s',S.schedules),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid,hasConflict:hasConflict,conflictNote:conflictNote}));
   }
   saveData();cm();renderAll();
 }
