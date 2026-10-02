@@ -50,8 +50,10 @@ function _staffConflicts(name,start,end,excludeId){
 }
 
 /* ── 모달 ── */
+var _stSelDate=null; /* null=오늘 기준, 달력 날짜 클릭 시 해당 날짜 */
 var _stCalY,_stCalM,_stVacFormOpen=false,_stVacListOpen=false,_stVacEditId=null;
 function openStaffStatus(){
+  _stSelDate=null;
   _stVacFormOpen=false;_stVacListOpen=false;_stVacEditId=null;
   var now=new Date();_stCalY=now.getFullYear();_stCalM=now.getMonth();
   document.getElementById('mc').innerHTML='<div class="mover"><div class="modal xxwide"><div class="mtit">BU3 인원 현황</div>'
@@ -66,14 +68,16 @@ function openStaffStatus(){
 
 function renderStaffLeft(){
   var el=document.getElementById('stLeft');if(!el)return;
+  var D=_stSelDate||TODAY;
+  var dLbl=(D.getMonth()+1)+'/'+D.getDate()+(_stSelDate?' 기준':' (오늘)');
   var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px">'
-    +'<span class="fl" style="margin:0">구성원 ('+BU3_STAFF.length+'명)</span>'
+    +'<span class="fl" style="margin:0">구성원 ('+BU3_STAFF.length+'명) · '+dLbl+'</span>'
     +'<button class="btn sm pri" onclick="toggleStaffVacForm()">+ 휴가 등록</button></div>';
   h+='<div id="stVacForm" style="display:'+(_stVacFormOpen?'block':'none')+'">'+_stVacFormHtml()+'</div>';
   h+='<div class="st-person-list">';
   BU3_STAFF.forEach(function(p){
-    var vac=_stVacationOn(p.name,TODAY);
-    var trip=_stTripOn(p.name,TODAY);
+    var vac=_stVacationOn(p.name,D);
+    var trip=_stTripOn(p.name,D);
     var badges='';
     if(vac)badges+='<span class="st-badge st-badge-vac">'+_esc(vac.type||'휴가')+'</span>';
     if(trip){
@@ -178,6 +182,7 @@ function renderStaffCalendar(){
   for(var d=1;d<=daysInMonth;d++){
     var dateObj=new Date(y,m,d);dateObj.setHours(0,0,0,0);
     var isToday=dateObj.getTime()===TODAY.getTime();
+    var isSel=_stSelDate&&dateObj.getTime()===_stSelDate.getTime();
     var vacChips='',tripChips='';
     BU3_STAFF.forEach(function(p){
       var vac=_stVacationOn(p.name,dateObj);
@@ -192,7 +197,7 @@ function renderStaffCalendar(){
       }
     });
     var chips=(vacChips?'<div class="st-cal-chiprow">'+vacChips+'</div>':'')+(tripChips?'<div class="st-cal-chiprow">'+tripChips+'</div>':'');
-    h+='<div class="st-cal-cell'+(isToday?' st-cal-today':'')+'"><div class="st-cal-daynum">'+d+'</div><div class="st-cal-chips">'+chips+'</div></div>';
+    h+='<div class="st-cal-cell'+(isToday?' st-cal-today':'')+(isSel?' st-cal-sel':'')+'" style="cursor:pointer" onclick="stSelectDate('+y+','+m+','+d+')"><div class="st-cal-daynum">'+d+'</div><div class="st-cal-chips">'+chips+'</div></div>';
   }
   h+='</div>';
   el.innerHTML=h;
@@ -202,4 +207,9 @@ function stCalNav(delta){
   if(_stCalM<0){_stCalM=11;_stCalY--;}
   if(_stCalM>11){_stCalM=0;_stCalY++;}
   renderStaffCalendar();
+}
+function stSelectDate(y,m,d){
+  var t=new Date(y,m,d);t.setHours(0,0,0,0);
+  _stSelDate=(t.getTime()===TODAY.getTime()||(_stSelDate&&_stSelDate.getTime()===t.getTime()))?null:t; // 오늘/선택된 날짜 재클릭 → 오늘 기준 복귀
+  renderStaffLeft();renderStaffCalendar();
 }

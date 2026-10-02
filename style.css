@@ -266,6 +266,7 @@ input.pf-podate{width:88px;font-size:11px;margin-left:4px;padding:2px 4px}
 .st-cal-cell{background:var(--bg-panel);min-height:108px;padding:4px}
 .st-cal-empty{background:var(--bg-base)}
 .st-cal-today{outline:2px solid #2a78d6;outline-offset:-2px}
+.st-cal-sel{outline:2px solid #e8590c;outline-offset:-2px}
 .st-cal-daynum{color:var(--tx-second);margin-bottom:2px}
 .st-cal-chips{display:flex;flex-direction:column;gap:3px}
 .st-cal-chiprow{display:flex;flex-wrap:wrap;gap:2px}
