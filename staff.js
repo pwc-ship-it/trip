@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════
    BU3 인원 현황 — 휴가/출장 상태 + 일정 겹침 확인
-   - S.vacations: [{id,name,start,end,note,mt}]
-   - 상태: 휴가중(S.vacations) / 출장중(S.schedules, type==='hq') / 본사(둘 다 아님)
+   - S.vacations: [{id,name,start,end,type,note,mt}] — type: '휴가'|'반차(오전)'|'반차(오후)'
+   - 상태: 휴가중(S.vacations) / 출장중(S.schedules, 이름 매칭 — 타입/숨김 무관) / 본사(둘 다 아님)
 ══════════════════════════════════════════ */
 
 var BU3_STAFF=[
@@ -12,13 +12,16 @@ var BU3_STAFF=[
   {name:'신호종',title:'과장'},{name:'박용대',title:'대리'},{name:'유현우',title:'대리'},
   {name:'김건중',title:'대리'},{name:'권석우',title:'사원'},{name:'최승민',title:'사원'}
 ];
+var ST_VAC_TYPES=['휴가','반차(오전)','반차(오후)'];
 
 function _stVacationOn(name,d){
   return (S.vacations||[]).find(function(v){return v.name===name && d>=pd(v.start) && d<=pd(v.end);});
 }
-function _stTripOn(name,d){
-  return (S.schedules||[]).find(function(sc){return sc.name===name && sc.type==='hq' && !sc.hidden && d>=pd(sc.start) && d<=pd(sc.end);});
+/* 그 날짜에 해당 이름으로 걸린 모든 출장 일정 — 타입/숨김/완료여부 무관하게 전부 매칭 */
+function _stTripsOn(name,d){
+  return (S.schedules||[]).filter(function(sc){return sc.name===name && d>=pd(sc.start) && d<=pd(sc.end);});
 }
+function _stTripOn(name,d){var t=_stTripsOn(name,d);return t.length?t[0]:null;}
 function _stTripSiteName(sc){
   var proj=S.projects.find(function(p){return p.id===sc.projectId;});
   var site=proj?S.sites.find(function(x){return x.id===proj.siteId;}):null;
@@ -40,11 +43,11 @@ function _staffConflicts(name,start,end,excludeId){
 }
 
 /* ── 모달 ── */
-var _stCalY,_stCalM,_stVacFormOpen=false;
+var _stCalY,_stCalM,_stVacFormOpen=false,_stVacListOpen=false,_stVacEditId=null;
 function openStaffStatus(){
-  _stVacFormOpen=false;
+  _stVacFormOpen=false;_stVacListOpen=false;_stVacEditId=null;
   var now=new Date();_stCalY=now.getFullYear();_stCalM=now.getMonth();
-  document.getElementById('mc').innerHTML='<div class="mover"><div class="modal xwide"><div class="mtit">BU3 인원 현황</div>'
+  document.getElementById('mc').innerHTML='<div class="mover"><div class="modal xxwide"><div class="mtit">BU3 인원 현황</div>'
     +'<div class="st-wrap"><div class="st-left" id="stLeft"></div><div class="st-right" id="stRight"></div></div>'
     +'<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="cm()">닫기</button></div>'
     +'</div></div>';
@@ -54,36 +57,52 @@ function openStaffStatus(){
 
 function renderStaffLeft(){
   var el=document.getElementById('stLeft');if(!el)return;
-  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px">'
     +'<span class="fl" style="margin:0">구성원 ('+BU3_STAFF.length+'명)</span>'
-    +'<button class="btn sm" onclick="toggleStaffVacForm()">+ 휴가 등록</button></div>';
+    +'<span style="display:flex;gap:4px"><button class="btn sm" onclick="toggleStaffVacList()">'+(_stVacListOpen?'목록 닫기':'📋 등록된 휴가')+'</button>'
+    +'<button class="btn sm pri" onclick="toggleStaffVacForm()">+ 휴가 등록</button></span></div>';
   h+='<div id="stVacForm" style="display:'+(_stVacFormOpen?'block':'none')+'">'+_stVacFormHtml()+'</div>';
+  h+='<div id="stVacListWrap" style="display:'+(_stVacListOpen?'block':'none')+'">'+_stVacListHtml()+'</div>';
   h+='<div class="st-person-list">';
   BU3_STAFF.forEach(function(p){
     var vac=_stVacationOn(p.name,TODAY);
     var trip=_stTripOn(p.name,TODAY);
     var badges='';
-    if(vac)badges+='<span class="st-badge st-badge-vac">휴가중</span>';
+    if(vac)badges+='<span class="st-badge st-badge-vac">'+_esc(vac.type||'휴가')+'</span>';
     if(trip)badges+='<span class="st-badge st-badge-trip">출장중'+(_stTripSiteName(trip)?' · '+_esc(_stTripSiteName(trip)):'')+'</span>';
     if(!vac&&!trip)badges+='<span class="st-badge st-badge-office">본사</span>';
     h+='<div class="st-person-row"><span class="st-person-name">'+_esc(p.name)+'</span><span class="st-person-title">'+_esc(p.title)+'</span><span class="st-person-badges">'+badges+'</span></div>';
   });
   h+='</div>';
-  h+='<div class="st-vac-list">'+_stVacListHtml()+'</div>';
   el.innerHTML=h;
 }
 
 function _stVacFormHtml(){
-  var opts=BU3_STAFF.map(function(p){return '<option value="'+_esc(p.name)+'">'+_esc(p.name)+'</option>';}).join('');
-  return '<div class="fg"><label class="fl">이름</label><select id="st_vac_name">'+opts+'</select></div>'
-    +'<div class="fr"><div class="fg"><label class="fl">시작일</label><input type="text" id="st_vac_start" placeholder="2026-10-05" maxlength="10" oninput="fmtDateInput(this)"></div>'
-    +'<div class="fg"><label class="fl">종료일</label><input type="text" id="st_vac_end" placeholder="2026-10-07" maxlength="10" oninput="fmtDateInput(this)"></div></div>'
-    +'<div class="fg"><label class="fl">메모</label><input type="text" id="st_vac_note" placeholder="선택사항"></div>'
-    +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:10px"><button class="btn sm" onclick="toggleStaffVacForm()">취소</button><button class="btn sm pri" onclick="saveStaffVacation()">등록</button></div>';
+  var ex=_stVacEditId?(S.vacations||[]).find(function(v){return v.id===_stVacEditId;}):null;
+  var dlOpts=BU3_STAFF.map(function(p){return '<option value="'+_esc(p.name)+'">';}).join('');
+  var typeOpts=ST_VAC_TYPES.map(function(t){return '<option value="'+t+'"'+(ex&&ex.type===t?' selected':'')+'>'+t+'</option>';}).join('');
+  return '<div class="mtit" style="font-size:12px;margin-bottom:8px">'+(ex?'휴가 수정':'휴가 등록')+'</div>'
+    +'<datalist id="st_staff_dl">'+dlOpts+'</datalist>'
+    +'<div class="fg"><label class="fl">이름 (목록에서 선택 또는 직접 입력)</label><input type="text" id="st_vac_name" list="st_staff_dl" value="'+_esc(ex?ex.name:'')+'" placeholder="이름 입력"></div>'
+    +'<div class="fg"><label class="fl">휴가 구분</label><select id="st_vac_type">'+typeOpts+'</select></div>'
+    +'<div class="fr"><div class="fg"><label class="fl">시작일</label><input type="text" id="st_vac_start" value="'+(ex?ex.start:'')+'" placeholder="2026-10-05" maxlength="10" oninput="fmtDateInput(this)"></div>'
+    +'<div class="fg"><label class="fl">종료일</label><input type="text" id="st_vac_end" value="'+(ex?ex.end:'')+'" placeholder="2026-10-07" maxlength="10" oninput="fmtDateInput(this)"></div></div>'
+    +'<div class="fg"><label class="fl">메모</label><input type="text" id="st_vac_note" value="'+(ex?_esc(ex.note||''):'')+'" placeholder="선택사항"></div>'
+    +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:10px"><button class="btn sm" onclick="toggleStaffVacForm()">취소</button><button class="btn sm pri" onclick="saveStaffVacation()">'+(ex?'수정 완료':'등록')+'</button></div>';
 }
-function toggleStaffVacForm(){_stVacFormOpen=!_stVacFormOpen;renderStaffLeft();}
+function toggleStaffVacForm(){
+  _stVacFormOpen=!_stVacFormOpen;
+  if(!_stVacFormOpen)_stVacEditId=null;
+  renderStaffLeft();
+}
+function toggleStaffVacList(){_stVacListOpen=!_stVacListOpen;renderStaffLeft();}
+function editStaffVacation(id){
+  _stVacEditId=id;_stVacFormOpen=true;_stVacListOpen=false;
+  renderStaffLeft();
+}
 function saveStaffVacation(){
-  var name=document.getElementById('st_vac_name').value;
+  var name=document.getElementById('st_vac_name').value.trim();
+  var type=document.getElementById('st_vac_type').value;
   var start=document.getElementById('st_vac_start').value;
   var end=document.getElementById('st_vac_end').value;
   var note=document.getElementById('st_vac_note').value.trim();
@@ -91,25 +110,43 @@ function saveStaffVacation(){
   if(!name||!start||!end){alert('이름과 기간을 입력하세요.');return;}
   if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}
   if(start>end){alert('종료일이 시작일보다 빠릅니다.');return;}
-  S.vacations.push(_touch({id:genId('vac',S.vacations),name:name,start:start,end:end,note:note}));
+  if(!BU3_STAFF.some(function(s){return s.name===name;})){
+    alert('"'+name+'"은(는) 구성원 목록(BU3 인원 현황)에 없는 이름입니다.\n그래도 등록됩니다 — 이름을 다시 확인해주세요.');
+  }
+  if(_stVacEditId){
+    var i=S.vacations.findIndex(function(v){return v.id===_stVacEditId;});
+    if(i>=0) S.vacations[i]=_touch({id:_stVacEditId,name:name,type:type,start:start,end:end,note:note});
+  } else {
+    S.vacations.push(_touch({id:genId('vac',S.vacations),name:name,type:type,start:start,end:end,note:note}));
+  }
   saveData();
-  _stVacFormOpen=false;
+  _stVacFormOpen=false;_stVacEditId=null;
   renderStaffLeft();renderStaffCalendar();
 }
 function _stVacListHtml(){
   var upcoming=(S.vacations||[]).filter(function(v){return pd(v.end)>=TODAY;}).sort(function(a,b){return a.start<b.start?-1:1;});
-  if(!upcoming.length)return '<div class="pf-empty" style="padding:12px 0">등록된 휴가 일정이 없습니다.</div>';
-  var h='<div class="fl" style="margin:10px 0 4px">등록된 휴가 (진행중/예정)</div>';
-  upcoming.forEach(function(v){
-    h+='<div class="st-vac-item"><span>'+_esc(v.name)+' · '+v.start+'~'+v.end+(v.note?' · '+_esc(v.note):'')+'</span><span class="st-vac-del" onclick="delStaffVacation(\''+v.id+'\')">삭제</span></div>';
-  });
+  var past=(S.vacations||[]).filter(function(v){return pd(v.end)<TODAY;}).sort(function(a,b){return a.start<b.start?1:-1;});
+  var h='<div class="fl" style="margin:4px 0">등록된 휴가 — 진행중/예정 ('+upcoming.length+'건)</div>';
+  if(!upcoming.length) h+='<div class="pf-empty" style="padding:8px 0">없음</div>';
+  upcoming.forEach(function(v){h+=_stVacItemHtml(v);});
+  if(past.length){
+    h+='<div class="fl" style="margin:8px 0 4px">지난 휴가 ('+past.length+'건)</div>';
+    past.slice(0,30).forEach(function(v){h+=_stVacItemHtml(v);});
+    if(past.length>30) h+='<div class="pf-empty" style="padding:4px 0">외 '+(past.length-30)+'건 더 있음</div>';
+  }
   return h;
+}
+function _stVacItemHtml(v){
+  return '<div class="st-vac-item"><span>'+_esc(v.name)+' · '+_esc(v.type||'휴가')+' · '+v.start+'~'+v.end+(v.note?' · '+_esc(v.note):'')+'</span>'
+    +'<span><span class="st-vac-edit" onclick="editStaffVacation(\''+v.id+'\')">수정</span>'
+    +'<span class="st-vac-del" onclick="delStaffVacation(\''+v.id+'\')">삭제</span></span></div>';
 }
 function delStaffVacation(id){
   if(!confirm('이 휴가 일정을 삭제할까요?'))return;
   S.vacations=S.vacations.filter(function(v){return v.id!==id;});
   _markDeleted('vacations',id);
   saveData();
+  if(_stVacEditId===id){_stVacEditId=null;_stVacFormOpen=false;}
   renderStaffLeft();renderStaffCalendar();
 }
 
@@ -129,9 +166,14 @@ function renderStaffCalendar(){
     var isToday=dateObj.getTime()===TODAY.getTime();
     var chips='';
     BU3_STAFF.forEach(function(p){
-      if(_stVacationOn(p.name,dateObj))chips+='<span class="st-chip st-chip-vac" title="'+_esc(p.name)+' 휴가">'+_esc(p.name)+'</span>';
-      var t=_stTripOn(p.name,dateObj);
-      if(t)chips+='<span class="st-chip st-chip-trip" title="'+_esc(p.name)+' 출장 · '+_esc(_stTripSiteName(t))+'">'+_esc(p.name)+'</span>';
+      var vac=_stVacationOn(p.name,dateObj);
+      if(vac)chips+='<span class="st-chip st-chip-vac" title="'+_esc(p.name)+' '+_esc(vac.type||'휴가')+'">'+_esc(p.name)+'</span>';
+      var trips=_stTripsOn(p.name,dateObj);
+      if(trips.length){
+        var anyConflict=trips.some(function(t){return t.hasConflict;});
+        var siteNames=trips.map(function(t){return _stTripSiteName(t);}).filter(function(x){return x;}).join(', ');
+        chips+='<span class="st-chip st-chip-trip'+(anyConflict?' st-chip-warn':'')+'" title="'+_esc(p.name)+' 출장 · '+_esc(siteNames)+(anyConflict?' ⚠ 겹침 있음':'')+'">'+_esc(p.name)+(anyConflict?' ⚠':'')+'</span>';
+      }
     });
     h+='<div class="st-cal-cell'+(isToday?' st-cal-today':'')+'"><div class="st-cal-daynum">'+d+'</div><div class="st-cal-chips">'+chips+'</div></div>';
   }
