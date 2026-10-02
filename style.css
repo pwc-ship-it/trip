@@ -248,10 +248,12 @@ input.pf-podate{width:88px;font-size:11px;margin-left:4px;padding:2px 4px}
 .st-badge{font-size:10px;padding:2px 7px;border-radius:10px;white-space:nowrap}
 .st-badge-vac{background:rgba(250,178,25,.28);color:#9a6400}
 .st-badge-trip{background:rgba(42,120,214,.22);color:#1558a0}
+.st-badge-trip-intl{background:rgba(74,58,167,.22);color:#4a3aa7}
 .st-badge-office{background:var(--bg-hover);color:var(--tx-second)}
 :root[data-theme="dark"] .st-badge-vac{color:#fab219}
 :root[data-theme="dark"] .st-badge-trip{color:#6fa8e8}
-.st-vac-list{margin-top:10px;border-top:1px solid var(--bd-light);padding-top:6px}
+:root[data-theme="dark"] .st-badge-trip-intl{color:#9085e9}
+.st-vac-panel{max-height:220px;overflow-y:auto;border:1px solid var(--bd-light);border-radius:6px;padding:8px 10px;margin-bottom:10px;background:var(--bg-alt)}
 .st-vac-item{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--tx-second);padding:3px 0}
 .st-vac-edit{cursor:pointer;color:var(--tx-second);flex-shrink:0;margin-right:8px}
 .st-vac-edit:hover{color:#2a78d6}
@@ -265,13 +267,16 @@ input.pf-podate{width:88px;font-size:11px;margin-left:4px;padding:2px 4px}
 .st-cal-empty{background:var(--bg-base)}
 .st-cal-today{outline:2px solid #2a78d6;outline-offset:-2px}
 .st-cal-daynum{color:var(--tx-second);margin-bottom:2px}
-.st-cal-chips{display:flex;flex-wrap:wrap;gap:2px}
+.st-cal-chips{display:flex;flex-direction:column;gap:3px}
+.st-cal-chiprow{display:flex;flex-wrap:wrap;gap:2px}
 .st-chip{font-size:10px;padding:1px 5px;border-radius:3px;white-space:nowrap}
 .st-chip-vac{background:rgba(250,178,25,.28);color:#9a6400}
 .st-chip-trip{background:rgba(42,120,214,.22);color:#1558a0}
+.st-chip-trip-intl{background:rgba(74,58,167,.22);color:#4a3aa7}
 .st-chip-warn{background:rgba(208,59,59,.28)!important;color:#b52020!important;font-weight:600}
 :root[data-theme="dark"] .st-chip-vac{color:#fab219}
 :root[data-theme="dark"] .st-chip-trip{color:#6fa8e8}
+:root[data-theme="dark"] .st-chip-trip-intl{color:#9085e9}
 :root[data-theme="dark"] .st-chip-warn{color:#ff8a8a!important}
 .chkrow input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#534AB7}
 .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd-main)}

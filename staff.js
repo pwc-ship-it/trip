@@ -27,6 +27,13 @@ function _stTripSiteName(sc){
   var site=proj?S.sites.find(function(x){return x.id===proj.siteId;}):null;
   return site?site.name:'';
 }
+/* 국내/해외 판정 — person.js와 동일한 규칙: domestic 체크가 우선, 아니면 사이트 region */
+function _stTripDomestic(sc){
+  if(sc.domestic)return true;
+  var proj=S.projects.find(function(p){return p.id===sc.projectId;});
+  if(!proj)return false;
+  return getSiteRegion(proj.siteId)==='korea';
+}
 
 /* 출장 등록 저장 직전 겹침검사 (modals.js saveSc에서 호출) */
 function _staffConflicts(name,start,end,excludeId){
@@ -48,10 +55,12 @@ function openStaffStatus(){
   _stVacFormOpen=false;_stVacListOpen=false;_stVacEditId=null;
   var now=new Date();_stCalY=now.getFullYear();_stCalM=now.getMonth();
   document.getElementById('mc').innerHTML='<div class="mover"><div class="modal xxwide"><div class="mtit">BU3 인원 현황</div>'
-    +'<div class="st-wrap"><div class="st-left" id="stLeft"></div><div class="st-right" id="stRight"></div></div>'
+    +'<div class="st-wrap"><div class="st-left" id="stLeft"></div>'
+    +'<div class="st-right"><div id="stVacPanel"></div><div id="stCalArea"></div></div></div>'
     +'<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="cm()">닫기</button></div>'
     +'</div></div>';
   renderStaffLeft();
+  renderStaffVacPanel();
   renderStaffCalendar();
 }
 
@@ -59,17 +68,18 @@ function renderStaffLeft(){
   var el=document.getElementById('stLeft');if(!el)return;
   var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px">'
     +'<span class="fl" style="margin:0">구성원 ('+BU3_STAFF.length+'명)</span>'
-    +'<span style="display:flex;gap:4px"><button class="btn sm" onclick="toggleStaffVacList()">'+(_stVacListOpen?'목록 닫기':'📋 등록된 휴가')+'</button>'
-    +'<button class="btn sm pri" onclick="toggleStaffVacForm()">+ 휴가 등록</button></span></div>';
+    +'<button class="btn sm pri" onclick="toggleStaffVacForm()">+ 휴가 등록</button></div>';
   h+='<div id="stVacForm" style="display:'+(_stVacFormOpen?'block':'none')+'">'+_stVacFormHtml()+'</div>';
-  h+='<div id="stVacListWrap" style="display:'+(_stVacListOpen?'block':'none')+'">'+_stVacListHtml()+'</div>';
   h+='<div class="st-person-list">';
   BU3_STAFF.forEach(function(p){
     var vac=_stVacationOn(p.name,TODAY);
     var trip=_stTripOn(p.name,TODAY);
     var badges='';
     if(vac)badges+='<span class="st-badge st-badge-vac">'+_esc(vac.type||'휴가')+'</span>';
-    if(trip)badges+='<span class="st-badge st-badge-trip">출장중'+(_stTripSiteName(trip)?' · '+_esc(_stTripSiteName(trip)):'')+'</span>';
+    if(trip){
+      var isDom=_stTripDomestic(trip);
+      badges+='<span class="st-badge '+(isDom?'st-badge-trip':'st-badge-trip-intl')+'">출장중'+(_stTripSiteName(trip)?' · '+_esc(_stTripSiteName(trip)):'')+' · '+(isDom?'국내':'해외')+'</span>';
+    }
     if(!vac&&!trip)badges+='<span class="st-badge st-badge-office">본사</span>';
     h+='<div class="st-person-row"><span class="st-person-name">'+_esc(p.name)+'</span><span class="st-person-title">'+_esc(p.title)+'</span><span class="st-person-badges">'+badges+'</span></div>';
   });
@@ -95,9 +105,9 @@ function toggleStaffVacForm(){
   if(!_stVacFormOpen)_stVacEditId=null;
   renderStaffLeft();
 }
-function toggleStaffVacList(){_stVacListOpen=!_stVacListOpen;renderStaffLeft();}
+function toggleStaffVacList(){_stVacListOpen=!_stVacListOpen;renderStaffVacPanel();}
 function editStaffVacation(id){
-  _stVacEditId=id;_stVacFormOpen=true;_stVacListOpen=false;
+  _stVacEditId=id;_stVacFormOpen=true;
   renderStaffLeft();
 }
 function saveStaffVacation(){
@@ -121,19 +131,23 @@ function saveStaffVacation(){
   }
   saveData();
   _stVacFormOpen=false;_stVacEditId=null;
-  renderStaffLeft();renderStaffCalendar();
+  renderStaffLeft();renderStaffVacPanel();renderStaffCalendar();
+}
+
+/* ── 등록된 휴가 패널 (달력 쪽, 구성원 List와 무관) ── */
+function renderStaffVacPanel(){
+  var el=document.getElementById('stVacPanel');if(!el)return;
+  var h='<div style="display:flex;justify-content:flex-end;margin-bottom:8px">'
+    +'<button class="btn sm" onclick="toggleStaffVacList()">'+(_stVacListOpen?'목록 닫기':'📋 등록된 휴가')+'</button></div>';
+  if(_stVacListOpen) h+='<div class="st-vac-panel">'+_stVacListHtml()+'</div>';
+  el.innerHTML=h;
 }
 function _stVacListHtml(){
-  var upcoming=(S.vacations||[]).filter(function(v){return pd(v.end)>=TODAY;}).sort(function(a,b){return a.start<b.start?-1:1;});
-  var past=(S.vacations||[]).filter(function(v){return pd(v.end)<TODAY;}).sort(function(a,b){return a.start<b.start?1:-1;});
-  var h='<div class="fl" style="margin:4px 0">등록된 휴가 — 진행중/예정 ('+upcoming.length+'건)</div>';
-  if(!upcoming.length) h+='<div class="pf-empty" style="padding:8px 0">없음</div>';
-  upcoming.forEach(function(v){h+=_stVacItemHtml(v);});
-  if(past.length){
-    h+='<div class="fl" style="margin:8px 0 4px">지난 휴가 ('+past.length+'건)</div>';
-    past.slice(0,30).forEach(function(v){h+=_stVacItemHtml(v);});
-    if(past.length>30) h+='<div class="pf-empty" style="padding:4px 0">외 '+(past.length-30)+'건 더 있음</div>';
-  }
+  var monthStart=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
+  var list=(S.vacations||[]).filter(function(v){return pd(v.end)>=monthStart;}).sort(function(a,b){return a.start<b.start?-1:1;});
+  var h='<div class="fl" style="margin:4px 0">이번 달 + 예정 휴가 ('+list.length+'건) — 지난 휴가는 표시하지 않음</div>';
+  if(!list.length) h+='<div class="pf-empty" style="padding:8px 0">없음</div>';
+  list.forEach(function(v){h+=_stVacItemHtml(v);});
   return h;
 }
 function _stVacItemHtml(v){
@@ -147,12 +161,12 @@ function delStaffVacation(id){
   _markDeleted('vacations',id);
   saveData();
   if(_stVacEditId===id){_stVacEditId=null;_stVacFormOpen=false;}
-  renderStaffLeft();renderStaffCalendar();
+  renderStaffLeft();renderStaffVacPanel();renderStaffCalendar();
 }
 
 /* ── 월 달력 ── */
 function renderStaffCalendar(){
-  var el=document.getElementById('stRight');if(!el)return;
+  var el=document.getElementById('stCalArea');if(!el)return;
   var y=_stCalY,m=_stCalM;
   var first=new Date(y,m,1);
   var startWeekday=first.getDay();
@@ -164,17 +178,20 @@ function renderStaffCalendar(){
   for(var d=1;d<=daysInMonth;d++){
     var dateObj=new Date(y,m,d);dateObj.setHours(0,0,0,0);
     var isToday=dateObj.getTime()===TODAY.getTime();
-    var chips='';
+    var vacChips='',tripChips='';
     BU3_STAFF.forEach(function(p){
       var vac=_stVacationOn(p.name,dateObj);
-      if(vac)chips+='<span class="st-chip st-chip-vac" title="'+_esc(p.name)+' '+_esc(vac.type||'휴가')+'">'+_esc(p.name)+'</span>';
+      if(vac)vacChips+='<span class="st-chip st-chip-vac" title="'+_esc(p.name)+' '+_esc(vac.type||'휴가')+'">'+_esc(p.name)+'</span>';
       var trips=_stTripsOn(p.name,dateObj);
       if(trips.length){
         var anyConflict=trips.some(function(t){return t.hasConflict;});
+        var anyIntl=trips.some(function(t){return !_stTripDomestic(t);});
         var siteNames=trips.map(function(t){return _stTripSiteName(t);}).filter(function(x){return x;}).join(', ');
-        chips+='<span class="st-chip st-chip-trip'+(anyConflict?' st-chip-warn':'')+'" title="'+_esc(p.name)+' 출장 · '+_esc(siteNames)+(anyConflict?' ⚠ 겹침 있음':'')+'">'+_esc(p.name)+(anyConflict?' ⚠':'')+'</span>';
+        var cls='st-chip '+(anyIntl?'st-chip-trip-intl':'st-chip-trip')+(anyConflict?' st-chip-warn':'');
+        tripChips+='<span class="'+cls+'" title="'+_esc(p.name)+' 출장 · '+_esc(siteNames)+' · '+(anyIntl?'해외':'국내')+(anyConflict?' ⚠ 겹침 있음':'')+'">'+_esc(p.name)+(anyConflict?' ⚠':'')+'</span>';
       }
     });
+    var chips=(vacChips?'<div class="st-cal-chiprow">'+vacChips+'</div>':'')+(tripChips?'<div class="st-cal-chiprow">'+tripChips+'</div>':'');
     h+='<div class="st-cal-cell'+(isToday?' st-cal-today':'')+'"><div class="st-cal-daynum">'+d+'</div><div class="st-cal-chips">'+chips+'</div></div>';
   }
   h+='</div>';
