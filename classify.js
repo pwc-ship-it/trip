@@ -9,6 +9,10 @@ var PAY_SHORT={free:'무상',md:'계약M/D',po:'별도PO'};
 var FREE_REASON={edu:'교육',warranty:'보증',etc:'기타'};
 var LOC_LABEL={overseas:'해외',dom_setup:'국내(납품 전 셋업)',dom_final:'국내(최종 납품처)'};
 var LOC_SHORT={overseas:'해외',dom_setup:'국내-셋업',dom_final:'국내-납품처'};
+/* 겹침이 이 일수 이하이면 '참고(ℹ)'로 낮춘다 — 출국·도착 이동일 패턴 */
+var INFO_OVERLAP_MAX_DAYS=2;
+/* 재분류 화면의 사이트 필터 기본값: 2차전지 사이트 */
+var CLS_BATTERY_SITES=['ESHD','ESOT','ESWA','ESHG','현대JV','ESMI'];
 
 /* ── 기본 헬퍼 ── */
 function _isNamed(n){n=String(n||'').trim();return !!n&&n!=='미지정';}
@@ -98,8 +102,8 @@ function conflictsOf(sc){
     if(!r) return;
     var os=schedSite(o);
     var cross=!!(mySite&&os&&mySite.id!==os.id);
-    /* 1일만 겹침(출국·귀국일)은 '참고(info)', 2일 이상은 경고 */
-    out.push({kind:'trip',o:o,r:r,cross:cross,level:r.n<=1?'info':'warn'});
+    /* 겹침이 2일 이하(출국·도착 이동일 패턴)면 '참고(info)', 3일 이상은 경고 */
+    out.push({kind:'trip',o:o,r:r,cross:cross,level:r.n<=INFO_OVERLAP_MAX_DAYS?'info':'warn'});
   });
   return out;
 }
@@ -109,7 +113,7 @@ function conflictText(sc,c){
       +' / 겹친 기간 '+_per(c.r.s,c.r.e)+' ('+c.r.n+'일)';
   }
   var o=c.o;
-  return (c.cross?'사이트 간 동시 출장':'출장 겹침')+(c.level==='info'?' (참고: 1일 겹침 — 출국·귀국일일 수 있음)':'')+' — '+sc.name+'님이 같은 기간에 다른 출장: '+_siteNameOf(o)+(o.task?' · '+o.task:'')+' '+_per(o.start,o.end)
+  return (c.cross?'사이트 간 동시 출장':'출장 겹침')+(c.level==='info'?' (참고: '+INFO_OVERLAP_MAX_DAYS+'일 이하 겹침 — 출국·도착 이동일일 수 있음)':'')+' — '+sc.name+'님이 같은 기간에 다른 출장: '+_siteNameOf(o)+(o.task?' · '+o.task:'')+' '+_per(o.start,o.end)
     +' / 겹친 기간 '+_per(c.r.s,c.r.e)+' ('+c.r.n+'일)';
 }
 /* 이상점 목록 [{code,text}] — code: date | orphan | loc | conflict */
@@ -513,7 +517,12 @@ function clsReadForm(){
 }
 
 /* ═══════════════ 재분류 모달 ═══════════════ */
-var _cls={filter:'all',site:'',q:'',cur:null,sel:{},reason:'재분류',note:''};
+var _cls={filter:'all',site:'__battery__',q:'',cur:null,sel:{},reason:'재분류',note:''};
+function _clsBatteryIds(){
+  var ids={};
+  S.sites.forEach(function(st){if(CLS_BATTERY_SITES.indexOf(st.name)>=0||CLS_BATTERY_SITES.indexOf(st.id)>=0) ids[st.id]=1;});
+  return ids;
+}
 function _clsBackupOk(){
   var ts=0;try{ts=Number(localStorage.getItem('bu3_last_backup_ts')||0);}catch(e){}
   return ts&&(Date.now()-ts)<6*3600*1000;
@@ -529,7 +538,8 @@ function _clsFiltered(){
     var p=effectivePay(sc);
     if(_cls.filter==='paid'&&p!=='pending_paid') return false;
     if(_cls.filter==='unchecked'&&p!=='pending_unchecked') return false;
-    if(_cls.site){var pr=schedProject(sc);if(!pr||pr.siteId!==_cls.site) return false;}
+    if(_cls.site==='__battery__'){var pb=schedProject(sc);if(!pb||!_clsBatteryIds()[pb.siteId]) return false;}
+    else if(_cls.site){var pr=schedProject(sc);if(!pr||pr.siteId!==_cls.site) return false;}
     if(q&&String(sc.name||'').indexOf(q)<0&&String(sc.task||'').indexOf(q)<0) return false;
     return true;
   });
@@ -540,7 +550,8 @@ function _clsFiltered(){
   return list;
 }
 function openReclassModal(){
-  _cls={filter:'all',site:'',q:'',cur:null,sel:{},reason:'재분류',note:''};
+  _cls={filter:'all',site:'__battery__',q:'',cur:null,sel:{},reason:'재분류',note:''};
+  if(!Object.keys(_clsBatteryIds()).length) _cls.site='';   /* 해당 사이트가 데이터에 하나도 없으면 전체로 */
   _renderReclass();
   document.removeEventListener('keydown',_clsKey);
   document.addEventListener('keydown',_clsKey);
@@ -566,12 +577,12 @@ function _renderReclass(){
   var nPaid=all.filter(function(s){return effectivePay(s)==='pending_paid';}).length,nUn=all.length-nPaid;
   var ok=_clsBackupOk();
   var siteOpts=_sitesWithProjects().map(function(s){return '<option value="'+s.id+'"'+(_cls.site===s.id?' selected':'')+'>'+_esc(s.name)+'</option>';}).join('');
-  var h='<div class="mtit">과금·위치 재분류 <span class="cls-sub" style="font-weight:400">미분류 '+all.length+'건 남음 (유상 체크 '+nPaid+' · 체크 해제 '+nUn+')</span></div>';
+  var h='<div class="mtit">과금·위치 재분류 <span class="cls-sub" style="font-weight:400">미분류 전체 '+all.length+'건 (유상 체크 '+nPaid+' · 체크 해제 '+nUn+') · 현재 필터 '+list.length+'건</span></div>';
   h+='<div class="cls-bkbar'+(ok?' ok':'')+'"><span>① 일괄 수정 전 전체 백업 — '+(ok?'백업 완료 ('+_clsBackupTxt()+')':'백업이 필요합니다 (마지막: '+_clsBackupTxt()+')')+'</span>'
     +'<button class="btn sm" onclick="clsBackup()">백업 파일 다운로드</button></div>';
   h+='<div class="cls-filters"><select onchange="_cls.filter=this.value;_cls.cur=null;_renderReclass()">'
     +[['all','전체'],['paid','유상 체크됨'],['unchecked','체크 해제됨']].map(function(o){return '<option value="'+o[0]+'"'+(_cls.filter===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'
-    +'<select onchange="_cls.site=this.value;_cls.cur=null;_renderReclass()"><option value="">모든 사이트</option>'+siteOpts+'</select>'
+    +'<select onchange="_cls.site=this.value;_cls.cur=null;_renderReclass()"><option value="__battery__"'+(_cls.site==='__battery__'?' selected':'')+'>2차전지 사이트 ('+CLS_BATTERY_SITES.join('·')+')</option><option value=""'+(_cls.site===''?' selected':'')+'>모든 사이트</option>'+siteOpts+'</select>'
     +'<input type="text" placeholder="이름·업무 검색" value="'+_esc(_cls.q)+'" onchange="_cls.q=this.value;_cls.cur=null;_renderReclass()" style="width:160px"></div>';
   if(!cur){
     h+='<div class="cls-empty">'+(all.length?'조건에 맞는 미분류 일정이 없습니다.':'🎉 미분류 일정이 모두 정리되었습니다.')+'</div>';
@@ -763,7 +774,7 @@ function _chkRow(x,projOpts){
 }
 function _renderDataCheck(){
   var all=allIssues();
-  var labels={all:'전체',cross:'견적 확정 전 정리 필요',conflict:'겹침',info:'참고(1일 겹침)',date:'날짜 오류',orphan:'프로젝트 없음',loc:'위치',cancelq:'취소 확인 필요'};
+  var labels={all:'전체',cross:'견적 확정 전 정리 필요',conflict:'겹침',info:'참고('+INFO_OVERLAP_MAX_DAYS+'일 이하 겹침)',date:'날짜 오류',orphan:'프로젝트 없음',loc:'위치',cancelq:'취소 확인 필요'};
   var count={};
   Object.keys(labels).forEach(function(k){count[k]=all.filter(function(x){return _chkMatch(x,k);}).length;});
   var list=all.filter(function(x){return _chkMatch(x,_chk.filter);});

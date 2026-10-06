@@ -2,6 +2,32 @@
 var TYPE_LBL={hq:'본사',outsource:'외주',tech:'기술',vision:'비전',host:'호스트',localOutsource:'현지외주'};
 var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a',host:'#7a2a2a',localOutsource:'#1a8ca0'};
 
+/* ── 화면 버전 / 최소 허용 버전 ──
+   서버(GAS 스크립트 속성 MIN_CLIENT_VERSION)가 허용하는 최소 버전보다 낮은 화면에서는 저장을 막는다.
+   구버전 화면이 새 필드(payType, loc, hist, canceled 등)를 지우는 일을 막기 위함.
+   배포할 때 이 값과 index.html 의 ?v= 값을 함께 올린다. */
+var APP_VERSION='20261007a';
+var _verBlock={blocked:false,min:''};
+function _verLess(a,b){return String(a||'')<String(b||'');}
+function _checkMinVersion(d){
+  if(d&&d.minClientVersion&&_verLess(APP_VERSION,d.minClientVersion)) _setVersionBlock(d.minClientVersion);
+}
+function _setVersionBlock(min){
+  _verBlock.blocked=true;_verBlock.min=min||'';
+  var b=document.getElementById('verBlockBanner');
+  if(!b){
+    b=document.createElement('div');
+    b.id='verBlockBanner';
+    b.className='ver-block-banner';
+    document.body.appendChild(b);
+  }
+  b.innerHTML='<b>새 버전이 배포되었습니다.</b> 이 화면은 구버전('+_esc(APP_VERSION)+')이라 <b>일정 저장이 차단</b>되었습니다 (최소 허용 버전 '+_esc(_verBlock.min)+'). '
+    +'<button class="btn sm pri" onclick="location.href=location.pathname+\'?r=\'+Date.now()">지금 새로고침</button> '
+    +'<span class="ver-sub">저장되지 않은 입력은 새로고침하면 사라질 수 있습니다.</span>';
+  b.style.display='block';
+  try{var led=document.getElementById('connLed'),txt=document.getElementById('connTxt');if(led){led.className='conn-led err';}if(txt){txt.textContent='새로고침 필요';}}catch(e){}
+}
+
 /* ── 상태 ── */
 var S={filterSite:'all',filterSites:[],showHidden:false,groups:[],sites:[],projects:[],schedules:[],events:[],workTasks:[],equipItems:[],equipUnits:[],equipSiteOrder:[],equipProjects:[],visionTemplate:{categories:[]},visionEquips:[],paidFeatures:[],vacations:[]};
 /* ══════════════════════════════════════════
@@ -609,6 +635,11 @@ var _savePending=false;      // 진행 중에 추가 저장 요청 있음
 var _saveRetryTimer=null;    // GET 실패로 이번 저장을 건너뛴 뒤 재시도 타이머
 
 function saveData(){
+  if(_verBlock.blocked){
+    _setVersionBlock(_verBlock.min);
+    alert('새 버전이 배포되어 이 화면에서는 저장할 수 없습니다.\n페이지를 새로고침(Ctrl+F5)한 뒤 다시 입력해 주세요.');
+    return;
+  }
   // 1. 즉시 localStorage 캐시 업데이트 (새로고침·오프라인 시 최신 상태 보장)
   var snapshot={groups:S.groups,sites:S.sites,projects:S.projects,schedules:S.schedules,events:S.events,workTasks:S.workTasks,equipItems:S.equipItems,equipUnits:S.equipUnits,equipSiteOrder:S.equipSiteOrder,equipProjects:S.equipProjects,visionTemplate:S.visionTemplate,visionEquips:S.visionEquips,paidFeatures:S.paidFeatures,vacations:S.vacations};
   saveCache(snapshot);
@@ -710,7 +741,7 @@ function _flushToSheets(){
   var _cacheOk=S._schCache&&S._schCache.ts&&(_now-S._schCache.ts)<10000;
   var fetchPromise=_cacheOk
     ? Promise.resolve(S._schCache.data)
-    : fetch(url+'?action=load').then(function(r){return r.json();}).then(function(d){S._schCache={data:d,ts:_now};return d;});
+    : fetch(url+'?action=load').then(function(r){return r.json();}).then(function(d){_checkMinVersion(d);S._schCache={data:d,ts:_now};return d;});
 
   // GET 실패 시 병합 없이 맹목적으로 POST하지 않음(방어적 이중 안전망 — 서버가 이제 병합 권위지만
   // 그래도 로컬이 방금 병합한 sheetsData 없이 쏘는 걸 피함) — dirty 유지하고 잠시 후 재시도
@@ -728,11 +759,14 @@ function _flushToSheets(){
           deletedIds:_tombList(),
           clearDeletedIds:_tombClearQueue,
           deletedScheduleIds:_deletedScIds(),
-          deviceTag:getDeviceTag()})
+          deviceTag:getDeviceTag(),clientVersion:APP_VERSION})
       });
     })
     .then(function(r){return r.json();})
-    .then(function(data){_onDone(!data.error);_handleSyncIssues(data);})
+    .then(function(data){
+      if(data&&data.error==='VERSION_TOO_OLD'){_saveInFlight=false;_setVersionBlock(data.minVersion);return;}
+      _onDone(!data.error);_handleSyncIssues(data);
+    })
     .catch(function(err){
       if(err===_GET_FAILED){
         _saveInFlight=false;
@@ -972,6 +1006,7 @@ function forceLoadFromSheets(){
   fetch(url+'?action=load')
     .then(function(r){return r.json();})
     .then(function(data){
+      _checkMinVersion(data);
       hideInd(ind);
       if(data.error)throw new Error(data.error);
       try{localStorage.removeItem(CACHE_KEY);}catch(e){}
@@ -1052,9 +1087,10 @@ function loadFromSheets(callback){
         deletedIds:_tombList(),
         clearDeletedIds:_tombClearQueue,
         deletedScheduleIds:_deletedScIds(),
-        deviceTag:getDeviceTag()})
+        deviceTag:getDeviceTag(),clientVersion:APP_VERSION})
     }).then(function(r){return r.json();})
     .then(function(data){
+      if(data&&data.error==='VERSION_TOO_OLD'){_setVersionBlock(data.minVersion);if(callback)callback();return;}
       _handleSyncIssues(data);
       if(!data.error){
         try{localStorage.removeItem(CACHE_DIRTY_KEY);}catch(e){}
@@ -1064,6 +1100,7 @@ function loadFromSheets(callback){
         fetch(url+'?action=load')
           .then(function(r2){if(!r2.ok)throw new Error('HTTP '+r2.status);return r2.json();})
           .then(function(pulled){
+            _checkMinVersion(pulled);
             if(!pulled.error){
               _absorbTombs(pulled.deletedIds);
               if(pulled.deletedScheduleIds&&pulled.deletedScheduleIds.length){
@@ -1109,6 +1146,7 @@ function loadFromSheets(callback){
   fetch(url+'?action=load')
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
+      _checkMinVersion(data);
       if(data.error)throw new Error(data.error);
 
       // ── Sheets 로드 전 로컬 스냅샷 보존 ──
@@ -1375,6 +1413,7 @@ function refreshVisionFromSheets(silent){
   fetch(url+'?action=load')
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
+      _checkMinVersion(data);
       if(data.error)throw new Error(data.error);
       // tombstone 흡수 + 로컬 정리
       _absorbTombs(data.deletedIds);
