@@ -98,8 +98,8 @@ function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 function _touch(r){if(r)r.mt=Date.now();return r;}
 /* ── 일정 변경 이력 (sc.hist = JSON 문자열, 최대 20건) — 변경 전/후 값과 사유 ── */
 function histSnap(sc){
-  return {payType:sc.payType||'',loc:sc.loc||'',poNo:sc.poNo||'',start:sc.start,end:sc.end,projectId:sc.projectId,
-    paid:(sc.paid===undefined?null:sc.paid),domestic:!!sc.domestic};
+  return {payType:sc.payType||'',freeReason:sc.freeReason||'',loc:sc.loc||'',poNo:sc.poNo||'',start:sc.start,end:sc.end,projectId:sc.projectId,
+    paid:(sc.paid===undefined?null:sc.paid),domestic:!!sc.domestic,canceled:!!sc.canceled};
 }
 function appendHist(sc,before,reason,note){
   var h=[];
@@ -191,7 +191,7 @@ function _viPostMerge(winner,loser){
 /* paid/hasConflict 문자열 보정 — Sheets에서 "FALSE" 같은 문자열이 오면 참으로 오인되던 문제 방지.
    빈 값('')은 '설정 안 함'으로 보고 키를 제거한다(미설정 ≠ 명시적 false 구분이 재분류 대상 판정에 쓰임). */
 function _normSchedFlags(sc){
-  ['paid','hasConflict'].forEach(function(k){
+  ['paid','hasConflict','canceled'].forEach(function(k){
     var v=sc[k];
     if(typeof v!=='string') return;
     var t=v.trim().toLowerCase();

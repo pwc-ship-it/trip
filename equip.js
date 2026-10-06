@@ -46,6 +46,7 @@ function getOnSitePersonnel(siteId){
   var todayStr=TODAY.getFullYear()+'-'+String(TODAY.getMonth()+1).padStart(2,'0')+'-'+String(TODAY.getDate()).padStart(2,'0');
   var result=[];
   S.schedules.forEach(function(sc){
+    if(sc.canceled) return;
     if(sc.start>todayStr||sc.end<todayStr) return;
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj||proj.siteId!==siteId) return;
