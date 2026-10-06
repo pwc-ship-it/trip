@@ -221,8 +221,13 @@ function siteDayRows(opts){
   return rows;
 }
 /* 계약 M/D 소진으로 세는 행: 유상-계약 M/D 소진. 국내(납품 전 셋업)는 사이트 설정(mdIncludeSetup)일 때만. 미분류는 제외 */
+/* 사이트의 '셋업 포함' 설정 — 서버 버전에 따라 'TRUE'/'FALSE' 문자열로 올 수 있어 방어적으로 해석 */
+function siteMdSetup(site){
+  var v=site&&site.mdIncludeSetup;
+  return v===true||String(v).toLowerCase()==='true';
+}
 function consumesMd(r){
-  return r.pay==='md'&&(r.loc!=='dom_setup'||!!r.site.mdIncludeSetup);
+  return r.pay==='md'&&(r.loc!=='dom_setup'||siteMdSetup(r.site));
 }
 function _stat(){return {free:0,md:0,po:0,pend:0,total:0};}
 function _addStat(st,pay,n){var k=(pay==='free'||pay==='md'||pay==='po')?pay:'pend';st[k]+=n;st.total+=n;}
@@ -380,13 +385,13 @@ function renderSiteDaysSummary(){
         html+='<tr class="pm-site-group-row"><td colspan="'+ncol+'">'+_esc(g.groupName)+'</td></tr>';
         g.sites.forEach(function(m){
           var sid=m.site.id.replace(/'/g,"\\'");
-          var setupNote=(!m.site.mdIncludeSetup&&m.loc.dom_setup.md>0)?'<div class="cls-sub">셋업 '+_fmtN(m.loc.dom_setup.md)+'일 제외</div>':'';
+          var setupNote=(!siteMdSetup(m.site)&&m.loc.dom_setup.md>0)?'<div class="cls-sub">셋업 '+_fmtN(m.loc.dom_setup.md)+'일 제외</div>':'';
           html+='<tr>'
             +'<td onclick="openSiteRosterModal(\''+sid+'\')" style="cursor:pointer"><span class="pm-site-chip" style="background:'+m.site.color+'"></span>'+_esc(m.site.name)+'</td>'
             +'<td>'+_locCell(m.loc.overseas)+'</td><td>'+_locCell(m.loc.dom_setup)+'</td><td>'+_locCell(m.loc.dom_final)+'</td>'
             +(tc?'<td>'+_locCell(m.type.hq)+'</td><td>'+_locCell(m.type.out)+'</td><td>'+_locCell(m.type.local)+'</td>':'')
             +'<td><b>'+_fmtN(m.mdUsed)+'일</b>'+setupNote
-            +'<label class="cls-sm"><input type="checkbox"'+(m.site.mdIncludeSetup?' checked':'')+' onchange="setSiteMdSetup(\''+sid+'\',this.checked)"> 셋업 포함</label></td>'
+            +'<label class="cls-sm"><input type="checkbox"'+(siteMdSetup(m.site)?' checked':'')+' onchange="setSiteMdSetup(\''+sid+'\',this.checked)"> 셋업 포함</label></td>'
             +'<td>'+_fmtN(m.mdPlan)+'일</td>'
             +'<td><input type="number" min="0" class="pm-estmd-inp" value="'+(m.estMd||'')+'" placeholder="-" onchange="updSiteEstMd(\''+sid+'\',this.value)"></td>'
             +'<td>'+_remainCell(m.estMd,m.mdUsed)+'</td><td>'+_excessCell(m)+'</td>'
