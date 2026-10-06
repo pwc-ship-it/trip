@@ -77,7 +77,7 @@
   --bd-strong:  #c4b99f;
   --tx-primary: #1b2738;
   --tx-second:  #4f5b6b;
-  --tx-muted:   #8a8d8e;
+  --tx-muted:   #616465;   /* 대비 보정(원래 #8a8d8e) */
   /* 위 값에서 파생 */
   --bg-alt:     #eee8d9;
   --bg-deep:    #e7e0ce;
@@ -89,10 +89,15 @@
   --bg-wksec:   #e2e3dc;
   --bd-light:   #ebe4d4;
   --bd-subtle:  #efe9db;
-  --tx-dim:     #9a9c9c;
-  --tx-faint:   #b3b3ad;
+  --tx-dim:     #626464;   /* 대비 보정 */
+  --tx-faint:   #64645d;   /* 대비 보정 */
+  /* 대비 보정: 다크 바탕용 밝은 글자색을 도면에서만 진하게 (글자색으로만 쓰이는 변수) */
+  --info:       #1967c3;
+  --ok:         #33754d;
+  --warn:       #8c5f0e;
+  --danger:     #cf1919;
   --r-sm: 0px; --r-md: 0px; --r-lg: 0px;
-  --font-mono: "D2Coding", Consolas, monospace;
+  --font-mono: "D2Coding", Consolas, "SF Mono", Menlo, monospace;
 }
 
 /* ═══════════════════════════════════════════
@@ -1065,3 +1070,19 @@ input.pf-podate{width:88px;font-size:var(--fs-xs);margin-left:4px;padding:2px 4p
 }
 /* 고정폭 글꼴은 폭이 넓어 이름 열 안에서 잘리므로 자간과 좌우 패딩만 줄인다 */
 [data-theme="blueprint"] .gbadge{letter-spacing:-.06em;padding-left:3px;padding-right:3px}
+
+/* ── 도면 대비 보정(4.5:1): 글자색만 진하게. 배경·테두리·막대 색은 그대로 ── */
+[data-theme="blueprint"] :is(.eq-date,.eq-act-btn.copy){color:#1565cd}
+[data-theme="blueprint"] .eq-memo-icon.has-memo{color:#1369b9}
+[data-theme="blueprint"] .pf-applied{color:#0b7652}
+[data-theme="blueprint"] .tdlb{color:#d40000}
+/* JS가 인라인으로 지정한 글자색 */
+[data-theme="blueprint"] [style*="color:#7aafee"]{color:#1967c3!important}
+[data-theme="blueprint"] [style*="color:#5a9aee"]{color:#1565cd!important}
+[data-theme="blueprint"] [style*="color:#4aaa70"]{color:#33754d!important}
+[data-theme="blueprint"] [style*="color:#e8a020"]{color:#8c5f0e!important}
+[data-theme="blueprint"] [style*="color:#cc8010"]{color:#935c0c!important}
+[data-theme="blueprint"] [style*="color:#e07030"]{color:#aa4e19!important}
+[data-theme="blueprint"] [style*="color:#e04060"]{color:#ca2143!important}
+[data-theme="blueprint"] [style*="color:#2176cc"]{color:#1d69b6!important}
+[data-theme="blueprint"] [style*="color:#e84040"]{color:#cf1919!important}
