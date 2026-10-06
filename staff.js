@@ -17,9 +17,9 @@ var ST_VAC_TYPES=['휴가','반차(오전)','반차(오후)'];
 function _stVacationOn(name,d){
   return (S.vacations||[]).find(function(v){return v.name===name && d>=pd(v.start) && d<=pd(v.end);});
 }
-/* 그 날짜에 해당 이름으로 걸린 모든 출장 일정 — 타입/숨김/완료여부 무관하게 전부 매칭 */
+/* 그 날짜에 해당 이름으로 걸린 모든 출장 일정 — 타입/숨김(hidden)/완료여부 무관, 취소된 일정만 제외 */
 function _stTripsOn(name,d){
-  return (S.schedules||[]).filter(function(sc){return sc.name===name && d>=pd(sc.start) && d<=pd(sc.end);});
+  return (S.schedules||[]).filter(function(sc){return !sc.canceled && sc.name===name && d>=pd(sc.start) && d<=pd(sc.end);});
 }
 function _stTripOn(name,d){var t=_stTripsOn(name,d);return t.length?t[0]:null;}
 function _stTripSiteName(sc){
@@ -27,12 +27,9 @@ function _stTripSiteName(sc){
   var site=proj?S.sites.find(function(x){return x.id===proj.siteId;}):null;
   return site?site.name:'';
 }
-/* 국내/해외 판정 — person.js와 동일한 규칙: domestic 체크가 우선, 아니면 사이트 region */
+/* 국내/해외 판정 — classify.js의 위치(해외/국내-납품 전 셋업/국내-최종 납품처)와 동일한 규칙 */
 function _stTripDomestic(sc){
-  if(sc.domestic)return true;
-  var proj=S.projects.find(function(p){return p.id===sc.projectId;});
-  if(!proj)return false;
-  return getSiteRegion(proj.siteId)==='korea';
+  return isDomesticLoc(sc);
 }
 
 /* 출장 등록 저장 직전 겹침검사 (modals.js saveSc에서 호출) */
@@ -41,7 +38,7 @@ function _staffConflicts(name,start,end,excludeId){
   var s=pd(start),e=pd(end);
   var vac=(S.vacations||[]).find(function(v){return v.name===name && s<=pd(v.end) && e>=pd(v.start);});
   if(vac) return {type:'vacation',name:name,start:vac.start,end:vac.end};
-  var trip=(S.schedules||[]).find(function(sc){return sc.name===name && sc.id!==excludeId && !sc.hidden && s<=pd(sc.end) && e>=pd(sc.start);});
+  var trip=(S.schedules||[]).find(function(sc){return sc.name===name && sc.id!==excludeId && !sc.canceled && s<=pd(sc.end) && e>=pd(sc.start);});
   if(trip){
     var label=_stTripSiteName(trip)+(trip.task?' '+trip.task:'');
     return {type:'trip',name:label.trim()||'다른 출장',start:trip.start,end:trip.end};
@@ -189,7 +186,7 @@ function renderStaffCalendar(){
       if(vac)vacChips+='<span class="st-chip st-chip-vac" title="'+_esc(p.name)+' '+_esc(vac.type||'휴가')+'">'+_esc(p.name)+'</span>';
       var trips=_stTripsOn(p.name,dateObj);
       if(trips.length){
-        var anyConflict=trips.some(function(t){return t.hasConflict;});
+        var anyConflict=trips.some(function(t){return hasWarnLive(t);}); /* 저장 당시 기록이 아니라 현재 데이터로 재검사 */
         var anyIntl=trips.some(function(t){return !_stTripDomestic(t);});
         var siteNames=trips.map(function(t){return _stTripSiteName(t);}).filter(function(x){return x;}).join(', ');
         var cls='st-chip '+(anyIntl?'st-chip-trip-intl':'st-chip-trip')+(anyConflict?' st-chip-warn':'');

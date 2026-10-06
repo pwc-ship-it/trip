@@ -163,32 +163,28 @@ function showSM(ex){
   var typeOpts=[['hq','본사'],['outsource','외주'],['localOutsource','현지외주'],['tech','기술'],['vision','비전'],['host','호스트']].map(function(t){return '<option value="'+t[0]+'"'+(curType===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('');
   var days=ie?dd(ex.start,ex.end)+' 일':'-';
   var dateInfo=ie?(fmtFull(ex.start)+' → '+fmtFull(ex.end)):'';
-  var isHidden=ie&&ex.hidden?true:false;
-  var isDomestic=ie&&ex.domestic?true:false;
-  var isPaid=ie&&ex.paid?true:false;
   var html='<div class="mtit">'+(isEdit?'출장 일정 수정':'출장 일정 등록')+'</div>';
+  if(isEdit) html+=issueBoxHtml(ex);
   html+='<div class="fg"><label class="fl">사이트</label><select id="f_site">'+so+'</select></div>';
-  html+='<div class="fg"><label class="fl">국내 여부</label><label class="chkrow" style="margin:0"><input type="checkbox" id="f_domestic"'+(isDomestic?' checked':'')+'>국내 출장 (현장이 아닌 국내에서 진행)</label><span id="f_dom_warn" style="display:none;font-size:10px;color:#d08020;margin-left:6px">⚠ 해외 사이트 — 출장일이 국내로 집계됩니다</span></div>';
   html+='<div class="fg"><label class="fl">프로젝트</label><select id="f_proj">'+po+'</select></div>';
   html+='<div class="fg"><label class="fl">업무 유형</label><input type="text" id="f_task" value="'+(ie?ex.task:'')+'" placeholder="예: 셋업, 대응, 개조"></div>';
   html+='<div class="fg"><label class="fl">출장자 이름</label><input type="text" id="f_name" value="'+(ie?ex.name:'')+'" placeholder="이름 입력"></div>';
   html+='<div class="fg"><label class="fl">인원 구분</label><select id="f_type">'+typeOpts+'</select></div>';
-  html+='<div class="fg"><label class="chkrow" style="margin:0"><input type="checkbox" id="f_paid"'+(isPaid?' checked':'')+'>유상 (별도 계약 건 — 견적 M/D 소모에서 제외)</label></div>';
+  html+=clsFormHtml(ie?ex:null,null);
   html+='<div class="fr"><div class="fg"><label class="fl">출발일 (YYYY-MM-DD)</label><input type="text" id="f_start" value="'+(ie?ex.start:'2026-03-01')+'" placeholder="2026-04-01" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div><div class="fg"><label class="fl">복귀일 (YYYY-MM-DD)</label><input type="text" id="f_end" value="'+(ie?ex.end:'2026-03-30')+'" placeholder="2026-06-30" maxlength="10" oninput="fmtDateInput(this);calcD()" style="font-family:monospace;letter-spacing:1px"></div></div>';
   html+='<div class="dbox"><span id="f_datebox" style="color:#ccc">'+dateInfo+'</span>'+(dateInfo?' &nbsp; ':'')+'체류: <span id="f_days" style="font-weight:500">'+days+'</span></div>';
   html+='<div class="fg"><label class="fl">메모 / 비고</label><input type="text" id="f_note" value="'+(ie?ex.note:'')+'" placeholder="주의사항 등"></div>';
-  html+='<label class="chkrow"><input type="checkbox" id="f_hidden"'+(isHidden?' checked':'')+'>간트차트에서 숨기기</label>';
+  if(isEdit) html+=histHtml(ex);
   html+='<div class="mfoot">';
   if(isEdit) html+='<button class="btn red sm" id="f_del">삭제</button>';
+  if(isEdit) html+='<button class="btn sm" id="f_split">날짜로 분할</button>';
   if(isEdit) html+='<button class="btn sm" id="f_copy">복사</button>';
   html+='<button class="btn sm" id="f_cancel">취소</button>';
   html+='<button class="btn sm pri" id="f_save">'+(isEdit?'수정 완료':'등록')+'</button>';
   html+='</div>';
   mw(html);
   // 이벤트 등록
-  function _updDomWarn(){var sid=document.getElementById('f_site').value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');var warn=document.getElementById('f_dom_warn');if(warn)warn.style.display=(domCb&&domCb.checked&&reg!=='korea'&&reg!=='other')?'inline':'none';}
-  document.getElementById('f_site').onchange=function(){upP();var sid=this.value;var reg=getSiteRegion(sid);var domCb=document.getElementById('f_domestic');if(domCb&&reg!=='korea'&&reg!=='other'){domCb.checked=false;}_updDomWarn();};
-  document.getElementById('f_domestic').onchange=function(){_updDomWarn();};
+  document.getElementById('f_site').onchange=function(){upP();clsSiteChanged(this.value);};
   document.getElementById('f_start').onchange=function(){calcD();};
   document.getElementById('f_end').onchange=function(){calcD();};
   document.getElementById('f_cancel').onclick=function(){cm();};
@@ -196,6 +192,7 @@ function showSM(ex){
   if(isEdit){
     document.getElementById('f_del').onclick=function(){delSc(ex.id);};
     document.getElementById('f_copy').onclick=function(){openCopySc(ex.id);};
+    document.getElementById('f_split').onclick=function(){openSplitModal(ex.id,'edit');};
   }
   if(ie){
     var pr2=S.projects.find(function(p){return p.id===ex.projectId;});
@@ -204,10 +201,10 @@ function showSM(ex){
     setTimeout(function(){
       document.getElementById('f_proj').value=ex.projectId;
       calcD(); // 수정 모드에서 초기 날짜 표시
-      _updDomWarn(); // 해외 사이트 + 국내 체크 시 경고 표시
     },0);
   } else {
     upP();
+    clsSiteChanged(document.getElementById('f_site').value); // 위치 기본값 = 사이트 납품처
     calcD(); // 신규 등록 모드 초기 날짜 표시
   }
 }
@@ -255,14 +252,14 @@ function saveSc(exId){
   var start=document.getElementById('f_start').value;
   var end=document.getElementById('f_end').value;
   var note=document.getElementById('f_note').value.trim();
-  var hidden=document.getElementById('f_hidden').checked;
-  var domestic=document.getElementById('f_domestic').checked;
-  var paid=document.getElementById('f_paid').checked;
+  var f=clsReadForm();
   var dateRe=/^\d{4}-\d{2}-\d{2}$/;
   if(!projId||!task||!name||!start||!end){alert('필수 항목을 모두 입력하세요.');return;}
   if(!dateRe.test(start)||!dateRe.test(end)){alert('날짜 형식이 올바르지 않아요.\n예: 2026-04-01');return;}
+  if(!isRealDate(start)||!isRealDate(end)){alert('존재하지 않는 날짜입니다. (예: 4/31)\n날짜를 다시 확인하세요.');return;}
   if(start>end){alert('복귀일이 출발일보다 빠릅니다.');return;}
-  var conflict=typeof _staffConflicts==='function'?_staffConflicts(name,start,end,exId):null;
+  if(f.canceled&&!f.cancelReason){alert('취소 사유를 입력하세요.');return;}
+  var conflict=(typeof _staffConflicts==='function'&&!f.canceled)?_staffConflicts(name,start,end,exId):null;
   var hasConflict=false,conflictNote='';
   if(conflict){
     var msg=conflict.type==='vacation'
@@ -272,11 +269,32 @@ function saveSc(exId){
     hasConflict=true;
     conflictNote=(conflict.type==='vacation'?'휴가 겹침: ':'출장 겹침: ')+conflict.name+' ('+conflict.start+'~'+conflict.end+')';
   }
-  if(exId){
-    var i=S.schedules.findIndex(function(s){return s.id===exId;});
-    S.schedules[i]=_touch({id:exId,projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid,hasConflict:hasConflict,conflictNote:conflictNote});
-  } else {
-    S.schedules.push(_touch({id:genId('s',S.schedules),projectId:projId,task:task,name:name,type:type,start:start,end:end,note:note,hidden:hidden,domestic:domestic,paid:paid,hasConflict:hasConflict,conflictNote:conflictNote}));
+  var rec=exId?S.schedules.find(function(s){return s.id===exId;}):null;
+  var isNew=!rec;
+  if(isNew) rec={id:genId('s',S.schedules)};
+  var before=isNew?null:histSnap(rec);
+  var wasCanceled=!!rec.canceled;
+  rec.projectId=projId;rec.task=task;rec.name=name;rec.type=type;rec.start=start;rec.end=end;rec.note=note;
+  /* hidden 값은 화면에서 더 이상 다루지 않고 기존 값을 그대로 보존한다 */
+  if(f.pay){   // 선택하지 않았으면(미분류 상태) 기존 값을 그대로 둔다
+    rec.payType=f.pay;rec.poNo=f.pay==='po'?f.poNo:'';rec.freeReason=f.pay==='free'?f.freeReason:'';
+    rec.paid=(f.pay==='po');   // 구버전 호환
+  }
+  rec.loc=f.loc||effectiveLoc(rec);
+  rec.domestic=(rec.loc!=='overseas');   // 구버전 호환
+  rec.canceled=!!f.canceled;
+  rec.cancelReason=f.canceled?f.cancelReason:'';
+  rec.hasConflict=hasConflict;rec.conflictNote=conflictNote;
+  _touch(rec);
+  if(isNew){
+    S.schedules.push(rec);
+  }else{
+    var after=histSnap(rec);
+    var changed=Object.keys(after).some(function(k){return JSON.stringify(after[k])!==JSON.stringify(before[k]);});
+    if(changed){
+      var why=rec.canceled&&!wasCanceled?'취소 처리':(!rec.canceled&&wasCanceled?'취소 해제':'일정 수정');
+      appendHist(rec,before,why,rec.canceled?rec.cancelReason:'');
+    }
   }
   saveData();cm();renderAll();
 }
@@ -284,7 +302,7 @@ function openCopySc(id){
   var s=S.schedules.find(function(x){return x.id===id;});
   if(!s)return;
   var c=Object.assign({},s);
-  delete c.id; delete c.mt;
+  delete c.id; delete c.mt; delete c.hist; delete c.splitGroup; delete c.canceled; delete c.cancelReason;
   c.name='';
   showSM(c);
 }

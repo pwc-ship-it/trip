@@ -62,13 +62,18 @@ function _doExportSiteRosterExcel(siteId){
   var site=S.sites.find(function(s){return s.id===siteId;});
   var siteName=site?site.name:siteId;
 
+  /* 집계 일수: 사이트별 Total·로스터 화면과 같은 엔진(오늘까지, 사이트·이름·날짜·위치 중복 제거, 취소 제외) */
+  var cmap={};
+  siteDayRows({period:'all'}).forEach(function(r){if(r.site.id===siteId) cmap[r.sc.id]=r.days;});
   var rows=[];
   S.schedules.forEach(function(sc){
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj||proj.siteId!==siteId) return;
-    var days=dd(sc.start,sc.end);
+    var days=(isRealDate(sc.start)&&isRealDate(sc.end))?dd(sc.start,sc.end):0;
     if(days<=0) return;
-    rows.push({name:sc.name,type:sc.type,task:sc.task||'',start:sc.start,end:sc.end,days:days});
+    var pay=effectivePay(sc);
+    rows.push({name:sc.name,type:sc.type,task:sc.task||'',start:sc.start,end:sc.end,days:days,cdays:cmap[sc.id]||0,canceled:!!sc.canceled,
+      loc:LOC_LABEL[effectiveLoc(sc)],pay:isPendingPay(pay)?'미분류':PAY_LABEL[pay]+(pay==='po'&&sc.poNo?' ('+sc.poNo+')':'')});
   });
   rows.sort(function(a,b){return a.start>b.start?1:(a.start<b.start?-1:a.name.localeCompare(b.name,'ko'));});
 
@@ -76,10 +81,10 @@ function _doExportSiteRosterExcel(siteId){
   wb.creator='BU3 출장 일정 관리';
   wb.created=new Date();
   var ws=wb.addWorksheet((siteName+' 출장이력').slice(0,31));
-  ws.columns=[20,10,20,14,14,10].map(function(w){return {width:w};});
+  ws.columns=[20,10,20,14,14,10,20,22,8,16].map(function(w){return {width:w};});
   ws.views=[{state:'frozen',ySplit:1}];
 
-  var hdr=['이름','인원구분','업무','출발일','복귀일','일수'];
+  var hdr=['이름','인원구분','업무','출발일','복귀일','일수(전체 기간)','위치','과금','상태','집계 일수(오늘까지)'];
   var hRow=ws.getRow(1);
   hdr.forEach(function(h,i){
     var cell=hRow.getCell(i+1);
@@ -92,7 +97,7 @@ function _doExportSiteRosterExcel(siteId){
   rows.forEach(function(r){
     var bg=rIdx%2===0?'#1c1c24':'#181820';
     var row=ws.getRow(rIdx);
-    [r.name,TYPE_LBL[r.type]||r.type,r.task,r.start,r.end,r.days].forEach(function(v,i){
+    [r.name,TYPE_LBL[r.type]||r.type,r.task,r.start,r.end,r.days,r.loc,r.pay,r.canceled?'취소':'',r.cdays].forEach(function(v,i){
       var cell=row.getCell(i+1);
       cell.value=v;
       _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:i>=3?'center':'left'});
@@ -101,7 +106,7 @@ function _doExportSiteRosterExcel(siteId){
     rIdx++;
   });
 
-  var total=rows.reduce(function(sum,r){return sum+r.days;},0);
+  var total=rows.reduce(function(sum,r){return sum+(r.canceled?0:r.days);},0); // 취소 일정은 합계에서 제외
   ws.mergeCells(rIdx,1,rIdx,5);
   var totCell=ws.getRow(rIdx).getCell(1);
   totCell.value='합계';
@@ -109,6 +114,9 @@ function _doExportSiteRosterExcel(siteId){
   var totDaysCell=ws.getRow(rIdx).getCell(6);
   totDaysCell.value=total;
   _xStyle(totDaysCell,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true,align:'center'});
+  var totC=ws.getRow(rIdx).getCell(10);
+  totC.value=rows.reduce(function(sum,r){return sum+r.cdays;},0);
+  _xStyle(totC,{bg:'#2a2a3e',fg:'#e0e0ec',bold:true,align:'center'});
 
   wb.xlsx.writeBuffer().then(function(buf){
     var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -125,8 +133,8 @@ function _doExportSiteRosterExcel(siteId){
 /* ── Sheet 1: 간트차트 ── */
 function _buildGanttSheet(wb){
   var ws=wb.addWorksheet('간트차트');
-  var colWidths=[12,10,30,10,12,8,13,13,9,20];
-  var colHdrs=['그룹','사이트','프로젝트','업무','출장자','유형','시작일','종료일','기간(일)','비고'];
+  var colWidths=[12,10,30,10,12,8,13,13,9,20,18,22,8];
+  var colHdrs=['그룹','사이트','프로젝트','업무','출장자','유형','시작일','종료일','기간(일)','비고','위치','과금','상태'];
   ws.columns=colHdrs.map(function(h,i){return {width:colWidths[i]};});
   ws.views=[{state:'frozen',ySplit:1}];
 
@@ -158,8 +166,11 @@ function _buildGanttSheet(wb){
       typeRaw:sc.type||'hq',
       start:sc.start,
       end:sc.end,
-      days:dd(sc.start,sc.end),
-      note:sc.note||''
+      days:(isRealDate(sc.start)&&isRealDate(sc.end))?dd(sc.start,sc.end):0,
+      note:sc.note||'',
+      loc:LOC_LABEL[effectiveLoc(sc)],
+      pay:isPendingPay(effectivePay(sc))?'미분류':PAY_LABEL[effectivePay(sc)]+(effectivePay(sc)==='po'&&sc.poNo?' ('+sc.poNo+')':''),
+      state:sc.canceled?'취소':''
     });
   });
   rows.sort(function(a,b){
@@ -171,7 +182,7 @@ function _buildGanttSheet(wb){
   var rIdx=2;
   rows.forEach(function(r){
     if(r.siteId!==prevSiteId){
-      ws.mergeCells(rIdx,1,rIdx,10);
+      ws.mergeCells(rIdx,1,rIdx,13);
       var sepCell=ws.getRow(rIdx).getCell(1);
       sepCell.value=r.siteName;
       _xStyle(sepCell,{bg:r.siteColor,fg:'#ffffff',bold:true,align:'left'});
@@ -181,7 +192,7 @@ function _buildGanttSheet(wb){
     }
     var bg=r.typeRaw==='hq'?'#0d1e33':(r.typeRaw==='outsource'?'#1e1400':'#181820');
     var dataRow=ws.getRow(rIdx);
-    [r.grp,r.siteName,r.proj,r.task,r.name,r.typeLabel,r.start,r.end,r.days,r.note].forEach(function(v,i){
+    [r.grp,r.siteName,r.proj,r.task,r.name,r.typeLabel,r.start,r.end,r.days,r.note,r.loc,r.pay,r.state].forEach(function(v,i){
       var cell=dataRow.getCell(i+1);
       cell.value=v;
       _xStyle(cell,{bg:bg,fg:'#c8c8d4',align:(i>=6&&i<=8)?'center':'left'});

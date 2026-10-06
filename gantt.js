@@ -48,7 +48,7 @@ function renderSidebar(){
   var el=document.getElementById('siteList');el.innerHTML='';
   // 전체 보기
   var _today=TODAY;var _tiso=_today.getFullYear()+'-'+String(_today.getMonth()+1).padStart(2,'0')+'-'+String(_today.getDate()).padStart(2,'0');
-  function _sVisible(s){var isPast=s.end&&s.end<_tiso;return (!s.hidden&&!isPast)||S.showHidden;}
+  function _sVisible(s){var isPast=s.end&&s.end<_tiso;return !isPast||S.showHidden;}
   var allDiv=document.createElement('div');
   allDiv.className='sit-all'+(S.filterSite==='all'?' on':'');
   var totalCnt=S.schedules.filter(_sVisible).length;
@@ -133,13 +133,19 @@ function addBar(el,sched){
   var sp=d2px(sched.start),ep=d2px(sched.end)+Math.round(WPX/7),wp=Math.max(ep-sp,8);
   var days=dd(sched.start,sched.end),dr=fmt(sched.start)+'~'+fmt(sched.end);
   var tl=TYPE_LBL[sched.type]||sched.type;
-  if(sched.paid){tl+='·유상';}
-  var domesticTag=sched.domestic?' [국내]':'';
-  var txt=dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'')+(sched.hasConflict?' ⚠ '+sched.conflictNote:'');
-  var bar=document.createElement('div');bar.className='bar '+barCls(sched);bar.style.cssText='left:'+sp+'px;width:'+wp+'px';bar.title=txt;
+  tl+=payTag(sched);
+  var domesticTag=locTag(sched);
+  var iss=schedIssues(sched);      /* 이상점: 겹침/날짜 오류/위치 등 — 마우스를 올리면 사유가 줄별로 표시됨 */
+  var tip=issuesTip(iss);
+  var txt=(sched.canceled?'[취소] ':'')+dr+' · '+sched.name+' ['+tl+']'+domesticTag+' ('+days+'일)'+(sched.note?' · '+sched.note:'');
+  var fullTip=txt+(sched.canceled&&sched.cancelReason?'\n취소 사유: '+sched.cancelReason:'')+(tip?'\n\n'+tip:'');
+  var bar=document.createElement('div');bar.className='bar '+barCls(sched)+(sched.canceled?' bar-canceled':'');bar.style.cssText='left:'+sp+'px;width:'+wp+'px';bar.title=fullTip;
   bar.onclick=(function(id){return function(){openEditSc(id);};})(sched.id);
   var lbl=document.createElement('span');lbl.className='barlbl';lbl.textContent=txt;bar.appendChild(lbl);
-  if(sched.hasConflict){var warn=document.createElement('span');warn.className='bar-warn';warn.textContent='⚠';bar.appendChild(warn);}
+  if(iss.length){
+    var nWarn=iss.filter(function(x){return x.level!=='info';}).length;
+    var warn=document.createElement('span');warn.className=nWarn?'bar-warn':'bar-info';warn.textContent=nWarn?'⚠':'ℹ';warn.title=tip;bar.appendChild(warn);
+  }
   el.appendChild(bar);
 }
 function wtLabelTxt(wt){
@@ -198,9 +204,10 @@ function assignWtLanes(wts){
 
 function renderGantt(){
   var body=document.getElementById('gbody');body.innerHTML='';
+  if(typeof invalidateIssIdx==='function')invalidateIssIdx();
   // 숨김 보기 버튼 상태 동기화 (showHidden이 localStorage에서 복원된 경우 반영)
   var _btn=document.getElementById('btnHidden');
-  if(_btn){_btn.textContent=S.showHidden?'숨김 숨기기':'숨김 보기';_btn.className='btn'+(S.showHidden?' warn':'');}
+  if(_btn){_btn.textContent=S.showHidden?'숨김 숨기기':'숨김 보기';_btn.className='btn'+(S.showHidden?' warn':'');_btn.title='종료일이 지난 일정 전체 보기/숨기기';}
   // 오늘 날짜 문자열 (과거 일정 판별용)
   var _td=TODAY;var todayISO=_td.getFullYear()+'-'+String(_td.getMonth()+1).padStart(2,'0')+'-'+String(_td.getDate()).padStart(2,'0');
   // 이벤트는 종료일이 없어 "날짜+숨김기준일" 경과 여부로 과거 판정 (설정 가능, 기본 30일)
@@ -229,7 +236,7 @@ function renderGantt(){
     var hasVisible=_typeShow.sched&&S.schedules.some(function(s){
       if(s.projectId!==p.id)return false;
       var isPast=s.end&&s.end<todayISO;
-      if(!((!s.hidden&&!isPast)||S.showHidden))return false;
+      if(isPast&&!S.showHidden)return false;
       if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
       return true;
     });
@@ -250,7 +257,7 @@ function renderGantt(){
     var scheds=!_typeShow.sched?[]:S.schedules.filter(function(s){
       if(s.projectId!==proj.id)return false;
       var isPast=s.end&&s.end<todayISO;
-      if(!((!s.hidden&&!isPast)||S.showHidden))return false;
+      if(isPast&&!S.showHidden)return false;
       if(_ganttSearch&&s.name.toLowerCase().indexOf(_ganttSearch)<0)return false;
       return true;
     });
@@ -318,15 +325,15 @@ function renderGantt(){
         var days=dd(sched.start,sched.end),dr=fmt(sched.start)+'~'+fmt(sched.end);
         var isDone=TODAY>pd(sched.end);var isEven=(ri%2===0);ri++;
         var row=document.createElement('div');
-        row.className='grow '+(isEven?'even':'odd')+(isDone?' done':'')+(sched.hidden?' hidden-row':'');
+        row.className='grow '+(isEven?'even':'odd')+(isDone?' done':'')+(sched.canceled?' canceled-row':'');
         var gf2=document.createElement('div');gf2.className='gfix';
         var tc=TYPE_COLOR[sched.type]||'#555';var tl=TYPE_LBL[sched.type]||sched.type;
-        if(sched.paid){tl+='·유상';}
+        tl+=payTag(sched);
         gf2.innerHTML='<div class="gtask">'+(idx===0?_esc(task):'')+'</div>'
           +'<div class="gperson">'+_esc(sched.name)
           +'<span class="type-badge" style="background:'+tc+'">'+_esc(tl)+'</span>'
           +(isDone?'<span class="done-badge">완료</span>':'')
-          +(sched.hidden?'<span class="hidden-badge">숨김</span>':'')
+          +(sched.canceled?'<span class="canceled-badge">취소</span>':'')
           +'<span class="gbadge">'+dr+' · '+days+'일</span></div>';
         var rtl=makeTL(28,'gtl',evts,false);addBar(rtl,sched);row.appendChild(gf2);row.appendChild(rtl);body.appendChild(row);
       });

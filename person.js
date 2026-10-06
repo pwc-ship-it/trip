@@ -166,6 +166,7 @@ function calcCurrentKoreaDays(trips){
 function aggregatePersonTrips(){
   var persons={};
   S.schedules.forEach(function(sc){
+    if(sc.canceled) return; // 취소된 일정은 모든 집계에서 제외
     // 인원 출장일 탭은 숨김 여부와 무관하게 모든 일정 집계
     var proj=S.projects.find(function(p){return p.id===sc.projectId;});
     if(!proj) return;
@@ -173,7 +174,7 @@ function aggregatePersonTrips(){
     var siteId=proj.siteId;
     var siteName=site?site.name:siteId;
     var siteColor=site?site.color:'#555';
-    var region=sc.domestic?'korea':getSiteRegion(siteId);
+    var region=isDomesticLoc(sc)?'korea':getSiteRegion(siteId); // 국내(납품 전 셋업/최종 납품처)는 국내 체류
     var s=pd(sc.start),e=pd(sc.end);
     var status=TODAY>e?'done':(TODAY>=s?'going':'plan');
     var key=sc.name;
@@ -187,7 +188,7 @@ function aggregatePersonTrips(){
       siteId:siteId,siteName:siteName,siteColor:siteColor,
       region:region,start:sc.start,end:sc.end,
       days:dd(sc.start,sc.end),status:status,task:sc.task,note:sc.note,
-      domestic:sc.domestic||false
+      domestic:isDomesticLoc(sc)
     });
   });
   Object.keys(persons).forEach(function(k){
@@ -196,83 +197,6 @@ function aggregatePersonTrips(){
   return persons;
 }
 
-// 사이트별 Total 출장일수 집계 (전체/본사/외주, 기간별)
-// period: 'all'(전체 기간) | 'year'(올해) | 'r12'(최근 12개월)
-function aggregateSiteDays(period){
-  var rangeStart=null, rangeEnd=null;
-  if(period==='year'){
-    rangeStart=new Date(TODAY.getFullYear(),0,1);
-    rangeEnd=new Date(TODAY.getFullYear(),11,31);
-  }else if(period==='r12'){
-    var r12=getRolling12();
-    rangeStart=r12.start; rangeEnd=r12.end;
-  }
-
-  var siteMap={}; // siteId -> {siteId,name,color,groupId,total,hq,out,local,names:{}}
-  S.schedules.forEach(function(sc){
-    if(!_pmSiteTypeFilter[sc.type]) return;
-    if(!_pmSiteIncludeDomestic && sc.domestic) return;
-    var proj=S.projects.find(function(p){return p.id===sc.projectId;});
-    if(!proj) return;
-    var site=S.sites.find(function(s){return s.id===proj.siteId;});
-    if(!site) return;
-    if(TODAY<pd(sc.start)) return; // 출장예정(미출발) 제외 — 완료+출장중만 집계
-    var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
-    if(days<=0) return;
-    var siteId=site.id;
-    if(!siteMap[siteId]) siteMap[siteId]={siteId:siteId,name:site.name,color:site.color,groupId:site.groupId,total:0,hq:0,hqUnpaid:0,hqPaid:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
-    var entry=siteMap[siteId];
-    entry.total+=days; // 전체 출장일은 항상 무상+유상 전체 실적 (표시용)
-    if(sc.type==='outsource'){entry.out+=days; if(sc.paid) entry.outPaid+=days; else entry.outUnpaid+=days;}
-    else if(sc.type==='localOutsource'){entry.local+=days; if(sc.paid) entry.localPaid+=days; else entry.localUnpaid+=days;}
-    else {entry.hq+=days; if(sc.paid) entry.hqPaid+=days; else entry.hqUnpaid+=days;}
-    entry.names[sc.name]=true;
-  });
-
-  var groupOrder=S.groups.map(function(g){return g.id;});
-  var siteList=Object.keys(siteMap).map(function(id){
-    var e=siteMap[id];
-    var siteObj=S.sites.find(function(s){return s.id===id;});
-    var totalUnpaid=e.hqUnpaid+e.outUnpaid+e.localUnpaid;
-    var totalPaid=e.hqPaid+e.outPaid+e.localPaid;
-    return {siteId:e.siteId,name:e.name,color:e.color,groupId:e.groupId,
-      total:e.total,totalUnpaid:totalUnpaid,totalPaid:totalPaid,
-      mdTotal:totalUnpaid+(_pmSiteIncludePaid?totalPaid:0), // 견적M/D 차이 계산용(유상 제외 기본)
-      hq:e.hq,hqUnpaid:e.hqUnpaid,hqPaid:e.hqPaid,out:e.out,outUnpaid:e.outUnpaid,outPaid:e.outPaid,local:e.local,localUnpaid:e.localUnpaid,localPaid:e.localPaid,personCount:Object.keys(e.names).length,
-      estMd:(siteObj&&siteObj.estMd)?Number(siteObj.estMd):0};
-  });
-  siteList.sort(function(a,b){
-    var gi=groupOrder.indexOf(a.groupId)-groupOrder.indexOf(b.groupId);
-    if(gi!==0) return gi;
-    return b.total-a.total;
-  });
-
-  var groups=[];
-  siteList.forEach(function(s){
-    var g=groups[groups.length-1];
-    if(!g||g.groupId!==s.groupId){
-      var gInfo=S.groups.find(function(x){return x.id===s.groupId;});
-      g={groupId:s.groupId,groupName:gInfo?gInfo.name:(s.groupId||'미분류'),sites:[]};
-      groups.push(g);
-    }
-    g.sites.push(s);
-  });
-
-  var grand={total:0,hq:0,hqUnpaid:0,hqPaid:0,out:0,outUnpaid:0,outPaid:0,local:0,localUnpaid:0,localPaid:0,names:{}};
-  Object.keys(siteMap).forEach(function(id){
-    grand.total+=siteMap[id].total; grand.hq+=siteMap[id].hq; grand.out+=siteMap[id].out; grand.local+=siteMap[id].local;
-    grand.hqUnpaid+=siteMap[id].hqUnpaid; grand.hqPaid+=siteMap[id].hqPaid;
-    grand.outUnpaid+=siteMap[id].outUnpaid; grand.outPaid+=siteMap[id].outPaid;
-    grand.localUnpaid+=siteMap[id].localUnpaid; grand.localPaid+=siteMap[id].localPaid;
-    Object.keys(siteMap[id].names).forEach(function(n){grand.names[n]=true;});
-  });
-  var grandTotalUnpaid=grand.hqUnpaid+grand.outUnpaid+grand.localUnpaid;
-  var grandTotalPaid=grand.hqPaid+grand.outPaid+grand.localPaid;
-
-  return {groups:groups,grandTotal:grand.total,grandTotalUnpaid:grandTotalUnpaid,grandTotalPaid:grandTotalPaid,
-    grandMdTotal:grandTotalUnpaid+(_pmSiteIncludePaid?grandTotalPaid:0),
-    grandHq:grand.hq,grandHqUnpaid:grand.hqUnpaid,grandHqPaid:grand.hqPaid,grandOut:grand.out,grandOutUnpaid:grand.outUnpaid,grandOutPaid:grand.outPaid,grandLocal:grand.local,grandLocalUnpaid:grand.localUnpaid,grandLocalPaid:grand.localPaid,grandPersons:Object.keys(grand.names).length};
-}
 
 // rolling 12M 기준 지역별 출장일 (중복 날짜 제거)
 function calcRegionDays12M(trips, region, rolling12){
@@ -513,9 +437,7 @@ var _pmTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true,localO
 var _pmExpanded={};           // 행 펼침 상태: { '이름': true }
 var _pmSitePeriod='all';      // 사이트별 출장일 집계 기간: all | year | r12
 var _pmSiteCollapsed=true;    // 사이트별 출장일 요약 접기 상태 (기본 접힘)
-var _pmSiteTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true,localOutsource:false}; // 사이트별 요약 인원유형 체크
-var _pmSiteIncludeDomestic=false; // 사이트별 요약에 국내(국내 출장) 일정 포함 여부, 기본 미포함
-var _pmSiteIncludePaid=false; // 사이트별 요약/견적M/D 계산에 유상(별도 계약 건) 출장 포함 여부 — 유상은 견적 M/D를 소모하지 않으므로 기본 미포함(무상만 집계)
+var _pmSiteTypeFilter={hq:true,outsource:true,tech:true,vision:true,host:true,localOutsource:true}; // 사이트별 요약 인원유형 체크
 
 function setPmFilter(f){ _pmFilter=f; renderPersonTab(); }
 function setPmSearch(v){
@@ -547,16 +469,6 @@ function togglePmSiteCollapse(){
 }
 function toggleSiteTypeFilter(type){
   _pmSiteTypeFilter[type]=!_pmSiteTypeFilter[type];
-  var el=document.getElementById('pmSiteDaysWrap');
-  if(el) el.outerHTML=renderSiteDaysSummary();
-}
-function toggleSiteDomesticFilter(){
-  _pmSiteIncludeDomestic=!_pmSiteIncludeDomestic;
-  var el=document.getElementById('pmSiteDaysWrap');
-  if(el) el.outerHTML=renderSiteDaysSummary();
-}
-function toggleSiteIncludePaid(){
-  _pmSiteIncludePaid=!_pmSiteIncludePaid;
   var el=document.getElementById('pmSiteDaysWrap');
   if(el) el.outerHTML=renderSiteDaysSummary();
 }
@@ -800,150 +712,8 @@ function runFeasibilityCheck(){
   resultEl.innerHTML=html;
 }
 
-// "유상 포함" 체크 여부에 따른 합계 — 미체크 시 무상만, 체크 시 무상+유상
-function _paidAdj(unpaid,paid){
-  return unpaid+(_pmSiteIncludePaid?paid:0);
-}
-// 무상/유상 일수 셀 포맷 — "유상 포함" 미체크 시 유상 숫자를 흐리게+취소선 처리(견적M/D 계산에서 빠진다는 시각적 표시)
-function _fmtPaidSplit(unpaid,paid){
-  var paidHtml=_pmSiteIncludePaid?String(paid):('<span style="color:var(--tx-muted);text-decoration:line-through">'+paid+'</span>');
-  return unpaid+'/'+paidHtml;
-}
-// 견적 M/D 대비 잔여/초과 표시 (estMd 미입력 시 '-')
-function _fmtEstMdDiff(estMd,allTotal){
-  if(!estMd) return '<span style="color:var(--tx-muted)">-</span>';
-  var diff=estMd-allTotal; // 양수: 잔여, 음수: 초과
-  if(diff>=0) return '<span style="color:#4aaa70">잔여 '+diff+'일</span>';
-  return '<span style="color:#ff4444">초과 '+(-diff)+'일</span>';
-}
 
-// 사이트별 Total 출장일수 요약 섹션 (전체/본사/외주)
-function renderSiteDaysSummary(){
-  var agg=aggregateSiteDays(_pmSitePeriod);
-  // 견적 대비 차이는 기간 탭과 무관하게 항상 전체 기간 실제 출장일과 비교
-  var allTotalMap=null;
-  if(_pmSitePeriod!=='all'){
-    var allAgg=aggregateSiteDays('all');
-    allTotalMap={};
-    allAgg.groups.forEach(function(g){g.sites.forEach(function(s){allTotalMap[s.siteId]=s.mdTotal;});});
-  }
-  var periods=[['all','전체'],['year','올해'],['r12','최근12개월']];
-  var html='<div class="pm-site-days" id="pmSiteDaysWrap">';
-  html+='<div class="pm-site-days-head">';
-  html+='<span class="pm-site-days-title" onclick="togglePmSiteCollapse()" style="cursor:pointer">'
-      +(_pmSiteCollapsed?'▶':'▼')+' 📍 사이트별 Total 출장일수</span>';
-  html+='<div class="pm-ctrl-group" style="margin-left:auto">';
-  periods.forEach(function(p){
-    html+='<button class="pm-filter-btn'+(_pmSitePeriod===p[0]?' on':'')+'" onclick="setPmSitePeriod(\''+p[0]+'\')">'+p[1]+'</button>';
-  });
-  html+='</div></div>';
 
-  if(!_pmSiteCollapsed){
-    var siteTypeList=[['hq','본사',TYPE_COLOR.hq],['outsource','외주',TYPE_COLOR.outsource],['localOutsource','현지외주',TYPE_COLOR.localOutsource],['tech','기술',TYPE_COLOR.tech],['vision','비전',TYPE_COLOR.vision],['host','호스트',TYPE_COLOR.host]];
-    html+='<div class="pm-ctrl-group" style="flex-wrap:wrap;gap:4px;padding:8px 12px 0 12px">';
-    html+='<span style="font-size:10px;color:#555">인원</span>';
-    siteTypeList.forEach(function(t){
-      var isOn=_pmSiteTypeFilter[t[0]];
-      html+='<label class="pm-type-ck'+(isOn?' on':'')+'" style="--tc:'+t[2]+';'+(isOn?'background:'+t[2]+'22;border-color:'+t[2]:'')+'"><input type="checkbox"'+(isOn?' checked':'')+' onchange="toggleSiteTypeFilter(\''+t[0]+'\')">'+t[1]+'</label>';
-    });
-    html+='<span style="width:1px;height:16px;background:#3a3a44;margin:0 2px"></span>';
-    html+='<label class="pm-type-ck'+(_pmSiteIncludeDomestic?' on':'')+'" style="--tc:#666666;'+(_pmSiteIncludeDomestic?'background:#66666622;border-color:#666666':'')+'"><input type="checkbox"'+(_pmSiteIncludeDomestic?' checked':'')+' onchange="toggleSiteDomesticFilter()">국내 포함</label>';
-    html+='<label class="pm-type-ck'+(_pmSiteIncludePaid?' on':'')+'" style="--tc:#b58500;'+(_pmSiteIncludePaid?'background:#b5850022;border-color:#b58500':'')+'"><input type="checkbox"'+(_pmSiteIncludePaid?' checked':'')+' onchange="toggleSiteIncludePaid()">유상 포함</label>';
-    html+='</div>';
-
-    if(!agg.groups.length){
-      html+='<div style="padding:12px;color:var(--tx-muted);font-size:12px">해당 조건에 등록된 출장 일정이 없습니다.</div>';
-    }else{
-      html+='<table class="pm-person-table pm-site-days-table"><thead><tr>'
-          +'<th>사이트</th><th>전체 출장일(무상/유상)</th><th>본사(무상/유상)</th><th>외주(무상/유상)</th><th>현지외주(무상/유상)</th><th>출장 인원수</th><th>견적 M/D</th><th>차이</th>'
-          +'</tr></thead><tbody>';
-      var grandEstMd=0, grandAllTotal=0;
-      agg.groups.forEach(function(g){
-        html+='<tr class="pm-site-group-row"><td colspan="8">'+_esc(g.groupName)+'</td></tr>';
-        g.sites.forEach(function(s){
-          var sidAttr=s.siteId.replace(/'/g,"\\'");
-          var allTotal=allTotalMap?(allTotalMap[s.siteId]||0):s.mdTotal;
-          grandEstMd+=s.estMd; grandAllTotal+=allTotal;
-          html+='<tr>'
-              +'<td onclick="openSiteRosterModal(\''+sidAttr+'\')" style="cursor:pointer"><span class="pm-site-chip" style="background:'+s.color+'"></span>'+_esc(s.name)+'</td>'
-              +'<td>'+s.mdTotal+'일 ('+_fmtPaidSplit(s.totalUnpaid,s.totalPaid)+')</td>'
-              +'<td>'+_paidAdj(s.hqUnpaid,s.hqPaid)+'일 ('+_fmtPaidSplit(s.hqUnpaid,s.hqPaid)+')</td>'
-              +'<td>'+_paidAdj(s.outUnpaid,s.outPaid)+'일 ('+_fmtPaidSplit(s.outUnpaid,s.outPaid)+')</td>'
-              +'<td>'+_paidAdj(s.localUnpaid,s.localPaid)+'일 ('+_fmtPaidSplit(s.localUnpaid,s.localPaid)+')</td>'
-              +'<td>'+s.personCount+'명</td>'
-              +'<td><input type="number" min="0" class="pm-estmd-inp" value="'+(s.estMd||'')+'" placeholder="-" onchange="updSiteEstMd(\''+sidAttr+'\',this.value)"></td>'
-              +'<td>'+_fmtEstMdDiff(s.estMd,allTotal)+'</td>'
-              +'</tr>';
-        });
-      });
-      html+='<tr class="pm-site-total-row">'
-          +'<td>합계</td><td>'+agg.grandMdTotal+'일 ('+_fmtPaidSplit(agg.grandTotalUnpaid,agg.grandTotalPaid)+')</td>'
-          +'<td>'+_paidAdj(agg.grandHqUnpaid,agg.grandHqPaid)+'일 ('+_fmtPaidSplit(agg.grandHqUnpaid,agg.grandHqPaid)+')</td>'
-          +'<td>'+_paidAdj(agg.grandOutUnpaid,agg.grandOutPaid)+'일 ('+_fmtPaidSplit(agg.grandOutUnpaid,agg.grandOutPaid)+')</td>'
-          +'<td>'+_paidAdj(agg.grandLocalUnpaid,agg.grandLocalPaid)+'일 ('+_fmtPaidSplit(agg.grandLocalUnpaid,agg.grandLocalPaid)+')</td>'
-          +'<td>'+agg.grandPersons+'명</td>'
-          +'<td>'+(grandEstMd?grandEstMd+'일':'-')+'</td><td>'+_fmtEstMdDiff(grandEstMd,grandAllTotal)+'</td>'
-          +'</tr>';
-      html+='</tbody></table>';
-    }
-  }
-  html+='</div>';
-  return html;
-}
-
-// 사이트 클릭 → 인원 로스터 모달 (현재 기간·인원구분 필터를 그대로 반영해 요약표와 대조 가능)
-function openSiteRosterModal(siteId){
-  var site=S.sites.find(function(s){return s.id===siteId;});
-  if(!site) return;
-  var period=_pmSitePeriod;
-  var rangeStart=null, rangeEnd=null;
-  if(period==='year'){ rangeStart=new Date(TODAY.getFullYear(),0,1); rangeEnd=new Date(TODAY.getFullYear(),11,31); }
-  else if(period==='r12'){ var r12=getRolling12(); rangeStart=r12.start; rangeEnd=r12.end; }
-
-  var rows=[];
-  S.schedules.forEach(function(sc){
-    if(!_pmSiteTypeFilter[sc.type]) return;
-    if(!_pmSiteIncludeDomestic && sc.domestic) return;
-    var proj=S.projects.find(function(p){return p.id===sc.projectId;});
-    if(!proj||proj.siteId!==siteId) return;
-    if(TODAY<pd(sc.start)) return; // 출장예정(미출발) 제외 — 요약표와 동일 기준
-    var days=rangeStart?calcOverlapDays(sc.start,sc.end,rangeStart,rangeEnd):dd(sc.start,sc.end);
-    if(days<=0) return;
-    rows.push({name:sc.name,type:sc.type,task:sc.task||'',start:sc.start,end:sc.end,days:days,paid:sc.paid||false});
-  });
-  rows.sort(function(a,b){return a.start>b.start?1:(a.start<b.start?-1:a.name.localeCompare(b.name,'ko'));});
-
-  var total=rows.reduce(function(sum,r){
-    if(r.paid&&!_pmSiteIncludePaid) return sum;
-    return sum+r.days;
-  },0);
-  var sidAttr2=siteId.replace(/'/g,"\\'");
-  var body='<div class="mtit" style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
-      +'<span>'+_esc(site.name)+' — 인원 출장 로스터</span>'
-      +'<button class="btn sm" onclick="exportSiteRosterExcel(\''+sidAttr2+'\')">📥 전체 이력 엑셀 다운로드</button>'
-      +'</div>';
-  if(!rows.length){
-    body+='<div style="padding:10px;color:var(--tx-muted);font-size:12px">해당 조건에 표시할 출장 기록이 없습니다.</div>';
-  }else{
-    body+='<div style="max-height:60vh;overflow-y:auto"><table class="pm-person-table"><thead><tr>'
-        +'<th>이름</th><th>인원구분</th><th>업무</th><th>출발일</th><th>복귀일</th><th>일수</th>'
-        +'</tr></thead><tbody>';
-    rows.forEach(function(r){
-      body+='<tr>'
-          +'<td>'+_esc(r.name)+'</td>'
-          +'<td>'+_esc(TYPE_LBL[r.type]||r.type)+(r.paid?' (유상)':'')+'</td>'
-          +'<td>'+_esc(r.task)+'</td>'
-          +'<td>'+r.start+'</td>'
-          +'<td>'+r.end+'</td>'
-          +'<td>'+r.days+'일</td>'
-          +'</tr>';
-    });
-    body+='<tr class="pm-site-total-row"><td colspan="5">합계</td><td>'+total+'일</td></tr>';
-    body+='</tbody></table></div>';
-  }
-  body+='<div class="mfoot"><button class="btn sm" onclick="cm()">닫기</button></div>';
-  mw(body,true);
-}
 
 // renderPersonTab : 전체 렌더 (탭 첫 진입, 지역필터 변경 시)
 // renderPersonBody: 결과 테이블만 갱신 (검색·정렬·타입필터 변경 시 → 검색창 IME 유지)
