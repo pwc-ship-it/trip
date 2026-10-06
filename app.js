@@ -1193,20 +1193,28 @@ function barCls(sc){
   return           isHq?'bar-hq-plan':'bar-out-plan';
 }
 
-/* ── 테마 (다크/라이트) ── */
+/* ── 테마 (다크/라이트/도면) — 저장 키 trip_theme 값: dark | light | blueprint ── */
+var THEMES=['dark','light','blueprint'];
+var THEME_ICON={dark:'🌙',light:'☀️',blueprint:'📐'};
+var THEME_NAME={dark:'다크',light:'라이트',blueprint:'도면'};
+function _paintThemeBtn(t){
+  var btn=document.getElementById('themeToggle');
+  if(!btn) return;
+  btn.textContent=THEME_ICON[t];
+  btn.title='현재: '+THEME_NAME[t]+' 모드 (클릭하면 '+THEME_NAME[THEMES[(THEMES.indexOf(t)+1)%THEMES.length]]+')';
+}
 function initTheme(){
   var saved=localStorage.getItem('trip_theme')||'dark';
+  if(THEMES.indexOf(saved)<0) saved='dark';
   document.documentElement.setAttribute('data-theme',saved);
-  var btn=document.getElementById('themeToggle');
-  if(btn) btn.textContent=saved==='dark'?'🌙':'☀️';
+  _paintThemeBtn(saved);
 }
 function toggleTheme(){
   var cur=document.documentElement.getAttribute('data-theme')||'dark';
-  var next=cur==='dark'?'light':'dark';
+  var next=THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
   document.documentElement.setAttribute('data-theme',next);
   localStorage.setItem('trip_theme',next);
-  var btn=document.getElementById('themeToggle');
-  if(btn) btn.textContent=next==='dark'?'🌙':'☀️';
+  _paintThemeBtn(next);
 }
 
 /* ── 바로가기 드롭다운 ── */
