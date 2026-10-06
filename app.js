@@ -96,6 +96,19 @@ function deepCopy(o){return JSON.parse(JSON.stringify(o));}
 /* ── 레코드 수정시각 마킹 (mt: epoch ms 숫자 — 동기화 충돌 시 최신 판정용) ──
    항상 현재시각으로 찍음. 미래 오염값 방어는 _mergeArr 비교단에서 처리(미래 mt 강등). */
 function _touch(r){if(r)r.mt=Date.now();return r;}
+/* ── 일정 변경 이력 (sc.hist = JSON 문자열, 최대 20건) — 변경 전/후 값과 사유 ── */
+function histSnap(sc){
+  return {payType:sc.payType||'',loc:sc.loc||'',poNo:sc.poNo||'',start:sc.start,end:sc.end,projectId:sc.projectId,
+    paid:(sc.paid===undefined?null:sc.paid),domestic:!!sc.domestic};
+}
+function appendHist(sc,before,reason,note){
+  var h=[];
+  try{h=JSON.parse(sc.hist||'[]')||[];}catch(e){h=[];}
+  h.push({t:Date.now(),dev:getDeviceTag(),why:reason||'',note:note||'',from:before,to:histSnap(sc)});
+  if(h.length>20)h=h.slice(-20);
+  sc.hist=JSON.stringify(h);
+}
+function getHist(sc){try{return JSON.parse(sc.hist||'[]')||[];}catch(e){return [];}}
 /* ── ID 생성 (timestamp base36 + 난수 — 다중 PC 동시 생성 충돌 방지) ── */
 function genId(prefix,arr){
   var id;
@@ -175,7 +188,21 @@ function _viPostMerge(winner,loser){
   }
 }
 /* schedules 전용 정규화 (Sheets 행 → 로컬 형식) */
+/* paid/hasConflict 문자열 보정 — Sheets에서 "FALSE" 같은 문자열이 오면 참으로 오인되던 문제 방지.
+   빈 값('')은 '설정 안 함'으로 보고 키를 제거한다(미설정 ≠ 명시적 false 구분이 재분류 대상 판정에 쓰임). */
+function _normSchedFlags(sc){
+  ['paid','hasConflict'].forEach(function(k){
+    var v=sc[k];
+    if(typeof v!=='string') return;
+    var t=v.trim().toLowerCase();
+    if(t==='true'||t==='1'||t==='yes') sc[k]=true;
+    else if(t==='false'||t==='0'||t==='no') sc[k]=false;
+    else delete sc[k];
+  });
+  return sc;
+}
 function _normSchedRec(sc){
+  _normSchedFlags(sc);
   sc.start=normDate(sc.start);sc.end=normDate(sc.end);
   if(typeof sc.hidden==='string'){
     sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
@@ -438,6 +465,7 @@ function loadData(){
           if(typeof sc.domestic==='string'){
             sc.domestic=sc.domestic.toUpperCase()==='TRUE'||sc.domestic==='1'||sc.domestic==='true';
           }
+          _normSchedFlags(sc);
           return sc;
         });
         S.events=d.events||[];
@@ -506,7 +534,7 @@ function _isValidCells(cells){
 }
 
 /* 수동 전체 데이터 백업 다운로드 */
-function downloadDataBackup(){
+function downloadDataBackup(quiet){
   try{
     var data={ts:new Date().toISOString(),
       groups:S.groups,sites:S.sites,projects:S.projects,
@@ -523,8 +551,10 @@ function downloadDataBackup(){
     a.href=url;
     a.download='BU3_backup_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    alert('백업 파일이 다운로드되었습니다.');
-  }catch(e){alert('백업 실패: '+e.message);}
+    try{localStorage.setItem('bu3_last_backup_ts',String(Date.now()));}catch(e){}
+    if(!quiet)alert('백업 파일이 다운로드되었습니다.');
+    return true;
+  }catch(e){alert('백업 실패: '+e.message);return false;}
 }
 
 /* 백업 파일로 데이터 복원 */
@@ -954,6 +984,7 @@ function forceLoadFromSheets(){
           sc.start=normDate(sc.start);sc.end=normDate(sc.end);
           if(typeof sc.hidden==='string')sc.hidden=sc.hidden.toUpperCase()==='TRUE'||sc.hidden==='1'||sc.hidden==='true';
           if(typeof sc.domestic==='string')sc.domestic=sc.domestic.toUpperCase()==='TRUE'||sc.domestic==='1'||sc.domestic==='true';
+          _normSchedFlags(sc);
           return sc;
         }).filter(function(sc){return !_isDeletedSc(sc.id);});
         var _seen={};
