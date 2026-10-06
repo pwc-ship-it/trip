@@ -15,7 +15,8 @@
 ## 2. 파일 구조
 
 - 바닐라 HTML / CSS / JS. 프레임워크와 외부 UI 라이브러리를 추가하지 않는다.
-- `index.html`, `style.css`, JS 10개: `data` `app` `gantt` `modals` `person` `equip` `vision` `export` `paidsw` `staff`
+- `index.html`, `style.css`, JS 11개: `data` `app` `gantt` `modals` `person` `equip` `vision` `export` `paidsw` `staff` `classify`
+- `classify.js`: 과금(무상/계약 M/D/별도 PO)·위치(해외/국내 셋업/국내 납품처) 분류, 이상점(⚠) 엔진, 사이트별 출장일 집계, 재분류·분할·데이터 점검 화면
 - 새 코드는 해당 탭·기능의 JS 파일에 넣는다.
 - `script.js`(약 3,250줄)는 index.html이 로드하지 않는 구버전 잔재다. 수정하거나 참고하지 않는다. 삭제는 사용자 확인 후에만 한다.
 
