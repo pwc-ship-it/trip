@@ -6,7 +6,7 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
    서버(GAS 스크립트 속성 MIN_CLIENT_VERSION)가 허용하는 최소 버전보다 낮은 화면에서는 저장을 막는다.
    구버전 화면이 새 필드(payType, loc, hist, canceled 등)를 지우는 일을 막기 위함.
    배포할 때 이 값과 index.html 의 ?v= 값을 함께 올린다. */
-var APP_VERSION='20261007a';
+var APP_VERSION='20261007b';
 var _verBlock={blocked:false,min:''};
 function _verLess(a,b){return String(a||'')<String(b||'');}
 function _checkMinVersion(d){

@@ -11,6 +11,16 @@ var LOC_LABEL={overseas:'해외',dom_setup:'국내(납품 전 셋업)',dom_final
 var LOC_SHORT={overseas:'해외',dom_setup:'국내-셋업',dom_final:'국내-납품처'};
 /* 겹침이 이 일수 이하이면 '참고(ℹ)'로 낮춘다 — 출국·도착 이동일 패턴 */
 var INFO_OVERLAP_MAX_DAYS=2;
+/* 2일 이하 겹침 무시 옵션 — 켜면(기본) 참고(ℹ) 표시·점검 목록에서 아예 빼고, 끄면 참고로 표시. 기기별(localStorage) 설정 */
+var IGNORE_SHORT_KEY='bu3_ignoreShortOverlap';
+function ignoreShortOverlap(){try{return localStorage.getItem(IGNORE_SHORT_KEY)!=='0';}catch(e){return true;}}
+function setIgnoreShortOverlap(on){
+  try{localStorage.setItem(IGNORE_SHORT_KEY,on?'1':'0');}catch(e){}
+  invalidateIssIdx();
+  if(_chk.filter==='info'&&on) _chk.filter='all';
+  renderAll();
+  _renderDataCheck();
+}
 /* 재분류 화면의 사이트 필터 기본값: 2차전지 사이트 */
 var CLS_BATTERY_SITES=['ESHD','ESOT','ESWA','ESHG','현대JV','ESMI'];
 
@@ -103,7 +113,9 @@ function conflictsOf(sc){
     var os=schedSite(o);
     var cross=!!(mySite&&os&&mySite.id!==os.id);
     /* 겹침이 2일 이하(출국·도착 이동일 패턴)면 '참고(info)', 3일 이상은 경고 */
-    out.push({kind:'trip',o:o,r:r,cross:cross,level:r.n<=INFO_OVERLAP_MAX_DAYS?'info':'warn'});
+    var lvl=r.n<=INFO_OVERLAP_MAX_DAYS?'info':'warn';
+    if(lvl==='info'&&ignoreShortOverlap()) return;   /* 2일 이하 겹침 무시 */
+    out.push({kind:'trip',o:o,r:r,cross:cross,level:lvl});
   });
   return out;
 }
@@ -786,8 +798,10 @@ function _renderDataCheck(){
   var order=function(a,b){return String(a.sc.name).localeCompare(String(b.sc.name),'ko')||(a.sc.start>b.sc.start?1:-1);};
   var top=list.filter(_chkIsCross).sort(order),rest=list.filter(function(x){return !_chkIsCross(x);}).sort(order);
   var pairs=0;top.forEach(function(x){x.issues.forEach(function(i){if(i.cross) pairs++;});});pairs=Math.round(pairs/2);
+  var ign=ignoreShortOverlap();
+  if(ign){delete labels.info;delete count.info;}
   var h='<div class="mtit">데이터 점검 <span class="cls-sub" style="font-weight:400">hidden(숨김) 값과 관계없이 전체 일정을 검사합니다</span></div>';
-  h+='<div class="cls-filters">'+Object.keys(labels).map(function(k){
+  h+='<div class="cls-filters"><label class="pm-type-ck'+(ign?' on':'')+'" style="--tc:#666666"><input type="checkbox"'+(ign?' checked':'')+' onchange="setIgnoreShortOverlap(this.checked)">'+INFO_OVERLAP_MAX_DAYS+'일 이하 겹침 무시 (출국·도착 이동일)</label>'+Object.keys(labels).map(function(k){
     return '<button class="pm-filter-btn'+(_chk.filter===k?' on':'')+'" onclick="_chk.filter=\''+k+'\';_renderDataCheck()">'+labels[k]+' '+count[k]+'</button>';}).join('')+'</div>';
   if(!list.length){h+='<div class="cls-empty">점검할 항목이 없습니다.</div>';}
   else{
