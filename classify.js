@@ -36,7 +36,12 @@ function isRealDate(s){
 }
 function schedProject(sc){return S.projects.find(function(p){return p.id===sc.projectId;})||null;}
 function schedSite(sc){var p=schedProject(sc);return p?(S.sites.find(function(s){return s.id===p.siteId;})||null):null;}
-function isDomesticSite(site){return !!site&&(site.country==='korea'||site.region==='korea');}
+function isDomesticSite(site){
+  if(!site) return false;
+  if(site.country==='korea'||site.region==='korea') return true;
+  /* 사이트 관리 화면의 '국내' 구역과 같은 기준: 국가가 비어 있고 지역이 '기타'(또는 빈 값)인 사이트 */
+  return !site.country&&(!site.region||site.region==='other');
+}
 function siteDefaultLoc(site){return isDomesticSite(site)?'dom_final':'overseas';}
 
 /* 과금 구분: payType 이 있으면 그것. paid 가 true → 유상 체크됨(미분류), false → 체크 해제됨(미분류).
@@ -807,6 +812,12 @@ function _renderDataCheck(){
   else{
     var projOpts=S.projects.map(function(p){var s=S.sites.find(function(x){return x.id===p.siteId;});return '<option value="'+p.id+'">'+_esc((s?s.name:'-')+' / '+p.name)+'</option>';}).join('');
     var head='<thead><tr><th>이름</th><th>사이트·업무</th><th>기간</th><th>이상점 사유</th><th></th></tr></thead>';
+    if(_chk.filter==='loc'){
+      var okb=_clsBackupOk();
+      h+='<div class="cls-bkbar'+(okb?' ok':'')+'"><span>위치 불일치 '+count.loc+'건을 <b>사이트 기준 위치</b>(국내 납품처 → 국내(최종 납품처), 해외 사이트 → 해외)로 일괄 변경합니다. 변경 이력이 기록됩니다. '
+        +(okb?'(백업 완료 '+_clsBackupTxt()+')':'먼저 전체 백업이 필요합니다.')+'</span>'
+        +(okb?'<button class="btn sm pri" onclick="chkFixLoc()">위치 일괄 정리</button>':'<button class="btn sm" onclick="downloadDataBackup(true);_renderDataCheck()">백업 파일 다운로드</button>')+'</div>';
+    }
     h+='<div class="cls-list" style="max-height:60vh"><table class="pm-person-table cls-chk">'+head+'<tbody>';
     if(top.length){
       h+='<tr class="cls-sechd cross"><td colspan="5">견적 확정 전 정리 필요 — 사이트 간 동시 출장 ('+pairs+'쌍 · 일정 '+top.length+'건). 집계에는 각 사이트에 그대로 반영되어 있습니다.</td></tr>';
@@ -820,6 +831,21 @@ function _renderDataCheck(){
   }
   h+='<div class="mfoot"><button class="btn sm" onclick="cm();renderAll()">닫기</button></div>';
   document.getElementById('mc').innerHTML='<div class="mover"><div class="modal xwide">'+h+'</div></div>';
+}
+/* 위치 불일치(국내 납품처인데 '해외', 해외 사이트인데 '국내(최종 납품처)')를 사이트 기준 위치로 일괄 정리 */
+function chkFixLoc(){
+  if(!_clsBackupOk()){alert('먼저 전체 백업 파일을 다운로드하세요.');return;}
+  var targets=allIssues().filter(function(x){return x.issues.some(function(i){return i.code==='loc';});}).map(function(x){return x.sc;});
+  if(!targets.length) return;
+  if(!confirm('위치 불일치 '+targets.length+'건을 사이트 기준 위치로 변경합니다.\n(변경 이력이 각 일정에 기록됩니다) 계속할까요?')) return;
+  targets.forEach(function(sc){
+    var before=histSnap(sc);
+    sc.loc=siteDefaultLoc(schedSite(sc));
+    sc.domestic=(sc.loc!=='overseas');
+    _touch(sc);
+    appendHist(sc,before,'위치 정리','사이트 기준 위치로 변경');
+  });
+  saveData();renderAll();_renderDataCheck();
 }
 function chkReconnect(id){
   var sc=S.schedules.find(function(s){return s.id===id;});
