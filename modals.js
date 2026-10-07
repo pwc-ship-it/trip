@@ -278,13 +278,13 @@ function saveSc(exId){
   /* hidden 값은 화면에서 더 이상 다루지 않고 기존 값을 그대로 보존한다 */
   if(f.pay){   // 선택하지 않았으면(미분류 상태) 기존 값을 그대로 둔다
     rec.payType=f.pay;rec.poNo=f.pay==='po'?f.poNo:'';rec.freeReason=f.pay==='free'?f.freeReason:'';
-    rec.paid=(f.pay==='po');   // 구버전 호환
+    rec.paid=(f.pay==='po')?'TRUE':'FALSE';   // 구버전 호환(서버가 읽어 주는 문자열 형식과 같게)
   }
   rec.loc=f.loc||effectiveLoc(rec);
   rec.domestic=(rec.loc!=='overseas');   // 구버전 호환
   rec.canceled=!!f.canceled;
   rec.cancelReason=f.canceled?f.cancelReason:'';
-  rec.hasConflict=hasConflict;rec.conflictNote=conflictNote;
+  /* hasConflict/conflictNote 는 더 이상 갱신하지 않는다(이상점은 현재 데이터로 재검사) */
   _touch(rec);
   if(isNew){
     S.schedules.push(rec);

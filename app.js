@@ -6,7 +6,7 @@ var TYPE_COLOR={hq:'#1a5a9a',outsource:'#8a5a00',tech:'#2a7a5a',vision:'#6a3a9a'
    서버(GAS 스크립트 속성 MIN_CLIENT_VERSION)가 허용하는 최소 버전보다 낮은 화면에서는 저장을 막는다.
    구버전 화면이 새 필드(payType, loc, hist, canceled 등)를 지우는 일을 막기 위함.
    배포할 때 이 값과 index.html 의 ?v= 값을 함께 올린다. */
-var APP_VERSION='20261007b';
+var APP_VERSION='20261007c';
 var _verBlock={blocked:false,min:''};
 function _verLess(a,b){return String(a||'')<String(b||'');}
 function _checkMinVersion(d){
@@ -214,19 +214,10 @@ function _viPostMerge(winner,loser){
   }
 }
 /* schedules 전용 정규화 (Sheets 행 → 로컬 형식) */
-/* paid/hasConflict 문자열 보정 — Sheets에서 "FALSE" 같은 문자열이 오면 참으로 오인되던 문제 방지.
-   빈 값('')은 '설정 안 함'으로 보고 키를 제거한다(미설정 ≠ 명시적 false 구분이 재분류 대상 판정에 쓰임). */
-function _normSchedFlags(sc){
-  ['paid','hasConflict','canceled'].forEach(function(k){
-    var v=sc[k];
-    if(typeof v!=='string') return;
-    var t=v.trim().toLowerCase();
-    if(t==='true'||t==='1'||t==='yes') sc[k]=true;
-    else if(t==='false'||t==='0'||t==='no') sc[k]=false;
-    else delete sc[k];
-  });
-  return sc;
-}
+/* paid/hasConflict/canceled 는 저장소에서 읽은 값을 **가공하지 않는다**.
+   (예전에는 "FALSE" 문자열을 불리언으로 바꾸고 빈 값 키를 지웠는데, 서버가 보낸 값과 내용이 달라져
+    저장할 때마다 '동시 수정 충돌'로 판정되는 문제가 있었음.) 해석은 사용할 때 effectivePay 등에서 한다. */
+function _normSchedFlags(sc){return sc;}
 function _normSchedRec(sc){
   _normSchedFlags(sc);
   sc.start=normDate(sc.start);sc.end=normDate(sc.end);

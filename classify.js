@@ -465,7 +465,7 @@ function applyClass(sc,pay,opt){
   sc.loc=loc;
   sc.poNo=(pay==='po')?(opt.poNo||''):'';
   sc.freeReason=(pay==='free')?(opt.freeReason||''):'';
-  if(pay){sc.paid=(pay==='po');}   /* 구버전 호환: 별도 PO = 예전 '유상' */
+  if(pay){sc.paid=(pay==='po')?'TRUE':'FALSE';}   /* 구버전 호환: 별도 PO = 예전 '유상'. 서버가 읽어 주는 형식(문자열)과 같게 저장 */
   sc.domestic=(loc!=='overseas');   /* 구버전 호환: 국내 판정 */
   _touch(sc);
   appendHist(sc,before,opt.reason||'재분류',opt.note||'');
