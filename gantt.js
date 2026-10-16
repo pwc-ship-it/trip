@@ -175,6 +175,18 @@ function addWtBar(el,wt){
   var lbl=document.createElement('span');lbl.className='barlbl-wk';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
 }
 
+/* 같은 레인에서 다음 막대와 라벨이 겹치면 라벨을 다음 막대 시작 전까지로 자름 (호버 시 전체 표시는 CSS) */
+function clipWtLabels(el){
+  var bars=Array.prototype.slice.call(el.querySelectorAll('.bar-wk')).sort(function(a,b){return parseFloat(a.style.left)-parseFloat(b.style.left);});
+  for(var i=0;i<bars.length-1;i++){
+    var lbl=bars[i].firstChild;
+    var avail=parseFloat(bars[i+1].style.left)-parseFloat(bars[i].style.left)-4;
+    if(measureTextW(lbl.textContent,WTLBL_FONT)+WTLBL_PAD<=avail)continue;
+    if(avail<24){lbl.style.display='none';continue;}
+    lbl.style.maxWidth=avail+'px';lbl.style.overflow='hidden';lbl.style.textOverflow='ellipsis';
+  }
+}
+
 /* ── 간트 렌더 ── */
 /* 작업 레인 배정: 막대+라벨 실제 텍스트 폭 기준으로 겹치지 않는 레인에 배치 (필요하면 3줄 이상도 사용)
    같은 group(예: 라인명) 태그를 가진 작업들은 항상 같은 레인에 고정 배치 — 순차 단계를 한 줄로 이어붙여 보여줄 때 사용 */
@@ -315,6 +327,7 @@ function renderGantt(){
         laneTasks.forEach(function(wt){
           addWtBar(wktl,wt);
         });
+        clipWtLabels(wktl);
         wkr.appendChild(wkf);wkr.appendChild(wktl);body.appendChild(wkr);
       });
     }
