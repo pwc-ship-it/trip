@@ -149,8 +149,8 @@ function addBar(el,sched){
   el.appendChild(bar);
 }
 function wtLabelTxt(wt){
-  var days=dd(wt.start,wt.end),dr=fmt(wt.start)+'~'+fmt(wt.end);
-  return dr+' · '+wt.title+(wt.note?' ('+wt.note+')':'')+'  '+days+'일';
+  var days=dd(wt.start,wt.end),dr=days===1?fmt(wt.start):fmt(wt.start)+'~'+fmt(wt.end);
+  return dr+' · '+wt.title+(wt.note?' ('+wt.note+')':'')+(days===1?'':'  '+days+'일');
 }
 var WTLBL_FONT="500 10px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 var WTLBL_PAD=14; // .barlbl-wk padding:0 7px 양쪽
@@ -175,16 +175,20 @@ function addWtBar(el,wt){
   var lbl=document.createElement('span');lbl.className='barlbl-wk';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
 }
 
-/* 같은 레인에서 다음 막대와 라벨이 겹치면 라벨을 다음 막대 시작 전까지로 자름 (호버 시 전체 표시는 CSS) */
-function clipWtLabels(el){
+/* 같은 레인에서 라벨이 다음 막대와 겹치게 되면 그 막대를 아래 줄로 내림 (라벨을 자르거나 숨기지 않음)
+   날짜가 겹치는 긴 막대끼리는 라벨만 안 겹치면 한 줄 유지 */
+function stackWtLabels(el){
   var bars=Array.prototype.slice.call(el.querySelectorAll('.bar-wk')).sort(function(a,b){return parseFloat(a.style.left)-parseFloat(b.style.left);});
-  for(var i=0;i<bars.length-1;i++){
-    var lbl=bars[i].firstChild;
-    var avail=parseFloat(bars[i+1].style.left)-parseFloat(bars[i].style.left)-4;
-    if(measureTextW(lbl.textContent,WTLBL_FONT)+WTLBL_PAD<=avail)continue;
-    if(avail<56){lbl.style.display='none';continue;}
-    lbl.style.maxWidth=avail+'px';lbl.style.overflow='hidden';lbl.style.textOverflow='ellipsis';
-  }
+  var rowEnd=[];
+  bars.forEach(function(b){
+    var left=parseFloat(b.style.left);
+    var end=left+measureTextW(b.firstChild.textContent,WTLBL_FONT)+WTLBL_PAD;
+    var k=rowEnd.findIndex(function(e){return left>=e+4;});
+    if(k<0){k=rowEnd.length;rowEnd.push(0);}
+    rowEnd[k]=end;
+    if(k)b.style.top=(4+22*k)+'px';
+  });
+  if(rowEnd.length>1){el.style.height=el.style.minHeight=(22*rowEnd.length)+'px';}
 }
 
 /* ── 간트 렌더 ── */
@@ -327,7 +331,7 @@ function renderGantt(){
         laneTasks.forEach(function(wt){
           addWtBar(wktl,wt);
         });
-        clipWtLabels(wktl);
+        stackWtLabels(wktl);
         wkr.appendChild(wkf);wkr.appendChild(wktl);body.appendChild(wkr);
       });
     }
