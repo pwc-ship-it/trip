@@ -205,6 +205,8 @@ body{font-family:var(--font);font-size:var(--fs-md);color:var(--tx-primary)}
 /* 작업 바 */
 .bar-wk-done{background:#2a3a5a}.bar-wk-going{background:#1a5a9a}.bar-wk-plan{background:#2a7acc}
 .bar-wk{height:14px;top:4px;border-radius:var(--r-sm);border-left:3px solid rgba(255,255,255,.25)}
+.bar-wk:hover{z-index:20}
+.bar-wk:hover .barlbl-wk{display:inline-flex!important;max-width:none!important;overflow:visible!important;background:var(--bg-wk);border-radius:var(--r-sm)}
 /* 작업 섹션 헤더 */
 .wksecrow{display:flex;align-items:stretch;border-bottom:1px solid var(--bd-light);border-top:1px solid #2a3a4a}
 .wksecfix{width:300px;min-width:300px;flex-shrink:0;border-right:2px solid var(--bd-strong);display:flex;align-items:center;padding:4px 10px;position:sticky;left:0;z-index:20;background:var(--bg-wksec)}

@@ -175,20 +175,16 @@ function addWtBar(el,wt){
   var lbl=document.createElement('span');lbl.className='barlbl-wk';lbl.textContent=txt;bar.appendChild(lbl);el.appendChild(bar);
 }
 
-/* 같은 레인에서 라벨이 다음 막대와 겹치게 되면 그 막대를 아래 줄로 내림 (라벨을 자르거나 숨기지 않음)
-   날짜가 겹치는 긴 막대끼리는 라벨만 안 겹치면 한 줄 유지 */
-function stackWtLabels(el){
+/* 같은 레인의 다음 막대 시작 전까지만 라벨 표시 (다음 막대 침범 금지, 넘치면 … 처리). 호버하면 전체 표시(CSS) */
+function clipWtLabels(el){
   var bars=Array.prototype.slice.call(el.querySelectorAll('.bar-wk')).sort(function(a,b){return parseFloat(a.style.left)-parseFloat(b.style.left);});
-  var rowEnd=[];
-  bars.forEach(function(b){
-    var left=parseFloat(b.style.left);
-    var end=left+measureTextW(b.firstChild.textContent,WTLBL_FONT)+WTLBL_PAD;
-    var k=rowEnd.findIndex(function(e){return left>=e+4;});
-    if(k<0){k=rowEnd.length;rowEnd.push(0);}
-    rowEnd[k]=end;
-    if(k)b.style.top=(4+22*k)+'px';
-  });
-  if(rowEnd.length>1){el.style.height=el.style.minHeight=(22*rowEnd.length)+'px';}
+  for(var i=0;i<bars.length-1;i++){
+    var lbl=bars[i].firstChild;
+    var avail=parseFloat(bars[i+1].style.left)-parseFloat(bars[i].style.left)-3;
+    if(measureTextW(lbl.textContent,WTLBL_FONT)+WTLBL_PAD<=avail)continue;
+    lbl.style.display='block';lbl.style.lineHeight='14px';
+    lbl.style.maxWidth=Math.max(avail,0)+'px';lbl.style.overflow='hidden';lbl.style.textOverflow='ellipsis';
+  }
 }
 
 /* ── 간트 렌더 ── */
@@ -331,7 +327,7 @@ function renderGantt(){
         laneTasks.forEach(function(wt){
           addWtBar(wktl,wt);
         });
-        stackWtLabels(wktl);
+        clipWtLabels(wktl);
         wkr.appendChild(wkf);wkr.appendChild(wktl);body.appendChild(wkr);
       });
     }
