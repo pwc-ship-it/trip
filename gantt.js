@@ -182,7 +182,7 @@ function clipWtLabels(el){
     var lbl=bars[i].firstChild;
     var avail=parseFloat(bars[i+1].style.left)-parseFloat(bars[i].style.left)-4;
     if(measureTextW(lbl.textContent,WTLBL_FONT)+WTLBL_PAD<=avail)continue;
-    if(avail<24){lbl.style.display='none';continue;}
+    if(avail<56){lbl.style.display='none';continue;}
     lbl.style.maxWidth=avail+'px';lbl.style.overflow='hidden';lbl.style.textOverflow='ellipsis';
   }
 }
