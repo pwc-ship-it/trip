@@ -440,7 +440,7 @@ function addSite(){
   var gid=document.getElementById('ns_grpsel').value;
   if(!name){alert('사이트 이름을 입력하세요.');return;}
   var baseId=name.replace(/[^a-zA-Z0-9가-힣]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')||'site';
-  var newId=baseId,n=2;while(S.sites.find(function(s){return s.id===newId;}))newId=baseId+'_'+n++;
+  var newId=baseId,n=2;while(_isDeleted("sites",newId)||S.sites.find(function(s){return s.id===newId;}))newId=baseId+'_'+n++;
   S.sites.push(_touch({id:newId,name:name,color:color,groupId:gid}));
   saveData();showSiteM();renderAll();
 }
@@ -470,7 +470,7 @@ function updPN(id,v){var p=S.projects.find(function(p){return p.id===id;});if(p)
 function addP(sid){
   var name=prompt('새 프로젝트 이름:');if(!name)return;
   var baseId=name.replace(/[^a-zA-Z0-9가-힣]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')||'pjt';
-  var newId=baseId,n=2;while(S.projects.find(function(p){return p.id===newId;}))newId=baseId+'_'+n++;
+  var newId=baseId,n=2;while(_isDeleted("projects",newId)||S.projects.find(function(p){return p.id===newId;}))newId=baseId+'_'+n++;
   S.projects.push(_touch({id:newId,siteId:sid,name:name}));saveData();showSiteM();renderAll();
 }
 function delPjt(id){
